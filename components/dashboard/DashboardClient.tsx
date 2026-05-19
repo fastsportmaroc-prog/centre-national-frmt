@@ -14,6 +14,7 @@ import { PerformancesDashboardSection } from "@/components/performances/Performa
 import { CneDashboardSection } from "@/components/dashboard/CneDashboardSection";
 import { InsightsAlertsSection } from "@/components/dashboard/InsightsAlertsSection";
 import { FrmtProductionDashboard } from "@/components/dashboard/FrmtProductionDashboard";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { StatCardSkeleton } from "@/components/ui/Skeleton";
 import { versionLabel } from "@/lib/version";
@@ -55,7 +56,7 @@ export function DashboardClient() {
         <FadeIn>
           <DashboardHero />
         </FadeIn>
-        <FrmtProductionDashboard />
+        {isSupabaseConfigured() && <FrmtProductionDashboard />}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats ? (
             <>
