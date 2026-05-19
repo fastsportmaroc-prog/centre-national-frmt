@@ -20,17 +20,37 @@ import {
   BarChart3,
 } from "lucide-react";
 import { FadeIn } from "@/components/motion/FadeIn";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export function FrmtProductionDashboard() {
+  const supabaseOk = isSupabaseConfigured();
   const [analytics, setAnalytics] = useState<AnalyticsDashboard | null>(null);
   const [insights, setInsights] = useState<FrmtInsight[]>([]);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    Promise.all([getAnalyticsDashboard(), getFrmtInsights()]).then(([a, i]) => {
-      setAnalytics(a);
-      setInsights(i);
-    });
-  }, []);
+    if (!supabaseOk) return;
+    Promise.all([getAnalyticsDashboard(), getFrmtInsights()])
+      .then(([a, i]) => {
+        setAnalytics(a);
+        setInsights(i);
+        setError(null);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Erreur analytics");
+      });
+  }, [supabaseOk]);
+
+  if (!supabaseOk) return null;
+
+  if (error && !analytics) {
+    return (
+      <Card className="border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        {error}
+      </Card>
+    );
+  }
 
   if (!analytics) {
     return (

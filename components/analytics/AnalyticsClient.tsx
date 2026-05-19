@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Card } from "@/components/ui/Card";
+import { StatCardSkeleton } from "@/components/ui/Skeleton";
+import { getAnalyticsDashboard } from "@/lib/data/analytics";
 import type { AnalyticsDashboard } from "@/lib/types/analytics";
 import {
   BarChart3,
@@ -17,9 +20,38 @@ import {
   Wrench,
 } from "lucide-react";
 
-type Props = { data: AnalyticsDashboard };
+export function AnalyticsClient() {
+  const [data, setData] = useState<AnalyticsDashboard | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-export function AnalyticsClient({ data }: Props) {
+  useEffect(() => {
+    getAnalyticsDashboard()
+      .then(setData)
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Impossible de charger les analyses")
+      );
+  }, []);
+
+  if (error) {
+    return (
+      <Card className="m-6 border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+        {error}
+      </Card>
+    );
+  }
+
+  if (!data) {
+    return (
+      <main className="flex-1 space-y-6 p-4 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      </main>
+    );
+  }
+
   const maxResa = Math.max(
     1,
     ...data.evolutionReservationsSemaine.map((d) => d.count)

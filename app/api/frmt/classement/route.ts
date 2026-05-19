@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFrmtClassementRaw, getFrmtClassementPlayers } from "@/lib/data/frmt-classement";
-import { mergeFrmtClassementToSupabase } from "@/lib/data/frmt-classement-import";
+import { mergeFrmtClassementToSupabase } from "@/lib/data/frmt-classement-import.server";
 
 export async function GET() {
   const file = getFrmtClassementRaw();

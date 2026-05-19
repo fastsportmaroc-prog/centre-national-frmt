@@ -14,9 +14,6 @@ import { PerformancesDashboardSection } from "@/components/performances/Performa
 import { CneDashboardSection } from "@/components/dashboard/CneDashboardSection";
 import { InsightsAlertsSection } from "@/components/dashboard/InsightsAlertsSection";
 import { FrmtProductionDashboard } from "@/components/dashboard/FrmtProductionDashboard";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { FrmtProductionDashboard } from "@/components/dashboard/FrmtProductionDashboard";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { StatCardSkeleton } from "@/components/ui/Skeleton";
 import { versionLabel } from "@/lib/version";
@@ -25,14 +22,18 @@ import { CalendarCheck, MapPin, Percent, Users } from "lucide-react";
 export function DashboardClient() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [upcoming, setUpcoming] = useState<ReservationWithRelations[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getDashboardStats(), getReservationsWithRelations()]).then(
-      ([s, res]) => {
+    Promise.all([getDashboardStats(), getReservationsWithRelations()])
+      .then(([s, res]) => {
         setStats(s);
         setUpcoming(res.filter((r) => r.statut !== "annulee").slice(0, 5));
-      }
-    );
+        setLoadError(null);
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : "Impossible de charger le tableau de bord");
+      });
   }, []);
 
   return (
@@ -42,10 +43,19 @@ export function DashboardClient() {
         description={`Centre National FRMT — vue d'ensemble · ${versionLabel()}`}
       />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
+        {loadError && (
+          <Card className="border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+            {loadError}
+            <p className="mt-2 text-xs text-muted">
+              Vérifiez la connexion Supabase, votre compte (RLS) et que les migrations SQL sont
+              appliquées.
+            </p>
+          </Card>
+        )}
         <FadeIn>
           <DashboardHero />
         </FadeIn>
-        {isSupabaseConfigured() && <FrmtProductionDashboard />}
+        <FrmtProductionDashboard />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats ? (
             <>

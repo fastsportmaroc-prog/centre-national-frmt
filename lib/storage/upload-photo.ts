@@ -1,5 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { assertSupabaseConfigured } from "@/lib/supabase/data-client";
+import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
 const BUCKET = "joueurs-photos";
 const MAX_SIZE = 2 * 1024 * 1024;

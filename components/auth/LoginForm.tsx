@@ -41,7 +41,14 @@ export function LoginForm({ supabaseConfigured }: Props) {
       router.push(redirect);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
+      const msg = err instanceof Error ? err.message : "Erreur de connexion";
+      setError(
+        msg.includes("Invalid login")
+          ? "Email ou mot de passe incorrect."
+          : msg.includes("Email not confirmed")
+            ? "Confirmez votre email (lien envoyé par Supabase) ou désactivez la confirmation dans le dashboard Supabase."
+            : msg
+      );
     } finally {
       setLoading(false);
     }

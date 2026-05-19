@@ -1,5 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { assertSupabaseConfigured } from "@/lib/supabase/data-client";
+import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
 const BUCKET = "passeport-documents";
 const MAX_SIZE = 5 * 1024 * 1024;
