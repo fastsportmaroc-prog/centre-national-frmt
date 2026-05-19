@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="FRMT">
+  <circle cx="200" cy="200" r="188" fill="none" stroke="#006233" stroke-width="5"/>
+  <circle cx="200" cy="218" r="78" fill="#C1272D"/>
+  <path d="M 128 258 Q 200 168 272 258" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+  <polygon fill="#006233" points="200,168 210,192 236,192 215,208 224,234 200,218 176,234 185,208 164,192 190,192"/>
+  <text x="200" y="52" fill="#006233" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" text-anchor="middle">FRMT</text>
+  <text x="200" y="368" fill="#006233" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="600" text-anchor="middle">FEDERATION ROYALE MAROCAINE DE TENNIS</text>
+</svg>

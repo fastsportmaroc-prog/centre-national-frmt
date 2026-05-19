@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07080a;
+  --foreground: #fafafa;
+  --surface: #0f1114;
+  --surface-elevated: #161a1f;
+  --border: #252a30;
+  --muted: #9ca3af;
+  /* Couleurs officielles FRMT */
+  --frmt-red: #c1272d;
+  --frmt-green: #006233;
+  --frmt-green-bright: #0a8f4a;
+  /* Accent UI (navigation active) */
+  --accent: var(--frmt-green);
+  --accent-dim: #004d28;
+  --tennis: var(--frmt-green-bright);
+  --tennis-dim: var(--frmt-green);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-frmt-red: var(--frmt-red);
+  --color-frmt-green: var(--frmt-green);
+  --color-tennis: var(--tennis);
+  --color-tennis-dim: var(--tennis-dim);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 98, 51, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(193, 39, 45, 0.06), transparent);
+}
+
+/* Cartes premium */
+.card-premium {
+  border-color: color-mix(in srgb, var(--border) 80%, var(--frmt-green) 20%);
+  background: linear-gradient(
+    145deg,
+    var(--surface) 0%,
+    color-mix(in srgb, var(--surface-elevated) 90%, transparent) 100%
+  );
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    transform 0.2s ease;
+}
+
+.card-premium:hover {
+  border-color: color-mix(in srgb, var(--frmt-green) 40%, var(--border));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-premium:hover {
+    transform: none;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--frmt-green) transparent;
+}
+
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: var(--frmt-green) var(--surface-elevated);
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: var(--surface-elevated);
+  border-radius: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--frmt-green);
+  border-radius: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--frmt-green-bright);
+}
+
+/* Bandeau tricolore discret (drapeau MA) */
+.frmt-tricolor {
+  background: linear-gradient(
+    90deg,
+    var(--frmt-red) 0%,
+    var(--frmt-red) 33.33%,
+    var(--frmt-green) 33.33%,
+    var(--frmt-green) 66.66%,
+    #1a1a1a 66.66%,
+    #1a1a1a 100%
+  );
+  height: 3px;
+}
+
+@keyframes frmt-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.frmt-fade-in {
+  animation: frmt-fade-in ease-out both;
+}
+
+.frmt-stagger-list .frmt-stagger-item {
+  animation: frmt-fade-in 0.3s ease-out both;
+}
+
+.frmt-stagger-list .frmt-stagger-item:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.frmt-stagger-list .frmt-stagger-item:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.frmt-stagger-list .frmt-stagger-item:nth-child(3) {
+  animation-delay: 0.09s;
+}
+.frmt-stagger-list .frmt-stagger-item:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.frmt-stagger-list .frmt-stagger-item:nth-child(5) {
+  animation-delay: 0.15s;
+}
+.frmt-stagger-list .frmt-stagger-item:nth-child(n + 6) {
+  animation-delay: 0.18s;
+}

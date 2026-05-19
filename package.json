@@ -1,0 +1,39 @@
+{
+  "name": "tennis-center",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "logo:install": "node scripts/install-frmt-logo.mjs",
+    "import:excel": "node scripts/import-excel-frmt.mjs",
+    "import:frmt-classement": "node scripts/import-frmt-classement.mjs",
+    "backup:snapshot": "node scripts/snapshot-backup.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.105.4",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.511.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "framer-motion": "^11.18.2"
+  },
+  "devDependencies": {
+    "xlsx": "^0.18.5",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

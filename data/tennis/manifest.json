@@ -1,0 +1,13 @@
+{
+  "name": "FRMT Morocco Tennis Dataset",
+  "version": "1.0.0",
+  "license": "Internal FRMT — données publiques agrégées (non commerciales)",
+  "description": "Joueurs marocains ATP/WTA/ITF, classements, matchs, tournois — sans API payante",
+  "sources": [
+    "Classements ATP/WTA (référence publique)",
+    "Tournois ITF / Futures / Challengers au Maroc",
+    "Fédération Royale Marocaine de Tennis (FRMT)"
+  ],
+  "default_mode": "dataset",
+  "filter": { "country_code": "MAR", "nationalite": "Maroc" }
+}

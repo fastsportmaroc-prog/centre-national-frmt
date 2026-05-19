@@ -1,0 +1,15 @@
+Logo officiel FRMT pour les rapports
+=====================================
+
+Placez votre fichier logo officiel ici :
+
+  public/frmt-logo.png
+
+Format recommandé : PNG, fond transparent ou blanc, 400x400 px minimum.
+
+Ce fichier sera automatiquement intégré dans :
+- Impression des rapports (/rapports)
+- Export PDF (via impression navigateur)
+- Documents billets d'avion
+
+Sans frmt-logo.png, le logo SVG FRMT de secours est utilisé.

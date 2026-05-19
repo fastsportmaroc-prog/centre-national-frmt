@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "imported_at": "2026-05-17T00:00:00.000Z",
+  "source": "seed-frmt-demo",
+  "files": {
+    "calendrier": {
+      "filename": "Calendrier CNE V3 FINALE.xlsx",
+      "sheets": [
+        {
+          "name": "Calendrier",
+          "columns": [
+            { "key": "id_excel", "header": "ID", "type": "string" },
+            { "key": "source", "header": "Source", "type": "string" },
+            { "key": "categorie", "header": "Catégorie", "type": "string" },
+            { "key": "stage_action", "header": "Stage / Action", "type": "string" },
+            { "key": "date_debut", "header": "Date début", "type": "date" },
+            { "key": "date_fin", "header": "Date fin", "type": "date" },
+            { "key": "nombre_joueurs", "header": "Nombre joueurs", "type": "number" },
+            { "key": "nombre_encadrants", "header": "Nombre encadrants", "type": "number" },
+            { "key": "hebergement", "header": "Hébergement", "type": "boolean" },
+            { "key": "chambres", "header": "Chambres", "type": "number" },
+            { "key": "lieu", "header": "Lieu", "type": "string" },
+            { "key": "notes", "header": "Notes", "type": "string" }
+          ],
+          "rowCount": 8
+        }
+      ]
+    },
+    "occupation": {
+      "filename": "Gestion Occupation CNE.xlsx",
+      "sheets": [
+        {
+          "name": "Occupation",
+          "columns": [
+            { "key": "date", "header": "Date", "type": "date" },
+            { "key": "pavillon", "header": "Pavillon", "type": "number" },
+            { "key": "numero_chambre", "header": "Chambre", "type": "number" },
+            { "key": "type_chambre", "header": "Type", "type": "string" },
+            { "key": "capacite", "header": "Capacité", "type": "number" },
+            { "key": "occupants", "header": "Occupants", "type": "number" },
+            { "key": "stage_id_excel", "header": "Stage ID", "type": "string" },
+            { "key": "stage_libelle", "header": "Stage", "type": "string" },
+            { "key": "categorie", "header": "Catégorie", "type": "string" },
+            { "key": "taux_occupation_pct", "header": "Taux %", "type": "number" },
+            { "key": "alerte", "header": "Alerte", "type": "string" }
+          ],
+          "rowCount": 12
+        }
+      ]
+    }
+  }
+}

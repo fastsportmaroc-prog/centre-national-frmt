@@ -1,0 +1,86 @@
+import type { BudgetAnnuelLigne } from "@/lib/types/budget";
+
+const now = new Date().toISOString();
+
+export const seedBudgetAnnuel: BudgetAnnuelLigne[] = [
+  {
+    id: "ba1",
+    annee: 2026,
+    categorie: "stages",
+    libelle: "Programme stages CNE",
+    montant_alloue: 450000,
+    montant_engage: 380000,
+    montant_reel: 125000,
+    devise: "MAD",
+    notes: "Calendrier CNE V3",
+    updated_at: now,
+  },
+  {
+    id: "ba2",
+    annee: 2026,
+    categorie: "voyages",
+    libelle: "Billets & missions entraîneurs",
+    montant_alloue: 320000,
+    montant_engage: 95000,
+    montant_reel: 42000,
+    devise: "MAD",
+    notes: null,
+    updated_at: now,
+  },
+  {
+    id: "ba3",
+    annee: 2026,
+    categorie: "hebergement",
+    libelle: "Hébergement centre & missions",
+    montant_alloue: 280000,
+    montant_engage: 120000,
+    montant_reel: 45000,
+    devise: "MAD",
+    notes: null,
+    updated_at: now,
+  },
+  {
+    id: "ba4",
+    annee: 2026,
+    categorie: "restauration",
+    libelle: "Restauration & événements",
+    montant_alloue: 180000,
+    montant_engage: 42000,
+    montant_reel: 16200,
+    devise: "MAD",
+    notes: null,
+    updated_at: now,
+  },
+  {
+    id: "ba5",
+    annee: 2026,
+    categorie: "equipement",
+    libelle: "Équipement & cordage",
+    montant_alloue: 95000,
+    montant_engage: 28000,
+    montant_reel: 12000,
+    devise: "MAD",
+    notes: null,
+    updated_at: now,
+  },
+  {
+    id: "ba6",
+    annee: 2026,
+    categorie: "total",
+    libelle: "Budget global FRMT Centre",
+    montant_alloue: 1325000,
+    montant_engage: 665000,
+    montant_reel: 240200,
+    devise: "MAD",
+    notes: "Synthèse annuelle",
+    updated_at: now,
+  },
+];
+
+/** Budget alloué par joueur (référence annuelle) */
+export const seedBudgetJoueursAlloue: Record<string, number> = {
+  j1: 25000,
+  j2: 18000,
+  j3: 22000,
+  j4: 15000,
+};

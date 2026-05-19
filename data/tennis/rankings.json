@@ -1,0 +1,12 @@
+[
+  { "id": "rk1", "joueur_id": "jm1", "circuit": "atp", "rang": 615, "points": 68, "variation": 8, "date_classement": "2026-05-12" },
+  { "id": "rk2", "joueur_id": "jm2", "circuit": "wta", "rang": 627, "points": 62, "variation": 5, "date_classement": "2026-05-12" },
+  { "id": "rk3", "joueur_id": "jm3", "circuit": "atp", "rang": 1176, "points": 12, "variation": -2, "date_classement": "2026-05-12" },
+  { "id": "rk4", "joueur_id": "jm4", "circuit": "itf_pro", "rang": 818, "points": 28, "variation": 11, "date_classement": "2026-05-12" },
+  { "id": "rk5", "joueur_id": "jm5", "circuit": "challenger", "rang": 1047, "points": 18, "variation": 15, "date_classement": "2026-05-12" },
+  { "id": "rk6", "joueur_id": "jm6", "circuit": "challenger", "rang": 1178, "points": 10, "variation": 3, "date_classement": "2026-05-12" },
+  { "id": "rk7", "joueur_id": "jm7", "circuit": "itf_junior", "rang": 42, "points": 520, "variation": 6, "date_classement": "2026-05-10" },
+  { "id": "rk8", "joueur_id": "jm8", "circuit": "futures", "rang": 890, "points": 22, "variation": 9, "date_classement": "2026-05-12" },
+  { "id": "rk9", "joueur_id": "jm1", "circuit": "itf_pro", "rang": 412, "points": 95, "variation": null, "date_classement": "2026-05-12" },
+  { "id": "rk10", "joueur_id": "jm2", "circuit": "itf_pro", "rang": 355, "points": 110, "variation": 4, "date_classement": "2026-05-12" }
+]

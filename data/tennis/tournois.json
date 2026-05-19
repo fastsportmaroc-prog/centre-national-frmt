@@ -1,0 +1,58 @@
+[
+  {
+    "id": "t1",
+    "joueur_id": "jm1",
+    "circuit": "atp",
+    "nom": "Grand Prix Hassan II",
+    "ville": "Marrakech",
+    "pays": "Maroc",
+    "surface": "Terre battue",
+    "date_debut": "2026-04-01",
+    "date_fin": "2026-04-14",
+    "statut": "termine",
+    "meilleur_tour": "1/16",
+    "points": 45
+  },
+  {
+    "id": "t2",
+    "joueur_id": "jm2",
+    "circuit": "wta",
+    "nom": "Grand Prix SAR La Princesse Lalla Meryem",
+    "ville": "Rabat",
+    "pays": "Maroc",
+    "surface": "Terre battue",
+    "date_debut": "2026-04-05",
+    "date_fin": "2026-04-18",
+    "statut": "termine",
+    "meilleur_tour": "1/8",
+    "points": 62
+  },
+  {
+    "id": "t3",
+    "joueur_id": "jm6",
+    "circuit": "challenger",
+    "nom": "Grand Prix Hassan II",
+    "ville": "Marrakech",
+    "pays": "Maroc",
+    "surface": "Terre battue",
+    "date_debut": "2026-04-01",
+    "date_fin": "2026-04-14",
+    "statut": "termine",
+    "meilleur_tour": "Qualifications",
+    "points": 30
+  },
+  {
+    "id": "t4",
+    "joueur_id": "jm8",
+    "circuit": "futures",
+    "nom": "Futures M25 Mohammedia",
+    "ville": "Mohammedia",
+    "pays": "Maroc",
+    "surface": "Terre battue",
+    "date_debut": "2026-03-22",
+    "date_fin": "2026-03-29",
+    "statut": "termine",
+    "meilleur_tour": "Demi-finale",
+    "points": 28
+  }
+]

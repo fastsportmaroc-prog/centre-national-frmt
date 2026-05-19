@@ -1,0 +1,17 @@
+{
+  "jm1": [
+    { "date": "2026-01", "circuit": "atp", "rang": 680 },
+    { "date": "2026-02", "circuit": "atp", "rang": 655 },
+    { "date": "2026-03", "circuit": "atp", "rang": 630 },
+    { "date": "2026-04", "circuit": "atp", "rang": 615 }
+  ],
+  "jm2": [
+    { "date": "2026-01", "circuit": "wta", "rang": 710 },
+    { "date": "2026-03", "circuit": "wta", "rang": 650 },
+    { "date": "2026-04", "circuit": "wta", "rang": 627 }
+  ],
+  "jm7": [
+    { "date": "2026-02", "circuit": "itf_junior", "rang": 58 },
+    { "date": "2026-04", "circuit": "itf_junior", "rang": 42 }
+  ]
+}

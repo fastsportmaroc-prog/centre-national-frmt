@@ -1,0 +1,16 @@
+{
+  "jm1": [
+    { "surface": "Terre battue", "matchs": 48, "victoires": 32, "defaites": 16 },
+    { "surface": "Dur", "matchs": 10, "victoires": 4, "defaites": 6 }
+  ],
+  "jm2": [
+    { "surface": "Terre battue", "matchs": 36, "victoires": 24, "defaites": 12 },
+    { "surface": "Dur", "matchs": 8, "victoires": 3, "defaites": 5 }
+  ],
+  "jm5": [
+    { "surface": "Terre battue", "matchs": 40, "victoires": 27, "defaites": 13 }
+  ],
+  "jm7": [
+    { "surface": "Terre battue", "matchs": 28, "victoires": 20, "defaites": 8 }
+  ]
+}

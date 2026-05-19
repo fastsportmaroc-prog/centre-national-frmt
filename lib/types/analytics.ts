@@ -1,0 +1,20 @@
+export type AnalyticsDashboard = {
+  joueursActifs: number;
+  reservationsAujourdhui: number;
+  tauxOccupationCourts: number;
+  reservationsAnnulees: number;
+  courtsMaintenance: number;
+  demandesLogistiqueEnAttente: number;
+  billetsValides: number;
+  repasAujourdhui: number;
+  chambresOccupees: number;
+  chambresTotal: number;
+  evolutionReservationsSemaine: { jour: string; count: number }[];
+  statsParGroupe: { nom: string; count: number }[];
+  statsParCourt: { nom: string; reservations: number }[];
+  stagesActifs: number;
+  budgetsDeplacementValides: number;
+  budgetMensuelMAD: number;
+  materielStockFaible: number;
+  budgetsParJoueur: { nom: string; total: number }[];
+};

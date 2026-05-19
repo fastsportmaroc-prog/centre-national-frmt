@@ -1,0 +1,17 @@
+Configuration API Tennis (joueurs marocains réels)
+==================================================
+
+1. Créez un compte sur https://api-tennis.com/
+2. Copiez votre clé API
+3. Dans tennis-center/.env.local ajoutez :
+
+   TENNIS_DATA_API_KEY=votre_cle_ici
+
+4. Redémarrez : npm run dev
+5. Ouvrez Performances > Résultats internationaux > Synchroniser
+
+Sans clé : mode démo avec noms marocains réalistes (Elliot Benchetrit, Aya El Aouni, etc.)
+Avec clé : classements ATP/WTA filtrés pays Morocco + matchs récents via l'API officielle.
+
+Optionnel — forcer des joueurs par clé interne api-tennis :
+   TENNIS_MOROCCO_PLAYER_KEYS=1234,5678

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "pm1",
+    "joueur_id": "jm1",
+    "circuit": "atp",
+    "tournoi": "Roland-Garros",
+    "date_prevue": "2026-05-25",
+    "tour": "Tableau principal",
+    "adversaire": { "nom": "Qualifié", "pays": "—", "country_code": "—", "classement": null },
+    "surface": "Terre battue"
+  },
+  {
+    "id": "pm2",
+    "joueur_id": "jm2",
+    "circuit": "wta",
+    "tournoi": "Roland-Garros",
+    "date_prevue": "2026-05-24",
+    "tour": "Tableau principal",
+    "adversaire": { "nom": "Sloane Stephens", "pays": "États-Unis", "country_code": "USA", "classement": "WTA 55" },
+    "surface": "Terre battue"
+  },
+  {
+    "id": "pm3",
+    "joueur_id": "jm7",
+    "circuit": "itf_junior",
+    "tournoi": "ITF J60 Rabat",
+    "date_prevue": "2026-05-20",
+    "tour": "1/4",
+    "adversaire": { "nom": "L. Nardi", "pays": "Italie", "country_code": "ITA", "classement": "ITF J #15" },
+    "surface": "Terre battue"
+  }
+]

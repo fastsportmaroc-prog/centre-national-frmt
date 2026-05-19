@@ -1,0 +1,6 @@
+[
+  { "id": "p1", "joueur_id": "jm1", "annee": 2025, "tournoi": "Futures Mohammedia", "circuit": "futures", "resultat": "Vainqueur" },
+  { "id": "p2", "joueur_id": "jm7", "annee": 2026, "tournoi": "ITF J60 Rabat", "circuit": "itf_junior", "resultat": "Vainqueur" },
+  { "id": "p3", "joueur_id": "jm2", "annee": 2025, "tournoi": "ITF W60 Rabat", "circuit": "itf_pro", "resultat": "Finaliste" },
+  { "id": "p4", "joueur_id": "jm8", "annee": 2025, "tournoi": "Futures Casablanca", "circuit": "futures", "resultat": "Demi-finaliste" }
+]
