@@ -1,43 +1,77 @@
 /**
- * Classement FRMT (JSON local). Import vers Supabase pour le registre joueurs.
+ * Import classement FRMT vers Supabase (client / data layer).
  */
-import classementFile from "@/data/frmt/classement-top5.json";
-import {
-  dedupeFrmtPlayers,
-  frmtPlayerToJoueurInput,
-  frmtPlayersToJoueurs,
-  type FrmtClassementFile,
-  type FrmtClassementPlayer,
-} from "@/lib/frmt/classement-to-joueurs";
-import type { Joueur } from "@/lib/types/database";
+import { frmtPlayerToJoueurInput } from "@/lib/frmt/classement-to-joueurs";
+import type { Joueur, JoueurInput } from "@/lib/types/database";
 import { createJoueur, getJoueurs } from "./joueurs";
+import {
+  getFrmtClassementJoueurs,
+  getFrmtClassementPlayers,
+  getFrmtClassementRaw,
+} from "./frmt-classement-data";
 
-const file = classementFile as FrmtClassementFile;
+export {
+  getFrmtClassementRaw,
+  getFrmtClassementPlayers,
+  getFrmtClassementJoueurs,
+} from "./frmt-classement-data";
 
-export function getFrmtClassementRaw(): FrmtClassementFile {
-  return file;
+function joueurExists(existing: Joueur[], input: JoueurInput): boolean {
+  const birthYear = input.date_naissance.slice(0, 4);
+  return existing.some(
+    (x) =>
+      x.nom.toLowerCase() === input.nom.toLowerCase() &&
+      x.prenom.toLowerCase() === input.prenom.toLowerCase() &&
+      x.date_naissance.startsWith(birthYear)
+  );
 }
 
-export function getFrmtClassementPlayers(): FrmtClassementPlayer[] {
-  return dedupeFrmtPlayers(file.players ?? []);
+export async function mergeFrmtClassementToSupabase(): Promise<{
+  added: number;
+  total: number;
+}> {
+  let existing = await getJoueurs();
+  const players = getFrmtClassementPlayers();
+  let added = 0;
+
+  for (let i = 0; i < players.length; i++) {
+    const input: JoueurInput = frmtPlayerToJoueurInput(players[i]!, i);
+    if (joueurExists(existing, input)) continue;
+    const created = await createJoueur(input);
+    existing = [...existing, created];
+    added++;
+  }
+
+  return { added, total: existing.length };
 }
 
-export function getFrmtClassementJoueurs(): Joueur[] {
-  return frmtPlayersToJoueurs(getFrmtClassementPlayers());
+export async function mergeFrmtClassementIntoMock(): Promise<{
+  added: number;
+  total: number;
+}> {
+  return mergeFrmtClassementToSupabase();
 }
 
-/** Fusionne les joueurs FRMT dans le store mock (sans doublons nom+prénom+année). */
-export function mergeFrmtClassementIntoMock(): { added: number; total: number } {
-  mockStore.ensureFrmtClassementJoueurs();
-  return mockStore.mergeFrmtClassementJoueurs(getFrmtClassementJoueurs());
-}
-
-/** Restaure la liste complète du classement WB27 (après sync performances). */
-export function ensureFrmtClassementInMock(): {
+export async function ensureFrmtClassementInMock(): Promise<{
   added: number;
   total: number;
   expected?: number;
   present?: number;
-} {
-  return mockStore.ensureFrmtClassementJoueurs();
+}> {
+  const expected = getFrmtClassementJoueurs().length;
+  const presentBefore = (await getJoueurs()).filter((j) => j.is_frmt_tracked).length;
+  if (presentBefore >= expected) {
+    return {
+      added: 0,
+      total: (await getJoueurs()).length,
+      expected,
+      present: presentBefore,
+    };
+  }
+  const result = await mergeFrmtClassementToSupabase();
+  return {
+    ...result,
+    expected,
+    present: (await getJoueurs()).filter((j) => j.is_frmt_tracked).length,
+  };
 }

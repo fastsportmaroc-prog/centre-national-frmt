@@ -86,7 +86,7 @@ export async function syncMoroccanPerformances(): Promise<SyncResult> {
     const { mockStore } = await import("@/lib/data/mock/store");
     mockStore.setPerformanceSyncFull(payload);
     const { ensureFrmtClassementInMock } = await import("@/lib/data/frmt-classement");
-    ensureFrmtClassementInMock();
+    await ensureFrmtClassementInMock();
     const { logHistorique } = await import("@/lib/audit/historique");
     await logHistorique({
       action: "modification",

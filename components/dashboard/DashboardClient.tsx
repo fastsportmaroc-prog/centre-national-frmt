@@ -88,6 +88,7 @@ export function DashboardClient() {
         </div>
         <CneDashboardSection />
         <PerformancesDashboardSection />
+        <InsightsAlertsSection />
 
         <Card premium>
           <h2 className="mb-4 text-lg font-semibold">Prochaines réservations</h2>

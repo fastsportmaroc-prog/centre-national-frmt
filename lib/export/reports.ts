@@ -139,9 +139,31 @@ export async function openPrintReport(meta: ReportMeta): Promise<void> {
   w.document.close();
 }
 
+function isReportMeta(value: unknown): value is ReportMeta {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "titre" in value &&
+    "colonnes" in value &&
+    Array.isArray((value as ReportMeta).colonnes)
+  );
+}
+
+/**
+ * Export PDF (impression navigateur).
+ * Accepte `(filename, meta)` ou `(meta, filename)` pour compatibilité.
+ */
 export async function exportPdfReport(
-  _filename: string,
-  meta: ReportMeta
+  first: string | ReportMeta,
+  second?: string | ReportMeta
 ): Promise<void> {
+  let meta: ReportMeta;
+  if (isReportMeta(first)) {
+    meta = first;
+  } else if (isReportMeta(second)) {
+    meta = second;
+  } else {
+    throw new Error("exportPdfReport : ReportMeta manquant");
+  }
   await openPrintReport(meta);
 }

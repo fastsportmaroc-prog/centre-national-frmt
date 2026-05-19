@@ -83,7 +83,9 @@ export function BudgetClient() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => exportPdfReport(buildBudgetAnnuelReport(dashboard), `budget-${annee}.pdf`)}
+              onClick={() =>
+                exportPdfReport(`budget-${annee}.pdf`, buildBudgetAnnuelReport(dashboard))
+              }
             >
               <FileDown className="h-4 w-4" />
               PDF
@@ -192,7 +194,9 @@ export function BudgetClient() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => exportPdfReport(buildBudgetJoueursReport(dashboard), `budget-joueurs-${annee}.pdf`)}
+              onClick={() =>
+                exportPdfReport(`budget-joueurs-${annee}.pdf`, buildBudgetJoueursReport(dashboard))
+              }
             >
               PDF joueurs
             </Button>

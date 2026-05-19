@@ -24,7 +24,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "framer-motion": "^11.18.2",
-    "server-only": "^0.0.1"
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "xlsx": "^0.18.5",

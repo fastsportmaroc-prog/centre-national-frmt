@@ -1,10 +1,9 @@
 import "server-only";
 
-import { getFrmtClassementPlayers } from "@/lib/data/frmt-classement";
+import { getFrmtClassementPlayers } from "@/lib/data/frmt-classement-data";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
-import type { JoueurInput } from "@/lib/types/database";
+import type { Joueur, JoueurInput } from "@/lib/types/database";
 import { frmtPlayerToJoueurInput } from "@/lib/frmt/classement-to-joueurs";
-import type { Joueur } from "@/lib/types/database";
 import {
   assertMoroccanPlayerProfile,
   isMoroccanPlayer,
@@ -27,7 +26,17 @@ function prepareJoueurInput(input: JoueurInput): JoueurInput {
   return input;
 }
 
-/** Import classement FRMT — route API / Server Actions uniquement. */
+function joueurExists(existing: Joueur[], input: JoueurInput): boolean {
+  const birthYear = input.date_naissance.slice(0, 4);
+  return existing.some(
+    (x) =>
+      x.nom.toLowerCase() === input.nom.toLowerCase() &&
+      x.prenom.toLowerCase() === input.prenom.toLowerCase() &&
+      x.date_naissance.startsWith(birthYear)
+  );
+}
+
+/** Import classement FRMT — routes API serveur uniquement. */
 export async function mergeFrmtClassementToSupabase(): Promise<{
   added: number;
   total: number;
@@ -45,14 +54,7 @@ export async function mergeFrmtClassementToSupabase(): Promise<{
 
   for (let i = 0; i < players.length; i++) {
     const input: JoueurInput = frmtPlayerToJoueurInput(players[i]!, i);
-    const birthYear = input.date_naissance.slice(0, 4);
-    const exists = existing.some(
-      (x) =>
-        x.nom.toLowerCase() === input.nom.toLowerCase() &&
-        x.prenom.toLowerCase() === input.prenom.toLowerCase() &&
-        x.date_naissance.startsWith(birthYear)
-    );
-    if (exists) continue;
+    if (joueurExists(existing, input)) continue;
 
     const payload = prepareJoueurInput(input);
     const { data, error } = await supabase.from("joueurs").insert(payload).select().single();

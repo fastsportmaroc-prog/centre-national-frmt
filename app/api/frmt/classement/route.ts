@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getFrmtClassementRaw, getFrmtClassementPlayers } from "@/lib/data/frmt-classement";
+import {
+  getFrmtClassementRaw,
+  getFrmtClassementPlayers,
+} from "@/lib/data/frmt-classement-data";
 import { mergeFrmtClassementToSupabase } from "@/lib/data/frmt-classement-import.server";
 
 export async function GET() {

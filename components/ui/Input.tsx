@@ -16,12 +16,17 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
 export function Label({
   children,
   htmlFor,
+  className,
 }: {
   children: React.ReactNode;
   htmlFor?: string;
+  className?: string;
 }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-muted">
+    <label
+      htmlFor={htmlFor}
+      className={cn("mb-1.5 block text-sm font-medium text-muted", className)}
+    >
       {children}
     </label>
   );
