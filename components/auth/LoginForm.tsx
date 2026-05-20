@@ -1,20 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { mapAuthErrorMessage } from "@/lib/auth/errors";
 import { signIn, signUp } from "@/lib/auth/session";
+import { isSupabaseConfigured, SUPABASE_ENV } from "@/lib/supabase/config";
 
-type Props = {
+type HealthPayload = {
   supabaseConfigured: boolean;
+  hint?: string | null;
+  diagnostics?: {
+    hasUrl: boolean;
+    hasAnonKey: boolean;
+    keyLength: number;
+  };
 };
 
-export function LoginForm({ supabaseConfigured }: Props) {
+export function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
+
+  const [configReady, setConfigReady] = useState(false);
+  const [supabaseOk, setSupabaseOk] = useState(false);
+  const [configHint, setConfigHint] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -24,6 +35,26 @@ export function LoginForm({ supabaseConfigured }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: HealthPayload) => {
+        setSupabaseOk(Boolean(data.supabaseConfigured));
+        setConfigHint(data.hint ?? null);
+        setConfigReady(true);
+      })
+      .catch(() => {
+        const fallback = isSupabaseConfigured();
+        setSupabaseOk(fallback);
+        setConfigHint(
+          fallback
+            ? null
+            : `Impossible de joindre /api/health. Vérifiez ${SUPABASE_ENV.URL} et ${SUPABASE_ENV.ANON_KEY} sur Vercel puis Redeploy.`
+        );
+        setConfigReady(true);
+      });
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -32,15 +63,12 @@ export function LoginForm({ supabaseConfigured }: Props) {
     try {
       if (mode === "login") {
         await signIn(email, password);
-        // Rechargement complet pour synchroniser les cookies SSR (middleware)
         window.location.href = redirect.startsWith("/") ? redirect : "/dashboard";
         return;
-      } else {
-        await signUp(email, password, fullName);
-        setMessage("Compte créé. Vérifiez votre email si la confirmation est activée.");
-        setLoading(false);
-        return;
       }
+      await signUp(email, password, fullName);
+      setMessage("Compte créé. Vérifiez votre email si la confirmation est activée.");
+      setLoading(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur de connexion";
       setError(mapAuthErrorMessage(msg));
@@ -49,26 +77,29 @@ export function LoginForm({ supabaseConfigured }: Props) {
     }
   }
 
-  if (!supabaseConfigured) {
+  if (!configReady) {
+    return (
+      <p className="p-4 text-center text-sm text-muted">Vérification Supabase…</p>
+    );
+  }
+
+  if (!supabaseOk) {
     return (
       <Card>
         <div className="space-y-4 p-4 text-center">
-          <p className="text-sm font-medium text-foreground">Connexion indisponible</p>
+          <p className="text-sm font-medium text-foreground">Supabase non configuré</p>
           <p className="text-sm text-muted">
-            Sur <strong>Vercel → Settings → Environment Variables</strong> (Production), ajoutez :
+            {configHint ??
+              `Ajoutez ${SUPABASE_ENV.URL} et ${SUPABASE_ENV.ANON_KEY} sur Vercel (Production), puis Redeploy sans cache.`}
           </p>
           <ul className="mt-2 space-y-1 text-left text-xs text-muted">
             <li>
-              <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_URL</code>
+              <code className="text-frmt-green">{SUPABASE_ENV.URL}</code>
             </li>
             <li>
-              <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
-            </li>
-            <li>
-              <code className="text-frmt-green">NEXT_PUBLIC_SITE_URL</code> (URL Vercel)
+              <code className="text-frmt-green">{SUPABASE_ENV.ANON_KEY}</code>
             </li>
           </ul>
-          <p className="text-xs text-muted">Puis redéployez le projet.</p>
         </div>
       </Card>
     );

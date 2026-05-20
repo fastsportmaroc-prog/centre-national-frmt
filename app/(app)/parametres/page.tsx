@@ -3,6 +3,8 @@ import { ParametresDemoRole } from "@/components/parametres/ParametresDemoRole";
 import { Card } from "@/components/ui/Card";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
+export const dynamic = "force-dynamic";
+
 export default function ParametresPage() {
   const supabaseOk = isSupabaseConfigured();
 

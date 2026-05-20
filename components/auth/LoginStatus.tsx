@@ -6,6 +6,7 @@ type Health = {
   ok: boolean;
   supabaseConfigured: boolean;
   siteUrl: string;
+  hint?: string | null;
 };
 
 export function LoginStatus() {
@@ -13,13 +14,13 @@ export function LoginStatus() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/health")
+    fetch("/api/health", { cache: "no-store" })
       .then((r) => r.json())
       .then((data: Health) => {
         setHealth(data);
         setErr(null);
       })
-      .catch(() => setErr("Serveur non démarré — lancez FAIRE-TOUT.bat ou npm run dev"));
+      .catch(() => setErr("Serveur non démarré — lancez npm run dev ou vérifiez Vercel"));
   }, []);
 
   if (err) {
@@ -31,13 +32,13 @@ export function LoginStatus() {
   }
 
   if (!health) {
-    return <p className="text-center text-xs text-muted">Verification du serveur…</p>;
+    return <p className="text-center text-xs text-muted">Vérification du serveur…</p>;
   }
 
   if (!health.supabaseConfigured) {
     return (
       <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-        Supabase non configuré (.env.local ou variables Vercel manquantes).
+        {health.hint ?? "Supabase non configuré — variables Vercel + Redeploy requis."}
       </p>
     );
   }

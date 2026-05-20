@@ -4,7 +4,9 @@ import { LoginStatus } from "@/components/auth/LoginStatus";
 import { AppBrand } from "@/components/brand/AppBrand";
 import { Card } from "@/components/ui/Card";
 import { FEDERATION_NAME } from "@/lib/constants/branding";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+/** Lit les variables d'environnement à chaque requête (pas au build statique). */
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
@@ -21,7 +23,7 @@ export default function LoginPage() {
             <LoginStatus />
           </div>
           <Suspense fallback={<p className="p-4 text-center text-sm text-muted">Chargement…</p>}>
-            <LoginForm supabaseConfigured={isSupabaseConfigured()} />
+            <LoginForm />
           </Suspense>
         </Card>
       </div>

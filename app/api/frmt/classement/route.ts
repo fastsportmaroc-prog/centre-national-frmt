@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import {
-  getFrmtClassementRaw,
+  getFrmtClassementGroups,
+  getFrmtClassementMeta,
   getFrmtClassementPlayers,
+  getFrmtClassementRaw,
 } from "@/lib/data/frmt-classement-data";
 import { mergeFrmtClassementToSupabase } from "@/lib/data/frmt-classement-import.server";
 
 export async function GET() {
   const file = getFrmtClassementRaw();
+  const meta = getFrmtClassementMeta();
+  const classementDate =
+    "classementDate" in file && typeof file.classementDate === "string"
+      ? file.classementDate
+      : null;
+
   return NextResponse.json({
     source: file.source,
     fetchedAt: file.fetchedAt,
+    classementDate,
     note: file.note,
-    count: file.players?.length ?? 0,
+    ...meta,
+    groups: getFrmtClassementGroups(),
     players: getFrmtClassementPlayers(),
   });
 }

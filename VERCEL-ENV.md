@@ -1,17 +1,40 @@
-# Variables Vercel (Production + Preview)
+# Variables Vercel — Supabase
 
-Copier depuis `.env.local` :
+## Noms exacts (obligatoires)
 
-| Nom | Exemple |
-|-----|---------|
+| Variable | Exemple |
+|----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://kcwvqwvcyiiwalyvhvxz.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clé depuis Supabase → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clé **anon** ou **publishable** (Supabase → Settings → API) |
 | `NEXT_PUBLIC_SITE_URL` | `https://votre-projet.vercel.app` |
 
-Après ajout : **Deployments → Redeploy**.
+Cochez **Production** et **Preview**.
 
-Supabase → Authentication → URL Configuration :
+## Après modification
+
+1. **Deployments → … → Redeploy**
+2. Cochez **Use existing Build Cache** = **OFF** (rebuild avec les nouvelles variables)
+
+## Test
+
+`https://VOTRE-URL.vercel.app/api/health`
+
+Attendu :
+
+```json
+{
+  "supabaseConfigured": true,
+  "diagnostics": {
+    "hasUrl": true,
+    "hasAnonKey": true,
+    "keyLength": 46
+  }
+}
+```
+
+Si `supabaseConfigured: false`, le champ `hint` indique la cause.
+
+## Supabase Auth
+
 - Site URL = URL Vercel
 - Redirect : `https://*.vercel.app/auth/callback`
-
-Test : `https://votre-url.vercel.app/api/health` → `"supabaseConfigured": true`

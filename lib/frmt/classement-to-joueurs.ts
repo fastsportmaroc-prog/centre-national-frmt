@@ -8,6 +8,8 @@ import {
 export type FrmtClassementPlayer = {
   classement_national: number;
   points: number;
+  /** Variation de points depuis le classement WB27 (colonne +/-) */
+  variation?: number | null;
   nom: string;
   prenom: string;
   annee_naissance: number;
@@ -21,6 +23,9 @@ export type FrmtClassementPlayer = {
 export type FrmtClassementFile = {
   source: string;
   fetchedAt: string;
+  classementDate?: string | null;
+  birthYearMin?: number;
+  birthYearMax?: number;
   players: FrmtClassementPlayer[];
   note?: string;
 };
@@ -49,7 +54,11 @@ export function frmtPlayerToJoueurInput(
 ): JoueurInput {
   const date_naissance = `${p.annee_naissance}-01-01`;
   const sexe = p.sexe as SexeJoueur;
-  const classementLabel = `${p.classement_national}e national · ${p.points} pts`;
+  const varLabel =
+    p.variation != null && !Number.isNaN(p.variation)
+      ? ` · ${p.variation >= 0 ? "+" : ""}${p.variation} pts`
+      : "";
+  const classementLabel = `${p.classement_national}e national · ${p.points} pts${varLabel}`;
   return {
     photo_url: null,
     prenom: titleCase(p.prenom),
@@ -70,7 +79,7 @@ export function frmtPlayerToJoueurInput(
     coach_referent: null,
     statut: "actif",
     documents: null,
-    notes: `Import FRMT WB27 (${p.frmt_filter}) — club ${p.club} — top ${p.rang_categorie}/5`,
+    notes: `Import FRMT WB27 (${p.frmt_filter}) — club ${p.club} — top ${p.rang_categorie}/5${varLabel}`,
   };
 }
 
