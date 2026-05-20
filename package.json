@@ -2,10 +2,16 @@
   "name": "tennis-center",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3000",
+    "local": "npm run build && next start --port 3000",
+    "publish": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/PUBLIER-MAINTENANT.ps1",
+    "faire-tout": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/FAIRE-TOUT.ps1",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3000",
     "lint": "eslint",
     "logo:install": "node scripts/install-frmt-logo.mjs",
     "import:excel": "node scripts/import-excel-frmt.mjs",

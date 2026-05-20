@@ -1,3 +1,5 @@
+import type { RoleUtilisateur } from "./roles";
+
 export type UserRole = "admin" | "staff";
 
 export type Profile = {
@@ -13,7 +15,7 @@ export type AuthUser = {
   id: string;
   email: string;
   role: UserRole;
-  frmtRole: string | null;
+  frmtRole: RoleUtilisateur;
   fullName: string | null;
   isMock: boolean;
 };

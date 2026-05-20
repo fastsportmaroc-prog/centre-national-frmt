@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
+import { mapAuthErrorMessage } from "@/lib/auth/errors";
 import { signIn, signUp } from "@/lib/auth/session";
 
 type Props = {
@@ -12,7 +13,6 @@ type Props = {
 };
 
 export function LoginForm({ supabaseConfigured }: Props) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/dashboard";
 
@@ -32,23 +32,18 @@ export function LoginForm({ supabaseConfigured }: Props) {
     try {
       if (mode === "login") {
         await signIn(email, password);
+        // Rechargement complet pour synchroniser les cookies SSR (middleware)
+        window.location.href = redirect.startsWith("/") ? redirect : "/dashboard";
+        return;
       } else {
         await signUp(email, password, fullName);
         setMessage("Compte créé. Vérifiez votre email si la confirmation est activée.");
         setLoading(false);
         return;
       }
-      router.push(redirect);
-      router.refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur de connexion";
-      setError(
-        msg.includes("Invalid login")
-          ? "Email ou mot de passe incorrect."
-          : msg.includes("Email not confirmed")
-            ? "Confirmez votre email (lien envoyé par Supabase) ou désactivez la confirmation dans le dashboard Supabase."
-            : msg
-      );
+      setError(mapAuthErrorMessage(msg));
     } finally {
       setLoading(false);
     }
@@ -57,13 +52,23 @@ export function LoginForm({ supabaseConfigured }: Props) {
   if (!supabaseConfigured) {
     return (
       <Card>
-        <div className="space-y-4 text-center p-2">
+        <div className="space-y-4 p-4 text-center">
+          <p className="text-sm font-medium text-foreground">Connexion indisponible</p>
           <p className="text-sm text-muted">
-            Supabase n&apos;est pas configuré. Ajoutez{" "}
-            <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_URL</code> et{" "}
-            <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> dans{" "}
-            <code>.env.local</code>.
+            Sur <strong>Vercel → Settings → Environment Variables</strong> (Production), ajoutez :
           </p>
+          <ul className="mt-2 space-y-1 text-left text-xs text-muted">
+            <li>
+              <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_URL</code>
+            </li>
+            <li>
+              <code className="text-frmt-green">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
+            </li>
+            <li>
+              <code className="text-frmt-green">NEXT_PUBLIC_SITE_URL</code> (URL Vercel)
+            </li>
+          </ul>
+          <p className="text-xs text-muted">Puis redéployez le projet.</p>
         </div>
       </Card>
     );

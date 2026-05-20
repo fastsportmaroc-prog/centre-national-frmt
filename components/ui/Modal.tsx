@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils/cn";
 import { X } from "lucide-react";
 import { Button } from "./Button";
 
@@ -8,9 +9,10 @@ type Props = {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  className?: string;
 };
 
-export function Modal({ open, onClose, title, children }: Props) {
+export function Modal({ open, onClose, title, children, className }: Props) {
   if (!open) return null;
 
   return (
@@ -23,7 +25,10 @@ export function Modal({ open, onClose, title, children }: Props) {
       <div
         role="dialog"
         aria-modal
-        className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-surface-elevated shadow-2xl"
+        className={cn(
+          "relative z-10 w-full max-w-lg rounded-xl border border-border bg-surface-elevated shadow-2xl",
+          className
+        )}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-lg font-semibold">{title}</h2>

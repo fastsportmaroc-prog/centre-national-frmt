@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { LoginStatus } from "@/components/auth/LoginStatus";
 import { AppBrand } from "@/components/brand/AppBrand";
 import { Card } from "@/components/ui/Card";
 import { FEDERATION_NAME } from "@/lib/constants/branding";
@@ -16,6 +17,9 @@ export default function LoginPage() {
           <p className="mt-1 text-xs text-muted/80">{FEDERATION_NAME}</p>
         </div>
         <Card className="card-premium border-frmt-green/25 shadow-xl">
+          <div className="mb-4 px-4 pt-4">
+            <LoginStatus />
+          </div>
           <Suspense fallback={<p className="p-4 text-center text-sm text-muted">Chargement…</p>}>
             <LoginForm supabaseConfigured={isSupabaseConfigured()} />
           </Suspense>

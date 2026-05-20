@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { CookieToSet } from "./cookies";
 import { getSupabaseEnv, isSupabaseConfigured } from "./config";
 
 const MOCK_AUTH_COOKIE = "tcp_demo_auth";
@@ -28,7 +29,8 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
     const isDemoAuthed = hasMockAuth(request);
 
-    if (!isAuthRoute && !isDemoAuthed && request.nextUrl.pathname !== "/") {
+    const isHealth = request.nextUrl.pathname === "/api/health";
+    if (!isAuthRoute && !isDemoAuthed && request.nextUrl.pathname !== "/" && !isHealth) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/login";
       return NextResponse.redirect(url);
@@ -43,7 +45,7 @@ export async function updateSession(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieToSet[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
@@ -59,7 +61,9 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
   const isPublic =
-    request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/api/auth");
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/api/auth") ||
+    request.nextUrl.pathname === "/api/health";
 
   if (!user && !isAuthRoute && !isPublic) {
     const redirectUrl = request.nextUrl.clone();

@@ -1,0 +1,29 @@
+CENTRE NATIONAL FRMT — DEMARRAGE RAPIDE
+======================================
+
+1) DOUBLE-CLIQUEZ :  FAIRE-TOUT.bat
+   (dans ce dossier)
+
+   Cela fait automatiquement :
+   - installation npm
+   - build (test Vercel)
+   - push GitHub (si possible)
+   - demarrage localhost + ouverture navigateur
+
+2) CONNEXION
+   URL : http://localhost:3000/auth/login
+   Compte : email + mot de passe cree dans Supabase
+   https://supabase.com/dashboard/project/kcwvqwvcyiiwalyvhvxz/auth/users
+
+3) VERCEL (apres push)
+   Variables sur vercel.com :
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+   NEXT_PUBLIC_SITE_URL = votre URL .vercel.app
+
+4) SI LOCALHOST NE REPOND PAS
+   - La fenetre noire doit rester ouverte (npm run dev)
+   - Message "Ready" doit apparaitre
+   - Essayez : npm run local  (mode production local)
+
+Support : CONNEXION-PRODUCTION.md

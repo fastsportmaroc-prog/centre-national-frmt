@@ -7,6 +7,8 @@ import {
   useEffect,
   useState,
 } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentUser, signOut } from "@/lib/auth/session";
 import { setAuditUser } from "@/lib/audit/historique";
 import type { AuthUser } from "@/lib/types/auth";
@@ -42,6 +44,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) return;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void refresh();
+      else setUser(null);
+    });
+
+    return () => subscription.unsubscribe();
   }, [refresh]);
 
   async function logout() {
