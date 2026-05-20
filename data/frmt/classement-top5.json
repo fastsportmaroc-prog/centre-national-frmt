@@ -1,8 +1,9 @@
 {
   "source": "https://info.frmt.ma/FRMT_CLASSEMENT_WB27",
-  "fetchedAt": "2026-05-20T21:40:04.088Z",
+  "fetchedAt": "2026-05-20T22:49:26.694Z",
+  "classementDate": null,
   "birthYearMin": 2005,
   "birthYearMax": 2015,
-  "note": "Top 5 garçons/filles isolés par année de naissance 2005–2015",
+  "note": "Top 5 garçons/filles isolés par année 2005–2015 (WB27)",
   "players": []
 }

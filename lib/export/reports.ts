@@ -1,6 +1,5 @@
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { getReportLogoImgHtml } from "@/lib/brand/logo";
 import {
   BRAND_CENTRE,
   BRAND_FRMT,
@@ -21,8 +20,6 @@ export type ReportMeta = {
 const REPORT_HEADER_STYLES = `
     body{font-family:system-ui,sans-serif;background:#fff;color:#111;padding:40px}
     .report-header{display:flex;align-items:center;gap:24px;margin-bottom:16px;padding-bottom:16px;border-bottom:2px solid ${FRMT_GREEN}}
-    .report-logo-wrap{flex-shrink:0}
-    .report-logo{width:120px;height:120px;object-fit:contain}
     .brand-frmt{font-size:26px;font-weight:900;color:${FRMT_RED};letter-spacing:0.06em;margin:0;line-height:1}
     .brand-centre{font-size:13px;font-weight:700;color:${FRMT_GREEN};letter-spacing:0.1em;margin:6px 0 0;text-transform:uppercase}
     .report-brand .fed{font-size:11px;margin:8px 0 0;color:#444;max-width:360px;line-height:1.4}
@@ -35,7 +32,6 @@ const REPORT_HEADER_STYLES = `
     .sig{margin-top:48px}.sig-line{border-top:1px solid #333;width:200px;margin-top:40px}
     @media print{
       body{padding:20px}
-      .report-logo{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     }
 `;
 
@@ -48,15 +44,9 @@ function escapeHtml(s: string): string {
 }
 
 async function reportBrandBlockHtml(): Promise<string> {
-  let logoHtml = "";
-  try {
-    logoHtml = `<div class="report-logo-wrap">${await getReportLogoImgHtml(120)}</div>`;
-  } catch {
-    logoHtml = "";
-  }
   return `
   <div class="report-header">
-    ${logoHtml}
+    <div style="width:72px;height:72px;border:2px dashed ${FRMT_GREEN};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#666;text-align:center;line-height:1.2">Logo officiel<br/>à intégrer</div>
     <div class="report-brand">
       <p class="brand-frmt">${escapeHtml(BRAND_FRMT)}</p>
       <p class="brand-centre">${escapeHtml(BRAND_CENTRE)}</p>

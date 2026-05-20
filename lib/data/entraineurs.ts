@@ -1,5 +1,6 @@
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
 import { logHistorique } from "@/lib/audit/historique";
+import { softDeleteRecord } from "@/lib/data/soft-delete";
 import { coachReferentLabel } from "@/lib/constants/entraineurs";
 import type {
   DisponibiliteEntraineur,
@@ -14,8 +15,18 @@ import type {
 
 export async function getEntraineurs(): Promise<Entraineur[]> {
   const supabase = await getSupabaseDataClient();
-  const { data, error } = await supabase.from("entraineurs").select("*").order("nom");
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase
+    .from("entraineurs")
+    .select("*")
+    .is("deleted_at", null)
+    .order("nom");
+  if (error) {
+    const fallback = await supabase.from("entraineurs").select("*").order("nom");
+    if (fallback.error) throw new Error(fallback.error.message);
+    return ((fallback.data ?? []) as (Entraineur & { deleted_at?: string | null })[]).filter(
+      (e) => !e.deleted_at
+    );
+  }
   return (data ?? []) as Entraineur[];
 }
 
@@ -26,20 +37,58 @@ export async function getEntraineurById(id: string): Promise<Entraineur | null> 
   return data as Entraineur;
 }
 
+function toEntraineurRow(input: EntraineurInput) {
+  return {
+    prenom: input.prenom.trim(),
+    nom: input.nom.trim(),
+    email: input.email?.trim() || null,
+    telephone: input.telephone?.trim() || null,
+    specialite: input.specialite?.trim() || null,
+    licence_fft: input.licence_fft?.trim() || null,
+    statut: input.statut,
+    groupe_ids: input.groupe_ids ?? [],
+    budget_voyages_annuel:
+      input.budget_voyages_annuel != null && !Number.isNaN(Number(input.budget_voyages_annuel))
+        ? Number(input.budget_voyages_annuel)
+        : null,
+    photo_url: input.photo_url ?? null,
+    notes: input.notes?.trim() || null,
+  };
+}
+
 export async function createEntraineur(input: EntraineurInput): Promise<Entraineur> {
+  if (!input.prenom.trim() || !input.nom.trim()) {
+    throw new Error("Le prénom et le nom sont obligatoires.");
+  }
+
   const supabase = await getSupabaseDataClient();
-  const { data, error } = await supabase.from("entraineurs").insert(input).select().single();
-  if (error) throw new Error(error.message);
+  const row = toEntraineurRow(input);
+  const { data, error } = await supabase.from("entraineurs").insert(row).select().single();
+
+  if (error) {
+    const msg = error.message;
+    if (msg.includes("row-level security") || msg.includes("RLS")) {
+      throw new Error(
+        "Ajout refusé : droits Supabase insuffisants. Exécutez la migration 018_entraineurs_rls_policies.sql dans le SQL Editor."
+      );
+    }
+    throw new Error(msg);
+  }
+
   const item = data as Entraineur;
-  await logHistorique({
-    action: "creation",
-    module: "entraineurs",
-    entite_id: item.id,
-    entite_label: `${item.prenom} ${item.nom}`,
-    ancienne_valeur: null,
-    nouvelle_valeur: item.statut,
-    commentaire: null,
-  });
+  try {
+    await logHistorique({
+      action: "creation",
+      module: "entraineurs",
+      entite_id: item.id,
+      entite_label: `${item.prenom} ${item.nom}`,
+      ancienne_valeur: null,
+      nouvelle_valeur: item.statut,
+      commentaire: null,
+    });
+  } catch {
+    /* historique optionnel — ne bloque pas la création */
+  }
   return item;
 }
 
@@ -58,10 +107,18 @@ export async function updateEntraineur(
   return data as Entraineur;
 }
 
-export async function deleteEntraineur(id: string): Promise<void> {
-  const supabase = await getSupabaseDataClient();
-  const { error } = await supabase.from("entraineurs").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+export async function deleteEntraineur(id: string, reason?: string): Promise<void> {
+  const existing = await getEntraineurById(id);
+  if (!existing) return;
+  await softDeleteRecord({
+    table: "entraineurs",
+    id,
+    entityType: "entraineur",
+    entityLabel: `${existing.prenom} ${existing.nom}`,
+    module: "entraineurs",
+    reason,
+    beforeSnapshot: existing as unknown as Record<string, unknown>,
+  });
 }
 
 export function entraineurCoachLabel(e: Entraineur): string {

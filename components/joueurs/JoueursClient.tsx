@@ -29,6 +29,9 @@ import type {
 } from "@/lib/types/database";
 import { filterJoueurs } from "@/lib/utils/joueur-filters";
 import { uploadJoueurPhoto } from "@/lib/storage/upload-photo";
+import { ConfirmArchiveDialog } from "@/components/shared/ConfirmArchiveDialog";
+import { ModuleToolbar } from "@/components/shared/ModuleToolbar";
+import { exportModuleList } from "@/lib/export/module-export-client";
 import { Plus, RefreshCw } from "lucide-react";
 
 const emptyForm = (): JoueurInput => ({
@@ -83,6 +86,10 @@ export function JoueursClient() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [importingFrmt, setImportingFrmt] = useState(false);
   const [frmtRefresh, setFrmtRefresh] = useState(0);
+  const [search, setSearch] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Joueur | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,10 +108,19 @@ export function JoueursClient() {
     load();
   }, [load]);
 
-  const filtered = useMemo(
-    () => filterJoueurs(joueurs, filters),
-    [joueurs, filters]
-  );
+  const filtered = useMemo(() => {
+    let list = filterJoueurs(joueurs, filters);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (j) =>
+          `${j.prenom} ${j.nom}`.toLowerCase().includes(q) ||
+          (j.classement ?? "").toLowerCase().includes(q) ||
+          (j.groupe?.nom ?? "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [joueurs, filters, search]);
 
   const frmtScope = useMemo(() => filterJoueursFrmtScope(joueurs), [joueurs]);
 
@@ -200,14 +216,57 @@ export function JoueursClient() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Supprimer ce joueur ?")) return;
+  function requestArchive(j: Joueur) {
+    setArchiveTarget(j);
+    setArchiveOpen(true);
+  }
+
+  async function confirmArchive(reason: string) {
+    if (!archiveTarget) return;
+    setArchiving(true);
     try {
-      await deleteJoueur(id);
+      await deleteJoueur(archiveTarget.id, reason || undefined);
+      setArchiveOpen(false);
+      setArchiveTarget(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setArchiving(false);
     }
+  }
+
+  function exportRows(rows: JoueurWithGroupe[]) {
+    return rows.map((j) => [
+      j.prenom,
+      j.nom,
+      j.date_naissance,
+      j.categorie_age,
+      j.sexe,
+      j.classement ?? "—",
+      j.groupe?.nom ?? "—",
+      j.statut,
+    ]);
+  }
+
+  function handlePrint() {
+    exportModuleList({
+      titre: "Registre joueurs",
+      filtres: search ? `Recherche: ${search}` : undefined,
+      colonnes: ["Prénom", "Nom", "Naissance", "Cat.", "Sexe", "Classement", "Groupe", "Statut"],
+      lignes: exportRows(listeUnique),
+      mode: "print",
+    });
+  }
+
+  function handlePdf() {
+    exportModuleList({
+      titre: "Registre joueurs",
+      filtres: search ? `Recherche: ${search}` : undefined,
+      colonnes: ["Prénom", "Nom", "Naissance", "Cat.", "Sexe", "Classement", "Groupe", "Statut"],
+      lignes: exportRows(listeUnique),
+      mode: "pdf",
+    });
   }
 
   async function handleImportFrmtClassement() {
@@ -215,12 +274,18 @@ export function JoueursClient() {
     setError(null);
     try {
       const res = await fetch("/api/frmt/classement", { method: "POST" });
-      if (!res.ok) throw new Error("Import classement impossible");
-      const { added, total } = (await res.json()) as { added: number; total: number };
+      const body = (await res.json()) as {
+        added?: number;
+        updated?: number;
+        total?: number;
+        sourcePlayers?: number;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(body.error ?? "Import classement impossible");
       await load();
       setFrmtRefresh((k) => k + 1);
       alert(
-        `Classement FRMT réintégré (2005–2015, top 5 G/F par année) : ${added} nouveau(x) sur ${total}. Source : info.frmt.ma/FRMT_CLASSEMENT_WB27 — pour rafraîchir le fichier, lancez IMPORT-FRMT-CLASSEMENT.bat`
+        `Classement FRMT intégré : ${body.added ?? 0} ajout(s), ${body.updated ?? 0} mis à jour (${body.sourcePlayers ?? "?"} dans le fichier, ${body.total ?? "?"} en base).`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur import FRMT");
@@ -326,7 +391,16 @@ export function JoueursClient() {
         )}
 
         {vueMode === "liste" && (
-          <JoueurFiltersBar filters={filters} onChange={setFilters} groupes={groupes} />
+          <>
+            <ModuleToolbar
+              search={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Nom, classement, groupe…"
+              onPrint={handlePrint}
+              onExportPdf={handlePdf}
+            />
+            <JoueurFiltersBar filters={filters} onChange={setFilters} groupes={groupes} />
+          </>
         )}
 
         {error && !modalOpen && (
@@ -357,7 +431,10 @@ export function JoueursClient() {
                   loading={loading}
                   showSexeColumn={false}
                   onEdit={openEdit}
-                  onDelete={handleDelete}
+                  onDelete={(id) => {
+                    const j = joueurs.find((x) => x.id === id);
+                    if (j) requestArchive(j);
+                  }}
                 />
               </Card>
             </section>
@@ -374,7 +451,10 @@ export function JoueursClient() {
                   loading={loading}
                   showSexeColumn={false}
                   onEdit={openEdit}
-                  onDelete={handleDelete}
+                  onDelete={(id) => {
+                    const j = joueurs.find((x) => x.id === id);
+                    if (j) requestArchive(j);
+                  }}
                 />
               </Card>
             </section>
@@ -391,7 +471,10 @@ export function JoueursClient() {
                     joueurs={autre}
                     loading={loading}
                     onEdit={openEdit}
-                    onDelete={handleDelete}
+                    onDelete={(id) => {
+                    const j = joueurs.find((x) => x.id === id);
+                    if (j) requestArchive(j);
+                  }}
                   />
                 </Card>
               </section>
@@ -404,7 +487,10 @@ export function JoueursClient() {
               loading={loading}
               showSexeColumn={false}
               onEdit={openEdit}
-              onDelete={handleDelete}
+                  onDelete={(id) => {
+                    const j = joueurs.find((x) => x.id === id);
+                    if (j) requestArchive(j);
+                  }}
             />
           </Card>
         )}
@@ -427,6 +513,19 @@ export function JoueursClient() {
           error={error}
         />
       </Modal>
+
+      <ConfirmArchiveDialog
+        open={archiveOpen}
+        title="Archiver ce joueur ?"
+        description="Le joueur sera retiré des listes actives. Les données restent en base et dans l'historique."
+        entityLabel={archiveTarget ? `${archiveTarget.prenom} ${archiveTarget.nom}` : undefined}
+        onClose={() => {
+          setArchiveOpen(false);
+          setArchiveTarget(null);
+        }}
+        onConfirm={confirmArchive}
+        loading={archiving}
+      />
     </>
   );
 }

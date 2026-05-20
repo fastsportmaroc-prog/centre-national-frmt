@@ -1,4 +1,5 @@
 import { logHistorique } from "@/lib/audit/historique";
+import { softDeleteRecord } from "@/lib/data/soft-delete";
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
 import {
   assertMoroccanPlayerProfile,
@@ -13,8 +14,15 @@ export async function getJoueurs(): Promise<Joueur[]> {
   const { data, error } = await supabase
     .from("joueurs")
     .select("*")
+    .is("deleted_at", null)
     .order("nom", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const fallback = await supabase.from("joueurs").select("*").order("nom", { ascending: true });
+    if (fallback.error) throw new Error(fallback.error.message);
+    return ((fallback.data ?? []) as (Joueur & { deleted_at?: string | null })[]).filter(
+      (j) => !j.deleted_at
+    );
+  }
   return (data ?? []) as Joueur[];
 }
 
@@ -104,22 +112,18 @@ export async function updateJoueur(
   return joueur;
 }
 
-export async function deleteJoueur(id: string): Promise<void> {
+export async function deleteJoueur(id: string, reason?: string): Promise<void> {
   const existing = await getJoueurById(id);
-  const supabase = await getSupabaseDataClient();
-  const { error } = await supabase.from("joueurs").delete().eq("id", id);
-  if (error) throw new Error(error.message);
-  if (existing) {
-    await logHistorique({
-      action: "suppression",
-      module: "joueurs",
-      entite_id: id,
-      entite_label: `${existing.prenom} ${existing.nom}`,
-      ancienne_valeur: existing.statut ?? null,
-      nouvelle_valeur: null,
-      commentaire: null,
-    });
-  }
+  if (!existing) return;
+  await softDeleteRecord({
+    table: "joueurs",
+    id,
+    entityType: "joueur",
+    entityLabel: `${existing.prenom} ${existing.nom}`,
+    module: "joueurs",
+    reason,
+    beforeSnapshot: existing as unknown as Record<string, unknown>,
+  });
 }
 
 /** Toujours false en production (Supabase obligatoire). */

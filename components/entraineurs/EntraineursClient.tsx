@@ -60,6 +60,8 @@ export function EntraineursClient() {
   const [filtreStatut, setFiltreStatut] = useState("");
   const [open, setOpen] = useState(false);
   const [openMission, setOpenMission] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EntraineurInput>(emptyEntraineur());
   const [missionForm, setMissionForm] = useState<MissionEntraineurInput>({
     entraineur_id: "",
@@ -118,20 +120,28 @@ export function EntraineursClient() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await createEntraineur({
-      ...form,
-      email: form.email || null,
-      telephone: form.telephone || null,
-      specialite: form.specialite || null,
-      licence_fft: form.licence_fft || null,
-      notes: form.notes || null,
-      budget_voyages_annuel: form.budget_voyages_annuel
-        ? Number(form.budget_voyages_annuel)
-        : null,
-    });
-    setOpen(false);
-    setForm(emptyEntraineur());
-    await load();
+    setFormError(null);
+    setSaving(true);
+    try {
+      await createEntraineur({
+        ...form,
+        email: form.email || null,
+        telephone: form.telephone || null,
+        specialite: form.specialite || null,
+        licence_fft: form.licence_fft || null,
+        notes: form.notes || null,
+        budget_voyages_annuel: form.budget_voyages_annuel
+          ? Number(form.budget_voyages_annuel)
+          : null,
+      });
+      setOpen(false);
+      setForm(emptyEntraineur());
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Impossible d'ajouter l'entraîneur");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleMissionSubmit(e: React.FormEvent) {
@@ -264,8 +274,20 @@ export function EntraineursClient() {
         </Card>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Nouvel entraîneur">
+      <Modal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setFormError(null);
+        }}
+        title="Nouvel entraîneur"
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {formError}
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>Prénom</Label>
@@ -341,7 +363,9 @@ export function EntraineursClient() {
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Annuler
             </Button>
-            <Button type="submit">Enregistrer</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </Button>
           </div>
         </form>
       </Modal>

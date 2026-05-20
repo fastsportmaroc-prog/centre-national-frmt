@@ -29,8 +29,16 @@ Projet : `https://kcwvqwvcyiiwalyvhvxz.supabase.co`
 | 13 | `013_entraineurs_budget.sql` | Entraîneurs, budget annuel |
 | 14 | `014_infrastructures_materiel_budget_deplacement.sql` | Infrastructures, matériel, budget déplacement |
 | 15 | `015_stages_links_reservations_infra.sql` | Liens stages, réservations infra |
+| 16 | `016_production_frmt.sql` | Rôles, photos entraîneurs, infrastructures |
+| 17 | `017_auth_ensure_profile.sql` | Profil auto à la connexion |
+| 18 | `018_entraineurs_rls_policies.sql` | **Obligatoire** — droits ajout entraîneurs (RLS) |
+| 19 | `019_soft_delete_audit_logs.sql` | **Recommandé** — `audit_logs` + colonnes `deleted_at` / `deleted_by` / `delete_reason` (NON destructif) |
 
 3. Si une migration échoue avec « already exists », c’est souvent normal (ré-exécution) : vérifier le message et passer à la suivante.
+
+**Archivage / suppression logique ?** Exécutez au minimum `019_soft_delete_audit_logs.sql` avant d’utiliser « Archiver » dans l’application.
+
+**Ajout entraîneur bloqué ?** Exécutez au minimum `018_entraineurs_rls_policies.sql`.
 
 ## Méthode 2 — Supabase CLI
 

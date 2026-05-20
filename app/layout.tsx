@@ -17,7 +17,6 @@ import { APP_NAME, FEDERATION_NAME } from "@/lib/constants/branding";
 export const metadata: Metadata = {
   title: APP_NAME,
   description: `Gestion du ${APP_NAME} — ${FEDERATION_NAME}`,
-  icons: { icon: "/frmt-logo.svg", apple: "/frmt-logo.svg" },
 };
 
 export default function RootLayout({

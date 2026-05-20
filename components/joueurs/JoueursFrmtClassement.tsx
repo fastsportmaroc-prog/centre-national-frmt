@@ -172,8 +172,8 @@ export function JoueursFrmtClassement({
             : ""}
         </p>
         <p className="mt-1 text-xs text-muted">
-          {inDb} déjà en base Supabase · cliquez <strong>Sync FRMT (WB27)</strong> en haut pour
-          ajouter les manquants
+          {inDb} déjà en base · cliquez <strong>Intégrer classement FRMT</strong> en haut pour
+          ajouter ou mettre à jour les classements
         </p>
         <a
           href="https://info.frmt.ma/FRMT_CLASSEMENT_WB27"

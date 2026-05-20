@@ -30,15 +30,24 @@ export type FrmtClassementFile = {
   note?: string;
 };
 
-const GROUPE_BY_CATEGORIE: Record<CategorieAge, string> = {
-  U8: "g6",
-  U10: "g6",
-  U12: "g6",
-  U14: "g5",
-  U16: "g4",
-  U18: "g3",
-  Senior: "g2",
+/** Noms des groupes Supabase (migration 003) — pas des ids mock g1/g6 */
+export const GROUPE_NOM_BY_CATEGORIE: Record<CategorieAge, string> = {
+  U8: "U12",
+  U10: "U12",
+  U12: "U12",
+  U14: "U14",
+  U16: "U16",
+  U18: "U18",
+  Senior: "Préparation compétition",
 };
+
+export function groupeIdForCategorie(
+  groupes: { id: string; nom: string }[],
+  categorie: CategorieAge
+): string | null {
+  const nom = GROUPE_NOM_BY_CATEGORIE[categorie];
+  return groupes.find((g) => g.nom === nom)?.id ?? null;
+}
 
 function titleCase(s: string): string {
   return s
@@ -75,7 +84,7 @@ export function frmtPlayerToJoueurInput(
     telephone: null,
     niveau: `Top ${p.rang_categorie} cat. ${p.annee_naissance}`,
     classement: classementLabel,
-    groupe_id: GROUPE_BY_CATEGORIE[p.categorie_age] ?? "g2",
+    groupe_id: groupeId,
     coach_referent: null,
     statut: "actif",
     documents: null,
