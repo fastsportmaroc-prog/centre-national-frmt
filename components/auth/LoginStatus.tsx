@@ -2,50 +2,45 @@
 
 import { useEffect, useState } from "react";
 
-type Health = {
-  ok: boolean;
-  supabaseConfigured: boolean;
-  siteUrl: string;
-  hint?: string | null;
-};
-
 export function LoginStatus() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/health", { cache: "no-store" })
       .then((r) => r.json())
-      .then((data: Health) => {
-        setHealth(data);
-        setErr(null);
+      .then((d: {
+        supabaseConfigured?: boolean;
+        authKeyOk?: boolean;
+        hint?: string;
+      }) => {
+        if (!d.supabaseConfigured) {
+          setStatus("error");
+          setHint(d.hint ?? null);
+          return;
+        }
+        setStatus("ok");
+        setHint(d.hint ?? null);
       })
-      .catch(() => setErr("Serveur non démarré — lancez npm run dev ou vérifiez Vercel"));
+      .catch(() => {
+        setStatus("error");
+        setHint("Lancez DEMARRER.bat puis ouvrez http://localhost:3001");
+      });
   }, []);
 
-  if (err) {
-    return (
-      <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-        {err}
-      </p>
-    );
+  if (status === "loading") {
+    return <p className="text-center text-xs text-muted">Verification serveur...</p>;
   }
 
-  if (!health) {
-    return <p className="text-center text-xs text-muted">Vérification du serveur…</p>;
-  }
-
-  if (!health.supabaseConfigured) {
+  if (status === "error") {
     return (
-      <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-        {health.hint ?? "Supabase non configuré — variables Vercel + Redeploy requis."}
+      <p className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        {hint ?? "Serveur ou Supabase non pret"}
       </p>
     );
   }
 
   return (
-    <p className="text-center text-xs text-emerald-400/90">
-      Serveur OK · Supabase connecté
-    </p>
+    <p className="text-center text-xs text-emerald-400">Serveur OK · Supabase connecte</p>
   );
 }

@@ -33,6 +33,7 @@ Projet : `https://kcwvqwvcyiiwalyvhvxz.supabase.co`
 | 17 | `017_auth_ensure_profile.sql` | Profil auto à la connexion |
 | 18 | `018_entraineurs_rls_policies.sql` | **Obligatoire** — droits ajout entraîneurs (RLS) |
 | 19 | `019_soft_delete_audit_logs.sql` | **Recommandé** — `audit_logs` + colonnes `deleted_at` / `deleted_by` / `delete_reason` (NON destructif) |
+| 20 | `020_auth_compte_frmt.sql` | **Connexion compte** — sync profils auth + admin FRMT (NON destructif) |
 
 3. Si une migration échoue avec « already exists », c’est souvent normal (ré-exécution) : vérifier le message et passer à la suivante.
 

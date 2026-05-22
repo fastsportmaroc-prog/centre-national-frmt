@@ -1,0 +1,24 @@
+FRMT Centre National — CONNEXION (3 étapes)
+==========================================
+
+1) Double-clic sur DEMARRER.bat
+   (ou: npm run demarrer)
+
+2) Ouvrir UNIQUEMENT:
+   http://localhost:3001/auth/login
+
+3) Se connecter → vous devez arriver sur /dashboard
+   (si retour login: Ctrl+F5 puis réessayer)
+
+---
+Si erreur "email non confirmé":
+  Supabase.com → votre projet → Authentication → Users
+  → cliquer l'utilisateur → Confirm user
+
+Si erreur "clé invalide":
+  Supabase → Settings → API → copier la clé "anon" (eyJ...)
+  dans .env.local → NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+  puis relancer DEMARRER.bat
+
+Test sans navigateur:
+  npm run verify:supabase

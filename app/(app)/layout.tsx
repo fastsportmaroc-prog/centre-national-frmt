@@ -1,16 +1,10 @@
-import { AppShell } from "@/components/layout/AppShell";
-import { AuthProvider } from "@/components/auth/AuthProvider";
-import { AuthGate } from "@/components/auth/AuthGate";
-import { FrmtRoleProvider } from "@/components/auth/FrmtRoleProvider";
+import { getAuthUserFromServer } from "@/lib/auth/server-session";
+import { AppLayoutClient } from "@/components/auth/AppLayoutClient";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <AuthGate>
-        <FrmtRoleProvider>
-          <AppShell>{children}</AppShell>
-        </FrmtRoleProvider>
-      </AuthGate>
-    </AuthProvider>
-  );
+export const dynamic = "force-dynamic";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const initialUser = await getAuthUserFromServer();
+
+  return <AppLayoutClient initialUser={initialUser}>{children}</AppLayoutClient>;
 }

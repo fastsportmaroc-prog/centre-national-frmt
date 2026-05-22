@@ -1,12 +1,11 @@
 import type { NextConfig } from "next";
 
-/** Expose explicitement les variables Supabase au build Vercel */
+/**
+ * Ne pas dupliquer NEXT_PUBLIC_* dans `env` : Next les fige au build.
+ * Si le build tourne sans .env.local, le client garde des valeurs vides
+ * alors que le serveur lit .env.local au runtime → bug login local.
+ */
 const nextConfig: NextConfig = {
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-  },
   images: {
     remotePatterns: [
       {

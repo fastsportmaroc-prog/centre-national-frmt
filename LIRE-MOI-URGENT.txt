@@ -1,0 +1,40 @@
+FRMT - DEMARRAGE EN 2 CLICS
+===========================
+
+1) Double-clic sur le fichier :
+   DEMARRER.bat
+
+2) Dans le navigateur, ouvrir EXACTEMENT :
+   http://localhost:3001/auth/login
+
+3) Entrer email + mot de passe Supabase
+   puis cliquer "Se connecter"
+
+Vous devez arriver sur le tableau de bord.
+
+---
+SI ERREUR ROUGE SUR LA PAGE LOGIN :
+
+A) Email ou mot de passe faux
+   -> Supabase.com -> votre projet -> Authentication -> Users
+
+B) Email non confirme
+   -> Users -> votre compte -> Confirm user
+
+C) Cle Supabase invalide
+   -> Settings -> API -> copier la cle "anon" (commence par eyJ)
+   -> coller dans .env.local :
+      NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   -> relancer DEMARRER.bat
+
+D) URL Supabase Dashboard
+   -> Authentication -> URL Configuration
+   -> ajouter : http://localhost:3001/**
+
+---
+TEST RAPIDE (PowerShell) :
+   cd C:\Users\USER\tennis-center
+   npm run verify:supabase
+
+---
+NE PAS utiliser le port 3000 si DEMARRER.bat dit 3001.

@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { CookieToSet } from "./cookies";
-import { getSupabaseEnv, isSupabaseConfigured } from "./config";
+import { getSupabasePublicEnv, isSupabaseConfigured } from "./config";
+import { isInvalidRefreshTokenError } from "@/lib/auth/session-errors";
 
 const MOCK_AUTH_COOKIE = "tcp_demo_auth";
 
@@ -22,6 +23,20 @@ export function clearMockAuth(response: NextResponse) {
   response.cookies.delete(MOCK_AUTH_COOKIE);
 }
 
+function redirectLoginWithClearedCookies(
+  request: NextRequest,
+  sessionResponse: NextResponse
+) {
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = "/auth/login";
+  redirectUrl.searchParams.set("reason", "session_expired");
+  const redirect = NextResponse.redirect(redirectUrl);
+  sessionResponse.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie.name, cookie.value, cookie);
+  });
+  return redirect;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -29,8 +44,11 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
     const isDemoAuthed = hasMockAuth(request);
 
-    const isHealth = request.nextUrl.pathname === "/api/health";
-    if (!isAuthRoute && !isDemoAuthed && request.nextUrl.pathname !== "/" && !isHealth) {
+    const isApi =
+      request.nextUrl.pathname.startsWith("/api/auth") ||
+      request.nextUrl.pathname === "/api/health" ||
+      request.nextUrl.pathname === "/api/status";
+    if (!isAuthRoute && !isDemoAuthed && request.nextUrl.pathname !== "/" && !isApi) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/login";
       return NextResponse.redirect(url);
@@ -38,7 +56,7 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  const { url, anonKey } = getSupabaseEnv();
+  const { url, anonKey } = getSupabasePublicEnv();
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {
@@ -55,15 +73,38 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+
+  try {
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error && isInvalidRefreshTokenError(error)) {
+      await supabase.auth.signOut();
+      return redirectLoginWithClearedCookies(request, response);
+    }
+
+    user = authUser;
+  } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        /* ignore */
+      }
+      return redirectLoginWithClearedCookies(request, response);
+    }
+  }
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
   const isPublic =
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname.startsWith("/api/auth") ||
-    request.nextUrl.pathname === "/api/health";
+    request.nextUrl.pathname === "/api/health" ||
+    request.nextUrl.pathname === "/api/status" ||
+    request.nextUrl.pathname.startsWith("/api/frmt-logo");
 
   if (!user && !isAuthRoute && !isPublic) {
     const redirectUrl = request.nextUrl.clone();

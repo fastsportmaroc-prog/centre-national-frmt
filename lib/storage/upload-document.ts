@@ -1,4 +1,4 @@
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
 const BUCKET = "passeport-documents";
@@ -13,8 +13,7 @@ export async function uploadDocument(file: File, dossierId: string): Promise<str
     throw new Error("Le fichier ne doit pas dépasser 5 Mo.");
   }
 
-  assertSupabaseConfigured();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = await createSupabaseBrowserClientAsync();
   if (!supabase) throw new Error("Supabase non disponible");
 
   const ext = file.name.split(".").pop() ?? "pdf";

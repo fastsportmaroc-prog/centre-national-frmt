@@ -1,0 +1,45 @@
+FRMT - MOT DE PASSE "INCORRECT" ALORS QU IL EST BON
+==================================================
+
+CAUSE 1 (la plus frequente)
+---------------------------
+Cle sb_publishable dans .env.local ne fonctionne pas toujours pour le login.
+
+FIX :
+1. Supabase.com -> projet kcwvqwvcyiiwalyvhvxz
+2. Settings -> API
+3. Copier la cle "anon" "public" qui commence par eyJ (PAS sb_publishable)
+4. Dans .env.local remplacer :
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... (toute la cle)
+5. DEMARRER.bat -> reconnecter
+
+
+CAUSE 2
+-------
+Utilisateur dans un autre projet Supabase.
+
+Verifier : page login affiche "Projet Supabase : kcwvqwvcyiiwalyvhvxz"
+Users : https://supabase.com/dashboard/project/kcwvqwvcyiiwalyvhvxz/auth/users
+
+
+CAUSE 3 - FORCER LE MOT DE PASSE (recommande)
+--------------------------------------------
+1. Dans .env.local ajouter UNE LIGNE (ne jamais publier sur GitHub) :
+
+   SUPABASE_SERVICE_ROLE_KEY=eyJ... (cle service_role du dashboard API)
+
+2. PowerShell :
+
+   cd C:\Users\USER\tennis-center
+   node scripts/fix-user-password.mjs s.abderrazzaq@frmt.ma MonNouveauPass2026!
+
+3. Se connecter avec ce NOUVEAU mot de passe sur :
+   http://localhost:3001/auth/login
+
+
+CAUSE 4
+-------
+Email non confirme.
+
+Supabase -> Authentication -> Users -> menu ... -> Confirm user
+OU executer FIX_AUTH_MOT_DE_PASSE.sql (section 2)

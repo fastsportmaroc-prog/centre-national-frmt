@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Label, Select } from "@/components/ui/Input";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFrmtRole } from "@/components/auth/FrmtRoleProvider";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { ROLES_UTILISATEUR, type RoleUtilisateur } from "@/lib/types/roles";
 
 export function ParametresDemoRole() {
@@ -21,7 +21,7 @@ export function ParametresDemoRole() {
     setSaving(true);
     setMessage(null);
     try {
-      const supabase = createSupabaseBrowserClient();
+      const supabase = await createSupabaseBrowserClientAsync();
       if (!supabase) throw new Error("Supabase indisponible");
       const { error } = await supabase
         .from("profiles")

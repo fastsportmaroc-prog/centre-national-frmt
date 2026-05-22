@@ -1,4 +1,4 @@
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
 const BUCKET = "joueurs-photos";
@@ -16,8 +16,7 @@ export async function uploadJoueurPhoto(
     throw new Error("La photo ne doit pas dépasser 2 Mo.");
   }
 
-  assertSupabaseConfigured();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = await createSupabaseBrowserClientAsync();
   if (!supabase) throw new Error("Supabase non disponible");
 
   const ext = file.name.split(".").pop() ?? "jpg";
@@ -36,8 +35,7 @@ export async function uploadJoueurPhoto(
 export async function deleteJoueurPhoto(photoUrl: string) {
   if (!photoUrl.startsWith("http")) return;
 
-  assertSupabaseConfigured();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = await createSupabaseBrowserClientAsync();
   if (!supabase) return;
 
   const marker = `/storage/v1/object/public/${BUCKET}/`;

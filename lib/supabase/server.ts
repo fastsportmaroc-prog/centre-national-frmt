@@ -3,13 +3,26 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { CookieToSet } from "./cookies";
-import { getSupabaseEnv, isSupabaseConfigured } from "./config";
+import { getSupabasePublicEnv } from "./config";
+import { readSupabaseEnvFromFile } from "./env-file";
+
+function getServerSupabaseEnv() {
+  const proc = getSupabasePublicEnv();
+  const file = readSupabaseEnvFromFile();
+  return {
+    url: proc.url || file.url,
+    anonKey:
+      proc.anonKey.startsWith("eyJ") || proc.anonKey.startsWith("sb_publishable_")
+        ? proc.anonKey
+        : file.anonKey || proc.anonKey,
+  };
+}
 
 export async function createSupabaseServerClient() {
-  if (!isSupabaseConfigured()) return null;
+  const { url, anonKey } = getServerSupabaseEnv();
+  if (!url || !anonKey || anonKey.length < 20) return null;
 
   const cookieStore = await cookies();
-  const { url, anonKey } = getSupabaseEnv();
 
   return createServerClient(url, anonKey, {
     cookies: {
@@ -17,13 +30,9 @@ export async function createSupabaseServerClient() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet: CookieToSet[]) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        } catch {
-          // Ignoré en Server Component statique
-        }
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
       },
     },
   });

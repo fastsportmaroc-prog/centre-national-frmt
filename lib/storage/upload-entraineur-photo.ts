@@ -1,4 +1,4 @@
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
 const BUCKET = "entraineurs-photos";
@@ -16,8 +16,7 @@ export async function uploadEntraineurPhoto(
     throw new Error("La photo ne doit pas dépasser 2 Mo.");
   }
 
-  assertSupabaseConfigured();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = await createSupabaseBrowserClientAsync();
   if (!supabase) throw new Error("Supabase non disponible");
 
   const ext = file.name.split(".").pop() ?? "jpg";

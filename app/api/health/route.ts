@@ -1,5 +1,6 @@
 import {
   getSupabaseEnvDiagnostics,
+  getSupabasePublicEnv,
   isSupabaseConfigured,
   SUPABASE_ENV,
 } from "@/lib/supabase/config";
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const diagnostics = getSupabaseEnvDiagnostics();
   const configured = isSupabaseConfigured();
+  const { anonKey } = getSupabasePublicEnv();
 
   return Response.json({
     ok: true,
@@ -20,20 +22,27 @@ export async function GET() {
     envKeys: {
       url: SUPABASE_ENV.URL,
       anonKey: SUPABASE_ENV.ANON_KEY,
+      publishableKey: SUPABASE_ENV.PUBLISHABLE_KEY,
     },
-    diagnostics,
-    hint: configured
+    diagnostics: {
+      ...diagnostics,
+      keyPrefix: anonKey ? `${anonKey.slice(0, 12)}…` : null,
+    },
+    authKeyOk: diagnostics.authReady,
+    hint: configured && diagnostics.keyKind === "publishable"
+      ? "Cle publishable OK pour demarrer. Pour login garanti, ajoutez aussi la cle anon eyJ... dans .env.local."
+      : configured
       ? null
       : !diagnostics.hasUrl
         ? `Variable manquante : ${SUPABASE_ENV.URL}`
         : !diagnostics.hasAnonKey
           ? `Variable manquante : ${SUPABASE_ENV.ANON_KEY}`
           : !diagnostics.notPlaceholder
-            ? "Valeur placeholder détectée — utilisez les vraies clés Supabase"
+            ? "Valeur placeholder — collez la vraie clé Supabase (Settings → API)"
             : !diagnostics.urlHttps
               ? "URL doit commencer par https://"
               : !diagnostics.keyMinLength
-                ? "Clé anon trop courte — vérifiez NEXT_PUBLIC_SUPABASE_ANON_KEY"
+                ? "Clé trop courte"
                 : "Configuration Supabase invalide",
   });
 }

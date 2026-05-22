@@ -1,0 +1,22 @@
+FRMT Centre National — demarrage immediat
+======================================
+
+1) Double-clic : REACTIVER.bat
+   (ou DEMARRER.bat — meme script)
+
+2) URL finale :
+   http://localhost:3001/auth/login
+
+3) Diagnostic complet :
+   http://localhost:3001/api/status
+
+4) Si login refuse :
+   - Supabase → Settings → API → copier cle anon eyJ...
+   - Remplacer NEXT_PUBLIC_SUPABASE_ANON_KEY dans .env.local
+   - Relancer REACTIVER.bat
+   - Ou REPARER-COMPTE.bat (avec SUPABASE_SERVICE_ROLE_KEY)
+
+5) Compte test :
+   npm run verify:supabase -- email@frmt.ma MotDePasse
+
+Le .env.local a ete nettoye (plus de doublons COLLE_ICI).

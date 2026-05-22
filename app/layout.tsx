@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { APP_NAME, FEDERATION_NAME } from "@/lib/constants/branding";
+import { Suspense } from "react";
+import { SupabaseSessionCleanup } from "@/components/auth/SupabaseSessionCleanup";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,12 +15,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-import { APP_NAME, FEDERATION_NAME } from "@/lib/constants/branding";
-
 export const metadata: Metadata = {
   title: APP_NAME,
   description: `Gestion du ${APP_NAME} — ${FEDERATION_NAME}`,
 };
+
+export const dynamic = "force-dynamic";
 
 export default function RootLayout({
   children,
@@ -29,7 +32,12 @@ export default function RootLayout({
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full bg-background text-foreground">{children}</body>
+      <body className="min-h-full bg-background text-foreground">
+        <Suspense fallback={null}>
+          <SupabaseSessionCleanup />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }
