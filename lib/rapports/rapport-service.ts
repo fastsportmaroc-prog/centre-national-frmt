@@ -236,13 +236,13 @@ export function filterSectionsData<T extends RapportEntityData>(
   data: T,
   sections: ReportSectionsConfig
 ): Partial<T> {
-  const out: Partial<T> = { ...data };
-  if (!sections.participants) delete (out as StageReportData).participants;
-  if (!sections.restauration) delete (out as StageReportData).restauration;
-  if (!sections.hebergement) delete (out as StageReportData).hebergement;
-  if (!sections.terrains) delete (out as StageReportData).terrains;
-  if (!sections.kinesitherapie) delete (out as StageReportData).kinesitherapie;
-  if (!sections.financier) delete (out as StageReportData).financier;
-  if (!sections.resultats) delete (out as StageReportData).resultats;
-  return out;
+  const out = { ...data } as Record<string, unknown>;
+  if (!sections.participants) delete out.participants;
+  if (!sections.restauration) delete out.restauration;
+  if (!sections.hebergement) delete out.hebergement;
+  if (!sections.terrains) delete out.terrains;
+  if (!sections.kinesitherapie) delete out.kinesitherapie;
+  if (!sections.financier) delete out.financier;
+  if (!sections.resultats) delete out.resultats;
+  return out as Partial<T>;
 }

@@ -118,8 +118,7 @@ export function InfrastructuresManager() {
     if (item.inCatalog) return;
     setSaving(true);
     try {
-      const source = item.catalogSource === "courts" ? "courts" : "terrains";
-      const result = await importInfrastructureToCatalogAction(source, item.sourceId);
+      const result = await importInfrastructureToCatalogAction(item.sourceId);
       if (!result.ok) {
         toast(result.error ?? "Import impossible", "error");
         return;

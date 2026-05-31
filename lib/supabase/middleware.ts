@@ -120,7 +120,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute && request.nextUrl.pathname === "/auth/login") {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/dashboard";
+    redirectUrl.pathname = "/v2/dashboard";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }

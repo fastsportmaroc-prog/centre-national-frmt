@@ -197,7 +197,7 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
 
         const dateDebut = `${day}T${debut}:00`;
         const dateFin = `${day}T${fin}:00`;
-        const { data: resa, error: resErr } = await createReservationInfrastructure({
+        const { data: resa, error: resErr } = await createReservationInfrastructureServer({
           infrastructure_id: court.id,
           stage_id,
           entraineur_id: coachId,

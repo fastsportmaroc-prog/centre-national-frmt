@@ -3,7 +3,7 @@
 import { RotateCcw, Search, FileDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
-import type { StatistiquesFilters } from "@/lib/statistiques/types";
+import type { SaisonOption, SexeFilter, StatistiquesFilters } from "@/lib/statistiques/types";
 import { officialCategoryFilterOptions } from "@/lib/constants/official-categories";
 
 type Options = {

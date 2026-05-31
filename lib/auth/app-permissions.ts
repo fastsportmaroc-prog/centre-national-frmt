@@ -53,7 +53,7 @@ export function canAccessV2Href(role: AppRole, href: string): boolean {
       href.includes("/reservations")
     );
   }
-  if (role === "joueur" || role === "viewer") {
+  if (role === "joueur") {
     return (
       href.includes("/dashboard") ||
       href.startsWith("/v2/joueurs") ||

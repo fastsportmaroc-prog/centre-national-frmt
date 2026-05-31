@@ -71,7 +71,7 @@ function incrementEvolutionCategory(pt: ParticipantsEvolutionPoint, cat: string)
     return;
   }
   const key = cat as keyof Omit<ParticipantsEvolutionPoint, "month" | "Elite Pro">;
-  if (key in pt && key !== "month") {
+  if (key in pt) {
     pt[key]++;
   }
 }
@@ -90,10 +90,12 @@ function calcPresencePct(
   if (rows.length === 0) return 82;
   const byJoueur = new Map<string, Set<string>>();
   for (const p of rows) {
+    const personneId = p.personne_id;
+    if (!personneId) continue;
     const present = p.petit_dejeuner || p.dejeuner || p.diner;
     if (!present) continue;
-    if (!byJoueur.has(p.personne_id)) byJoueur.set(p.personne_id, new Set());
-    byJoueur.get(p.personne_id)!.add(p.date_repas);
+    if (!byJoueur.has(personneId)) byJoueur.set(personneId, new Set());
+    byJoueur.get(personneId)!.add(p.date_repas);
   }
   let sum = 0;
   for (const id of joueurIds) {

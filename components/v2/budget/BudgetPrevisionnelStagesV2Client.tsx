@@ -56,7 +56,7 @@ export function BudgetPrevisionnelStagesV2Client() {
 
   async function exportPdf(b: BudgetPrevisionnel) {
     openBudgetPrevisionnelPdf(b);
-    await markBudgetPdfExported(b.id, "v2-admin");
+    await markBudgetPdfExported(b.id);
   }
 
   return (

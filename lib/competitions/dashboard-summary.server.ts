@@ -113,6 +113,7 @@ export async function getCompetitionDashboardSummary(): Promise<CompetitionDashb
             p.passeport_alerte === "attention" ||
             p.passeport_alerte === "inconnu";
           if (!visaUrgent && !passeportUrgent) continue;
+          if (p.participant_type !== "joueur" && p.participant_type !== "coach") continue;
           visasUrgents.push({
             competition_id: c.id,
             competition_nom: c.nom,

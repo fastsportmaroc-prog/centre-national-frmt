@@ -15,7 +15,7 @@ type Props = {
 
 export function LoginForm({ projectRef, configured }: Props) {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = searchParams.get("redirect") ?? "/v2/dashboard";
   const [mode, setMode] = useState<"login" | "signup">("login");
 
   const [loginState, loginFormAction, loginPending] = useActionState(

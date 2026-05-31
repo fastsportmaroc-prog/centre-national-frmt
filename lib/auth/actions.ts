@@ -55,7 +55,7 @@ export async function loginAction(
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const redirectTo = String(formData.get("redirect") ?? "/dashboard");
+  const redirectTo = String(formData.get("redirect") ?? "/v2/dashboard");
 
   if (!email.trim() || !password) {
     return { error: "Email et mot de passe requis.", message: null };
@@ -107,7 +107,7 @@ export async function signupAction(
 
   if (data.session) {
     revalidatePath("/", "layout");
-    redirect("/dashboard");
+    redirect("/v2/dashboard");
   }
 
   return {

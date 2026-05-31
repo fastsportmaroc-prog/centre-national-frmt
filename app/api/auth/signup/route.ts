@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   }
 
   if (data.session) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/v2/dashboard", request.url));
   }
 
   loginUrl.searchParams.set("message", "compte_cree");
