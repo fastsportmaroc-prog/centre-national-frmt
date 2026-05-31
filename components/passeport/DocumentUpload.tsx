@@ -98,7 +98,7 @@ export function DocumentUpload({
         onClick={() => inputRef.current?.click()}
       >
         <Upload className="h-4 w-4" />
-        {loading ? "Envoi…" : displayUrl ? "Remplacer" : "Téléverser"}
+        {loading ? "Envoi…" : displayUrl ? "Remplacer" : "Joindre"}
       </Button>
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>

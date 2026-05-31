@@ -16,11 +16,11 @@ export async function GET() {
       : null;
 
   return NextResponse.json({
+    ...meta,
     source: file.source,
     fetchedAt: file.fetchedAt,
     classementDate,
     note: file.note,
-    ...meta,
     groups: getFrmtClassementGroups(),
     players: getFrmtClassementPlayers(),
   });

@@ -28,7 +28,8 @@ export type ActionHistorique =
   | "annulation"
   | "envoi_email"
   | "export"
-  | "imputation";
+  | "imputation"
+  | "stage_created";
 
 export type HistoriqueEntry = {
   id: string;

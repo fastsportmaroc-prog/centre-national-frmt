@@ -5,11 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
-import {
-  initialAuthState,
-  loginAction,
-  signupAction,
-} from "@/lib/auth/actions";
+import { initialAuthState } from "@/lib/auth/form-state";
+import { loginAction, signupAction } from "@/lib/auth/actions";
 
 type Props = {
   projectRef: string;

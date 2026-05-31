@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -12,6 +13,11 @@ type Props = {
 };
 
 export function Header({ title, description, onMenuClick, actions }: Props) {
+  const [demoMode, setDemoMode] = useState(false);
+  useEffect(() => {
+    setDemoMode(!isSupabaseConfigured());
+  }, []);
+
   return (
     <header className="flex flex-col gap-4 border-b border-border bg-background/80 px-4 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <div className="flex items-start gap-3">
@@ -35,7 +41,7 @@ export function Header({ title, description, onMenuClick, actions }: Props) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {actions}
-        {!isSupabaseConfigured() && (
+        {demoMode && (
           <span className="inline-flex w-fit items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-400">
             Données de démonstration (Supabase non configuré)
           </span>

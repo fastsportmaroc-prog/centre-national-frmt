@@ -1,15 +1,18 @@
 Logo officiel FRMT pour les rapports
 =====================================
 
-Placez votre fichier logo officiel ici :
+Source unique :
 
-  public/frmt-logo.png
+  public/logo-frmt.png
 
-Format recommandé : PNG, fond transparent ou blanc, 400x400 px minimum.
+Régénérer le base64 embarqué (après remplacement du PNG) :
 
-Ce fichier sera automatiquement intégré dans :
-- Impression des rapports (/rapports)
-- Export PDF (via impression navigateur)
-- Documents billets d'avion
+  node scripts/convert-logo-base64.js
 
-Sans frmt-logo.png, le logo SVG FRMT de secours est utilisé.
+Ce logo est utilisé pour :
+- Impression des rapports (window.print)
+- Export PDF jsPDF
+- Documents budget prévisionnel
+- API /api/frmt-logo
+
+Le fichier public/frmt-logo.png est un alias du même PNG (compatibilité).

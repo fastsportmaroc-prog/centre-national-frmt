@@ -43,15 +43,25 @@ import type {
   TypeEvenementRestauration,
 } from "@/lib/types/restauration";
 import { formatDate } from "@/lib/utils/dates";
+import Link from "next/link";
 import {
   Building2,
   CalendarDays,
+  FileDown,
   FileText,
   Pencil,
   Plus,
   Trash2,
   UtensilsCrossed,
 } from "lucide-react";
+import { getStageProvisionSummaries } from "@/lib/data/stage-besoins";
+import type { StageProvisionSummary } from "@/lib/data/stage-besoins";
+import { StageProvisionList } from "@/components/stages/StageProvisionList";
+import { parseStageIdFromNotes } from "@/lib/utils/stage-link";
+import { getStageRestaurations, deleteStageRestauration } from "@/lib/data/stage-services";
+import { exportPdfReport, openPrintReport } from "@/lib/export/reports";
+import { buildRestaurationStagesReport } from "@/lib/reports/restauration-report";
+import type { StageRestaurationRecord } from "@/lib/types/stage-services";
 
 type Tab = "besoins" | "prestataires" | "factures";
 
@@ -144,20 +154,42 @@ export function RestaurationClient() {
   const [formFacture, setFormFacture] = useState<FactureRestaurationInput>(emptyFacture());
 
   const [detailPrestataire, setDetailPrestataire] = useState<PrestataireEtatGeneral | null>(null);
+  const [stageProvisions, setStageProvisions] = useState<StageProvisionSummary[]>([]);
+  const [stageRestaurations, setStageRestaurations] = useState<StageRestaurationRecord[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [r, b, p, f, e] = await Promise.all([
-      getRepas(),
-      getBesoinsRestauration(),
-      getPrestatairesRestauration(),
-      getFacturesRestauration(),
-      getPrestatairesEtatGeneral(),
-    ]);
-    setRepas(r);
-    setBesoins(b);
-    setPrestataires(p);
-    setFactures(f);
-    setEtats(e);
+    setLoadError(null);
+    try {
+      const [r, b, p, f, e, provisions, stageRestau] = await Promise.all([
+        getRepas(),
+        getBesoinsRestauration(),
+        getPrestatairesRestauration(),
+        getFacturesRestauration(),
+        getPrestatairesEtatGeneral(),
+        getStageProvisionSummaries(),
+        getStageRestaurations(),
+      ]);
+      setRepas(r);
+      setBesoins(b);
+      setPrestataires(p);
+      setFactures(f);
+      setEtats(e);
+      setStageProvisions(provisions);
+      setStageRestaurations(stageRestau);
+    } catch (err) {
+      console.warn("Chargement restauration:", err);
+      setRepas([]);
+      setBesoins([]);
+      setPrestataires([]);
+      setFactures([]);
+      setEtats([]);
+      setStageProvisions([]);
+      setStageRestaurations([]);
+      setLoadError(
+        err instanceof Error ? err.message : "Impossible de charger la restauration"
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -276,8 +308,44 @@ export function RestaurationClient() {
       <PageHeader
         title="Restauration"
         description="Besoins par événement · Factures prestataires · État général"
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const meta = buildRestaurationStagesReport(
+                  stageRestaurations,
+                  stageProvisions
+                );
+                await openPrintReport(meta);
+              }}
+            >
+              Imprimer
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const meta = buildRestaurationStagesReport(
+                  stageRestaurations,
+                  stageProvisions
+                );
+                await exportPdfReport("restauration.pdf", meta);
+              }}
+            >
+              <FileDown className="h-4 w-4" />
+              Export PDF
+            </Button>
+          </>
+        }
       />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
+        {loadError && (
+          <Card className="border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+            {loadError}
+          </Card>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           <Card className="p-4">
             <p className="text-sm text-muted">Besoins actifs</p>
@@ -328,6 +396,48 @@ export function RestaurationClient() {
 
         {tab === "besoins" && (
           <section className="space-y-3">
+            <StageProvisionList
+              summaries={stageProvisions}
+              filter="restauration"
+              emptyMessage="Aucun besoin restauration auto-créé par un stage."
+            />
+            {stageRestaurations.length > 0 && (
+              <Card className="p-4">
+                <p className="mb-2 text-sm font-semibold">Restaurations stage (table)</p>
+                <ul className="space-y-2 text-sm">
+                  {stageRestaurations.map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Stage {r.stage_id.slice(0, 8)} · {formatDate(r.date_debut)} →{" "}
+                        {formatDate(r.date_fin)} · {r.nb_personnes} pers. · {r.total_repas} repas
+                      </span>
+                      <div className="flex gap-2">
+                        <Link href={`/stages/${r.stage_id}`}>
+                          <Button size="sm" variant="ghost">
+                            Voir stage
+                          </Button>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!confirm("Supprimer cette restauration stage ?")) return;
+                            await deleteStageRestauration(r.id);
+                            await load();
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 text-red-400" />
+                          Supprimer
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+            <p className="text-xs text-muted">
+              Besoins manuels et événements hors stage ci-dessous.
+            </p>
             <div className="flex justify-end">
               <Button
                 onClick={() => {
@@ -340,12 +450,22 @@ export function RestaurationClient() {
                 Nouveau besoin
               </Button>
             </div>
-            {besoins.map((b) => (
+            {besoins.map((b) => {
+              const stageId = parseStageIdFromNotes(b.notes);
+              return (
               <Card key={b.id}>
                 <div className="flex flex-col gap-2 lg:flex-row lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold">{b.titre}</h3>
+                      {stageId && (
+                        <Link
+                          href={`/stages/${stageId}`}
+                          className="text-xs text-frmt-green hover:underline"
+                        >
+                          Stage lié
+                        </Link>
+                      )}
                       <Badge variant={besoinBadgeVariant(b.statut)}>
                         {STATUTS_BESOIN.find((s) => s.value === b.statut)?.label}
                       </Badge>
@@ -403,7 +523,8 @@ export function RestaurationClient() {
                   </div>
                 </div>
               </Card>
-            ))}
+            );
+            })}
           </section>
         )}
 

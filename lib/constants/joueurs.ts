@@ -1,4 +1,5 @@
-import type { CategorieAge, SexeJoueur, StatutJoueur } from "@/lib/types/database";
+import { categoryCodes, getDefaultAgeCategories } from "@/lib/v2/categories-age-store";
+import type { SexeJoueur, StatutJoueur } from "@/lib/types/database";
 
 export const SEXES_JOUEUR: { value: SexeJoueur; label: string; short: string }[] = [
   { value: "M", label: "Garçons", short: "G" },
@@ -10,15 +11,10 @@ export function sexeJoueurLabel(sexe: SexeJoueur): string {
   return SEXES_JOUEUR.find((s) => s.value === sexe)?.label ?? sexe;
 }
 
-export const CATEGORIES_AGE: CategorieAge[] = [
-  "U8",
-  "U10",
-  "U12",
-  "U14",
-  "U16",
-  "U18",
-  "Senior",
-];
+/** Catégories jeunes (avec borne d'âge) pour filtres / formulaires legacy. */
+export const CATEGORIES_AGE: string[] = categoryCodes(
+  getDefaultAgeCategories().filter((c) => c.maxAge != null)
+);
 
 export const STATUTS_JOUEUR: { value: StatutJoueur; label: string }[] = [
   { value: "actif", label: "Actif" },

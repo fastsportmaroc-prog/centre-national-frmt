@@ -1,11 +1,15 @@
 import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
 
-const BUCKET = "passeport-documents";
+const DEFAULT_BUCKET = "admin-documents";
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
-export async function uploadDocument(file: File, dossierId: string): Promise<string> {
+export async function uploadDocument(
+  file: File,
+  dossierId: string,
+  bucket: string = DEFAULT_BUCKET
+): Promise<string> {
   if (!ALLOWED.includes(file.type)) {
     throw new Error("Format accepté : JPG, PNG, WebP ou PDF.");
   }
@@ -20,11 +24,11 @@ export async function uploadDocument(file: File, dossierId: string): Promise<str
   const path = `${dossierId}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
+    .from(bucket)
     .upload(path, file, { upsert: true, cacheControl: "3600" });
 
   if (uploadError) throw new Error(uploadError.message);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }

@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { getStageById } from "@/lib/data/stages";
-import { getStageAutomatisation, synchroniserStage } from "@/lib/data/stage-operations";
+import { getStageAutomatisation } from "@/lib/data/stage-operations";
 import { getInfrastructures } from "@/lib/data/infrastructures";
 import { getEntraineurs } from "@/lib/data/entraineurs";
+import { getJoueurs } from "@/lib/data/joueurs";
 import type { StageProgramme } from "@/lib/types/stages";
 import type { StageAutomatisation } from "@/lib/data/stage-operations";
+import type { StageLogistiquePack } from "@/lib/types/stage-logistique";
 import { formatDate } from "@/lib/utils/dates";
 import { statutStageLabel } from "@/lib/utils/stage-automation";
 import { buildStageFicheReport } from "@/lib/reports/stage-fiche";
 import { exportPdfReport, openPrintReport } from "@/lib/export/reports";
+import { getStageLogistique, provisionStageAfterCreate } from "@/lib/stages/provision-stage";
+import { parseLogistiqueFromNotes, stripLogistiqueFromNotes } from "@/lib/stages/stage-logistique-serializer";
+import { StageDetailSections } from "@/components/stages/StageDetailSections";
 import { ArrowLeft, FileDown, Printer, RefreshCw } from "lucide-react";
 
 type Props = { id: string };
@@ -23,28 +28,40 @@ type Props = { id: string };
 export function StageDetailClient({ id }: Props) {
   const [stage, setStage] = useState<StageProgramme | null>(null);
   const [auto, setAuto] = useState<StageAutomatisation | null>(null);
+  const [logistique, setLogistique] = useState<StageLogistiquePack | null>(null);
   const [infraLabels, setInfraLabels] = useState<string[]>([]);
   const [coachLabels, setCoachLabels] = useState<string[]>([]);
-  const [syncing, setSyncing] = useState(false);
+  const [joueurLabels, setJoueurLabels] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
-    const [s, a, infras, coaches] = await Promise.all([
+    const [s, a, infras, coaches, joueurs] = await Promise.all([
       getStageById(id),
       getStageAutomatisation(id),
       getInfrastructures(),
       getEntraineurs(),
+      getJoueurs(),
     ]);
     setStage(s);
     setAuto(a);
+    const pack = s ? getStageLogistique(s) ?? parseLogistiqueFromNotes(s.notes) : null;
+    setLogistique(pack);
     if (s) {
       setInfraLabels(
         s.infrastructure_ids.map((iid) => infras.find((i) => i.id === iid)?.nom ?? iid)
       );
+      const coachIds = pack?.entraineur_ids.length ? pack.entraineur_ids : s.entraineur_ids;
       setCoachLabels(
-        s.entraineur_ids.map((cid) => {
+        coachIds.map((cid) => {
           const c = coaches.find((x) => x.id === cid);
           return c ? `${c.prenom} ${c.nom}` : cid;
+        })
+      );
+      setJoueurLabels(
+        (pack?.joueur_ids ?? []).map((jid) => {
+          const j = joueurs.find((x) => x.id === jid);
+          return j ? `${j.prenom} ${j.nom}` : jid;
         })
       );
     }
@@ -55,17 +72,17 @@ export function StageDetailClient({ id }: Props) {
   }, [load]);
 
   async function handleSync() {
+    if (!stage || !logistique) {
+      setMessage("Aucune configuration logistique — recréez le stage avec le nouveau formulaire.");
+      return;
+    }
     setSyncing(true);
     setMessage(null);
     try {
-      const res = await synchroniserStage(id);
-      if (res.conflits > 0) {
-        setMessage(`${res.conflits} conflit(s) infrastructure — corrigez avant synchronisation.`);
-      } else {
-        setMessage(
-          `Synchronisé : ${res.reservations} réservation(s), ${res.mouvements} mouvement(s) matériel.`
-        );
-      }
+      const res = await provisionStageAfterCreate(stage.id, logistique, { strictCourts: true });
+      setMessage(
+        `Synchronisé : ${res.reservations_crees} réservation(s), ${res.besoins_restauration_crees} besoin(s) restauration.`
+      );
       await load();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur de synchronisation");
@@ -74,21 +91,33 @@ export function StageDetailClient({ id }: Props) {
     }
   }
 
-  async function exportPdf() {
-    if (!stage || !auto) return;
-    await exportPdfReport(
-      `fiche-stage-${stage.id}.pdf`,
-      buildStageFicheReport(stage, auto, infraLabels, coachLabels)
+  function ficheReport() {
+    if (!stage || !auto) return null;
+    return buildStageFicheReport(
+      stage,
+      auto,
+      infraLabels,
+      coachLabels,
+      joueurLabels,
+      logistique
     );
+  }
+
+  async function exportPdf() {
+    const report = ficheReport();
+    if (!stage || !report) return;
+    await exportPdfReport(`fiche-stage-${stage.id}.pdf`, report);
   }
 
   if (!stage || !auto) {
     return <p className="p-6 text-muted">Chargement…</p>;
   }
 
+  const notesAffichables = stripLogistiqueFromNotes(stage.notes);
+
   return (
     <>
-      <PageHeader title={stage.stage_action} description="Détail stage — automatisations CNE" />
+      <PageHeader title={stage.stage_action} description="Fiche stage — récapitulatif CNE" />
       <main className="flex-1 space-y-4 p-4 sm:p-6">
         <Link href="/stages">
           <Button variant="ghost" size="sm">
@@ -110,124 +139,77 @@ export function StageDetailClient({ id }: Props) {
           </p>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="premium p-5">
-            <h3 className="mb-3 font-semibold">Informations</h3>
-            <dl className="grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted">Dates</dt>
-                <dd className="font-medium">
-                  {formatDate(stage.date_debut)} → {formatDate(stage.date_fin)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted">Durée</dt>
-                <dd className="font-medium">{auto.duree_jours} jour(s)</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Participants</dt>
-                <dd className="font-medium">
-                  {stage.nombre_joueurs} joueurs · {stage.nombre_encadrants} encadrants (
-                  {auto.total_participants} total)
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted">Hébergement</dt>
-                <dd className="font-medium">
-                  {stage.hebergement
-                    ? `Oui — ${auto.chambres_requises} chambre(s) requise(s)`
-                    : "Non"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted">Lieu</dt>
-                <dd className="font-medium">{stage.lieu ?? "—"}</dd>
-              </div>
+        <Card className="premium p-5">
+          <h3 className="mb-3 font-semibold">Informations générales</h3>
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted">Dates</dt>
+              <dd className="font-medium">
+                {formatDate(stage.date_debut)} → {formatDate(stage.date_fin)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Lieu</dt>
+              <dd className="font-medium">{stage.lieu ?? "—"}</dd>
+            </div>
+            {notesAffichables && (
               <div className="sm:col-span-2">
                 <dt className="text-muted">Notes</dt>
-                <dd>{stage.notes ?? "—"}</dd>
-              </div>
-            </dl>
-          </Card>
-
-          <Card className="premium p-5">
-            <h3 className="mb-3 font-semibold">Calculs automatiques</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                Repas estimés : <strong>{auto.repas_estimes}</strong>
-              </li>
-              <li>
-                Budget estimé : <strong>{auto.budget_estime.toLocaleString("fr-FR")} MAD</strong>
-              </li>
-              <li>
-                Budget prévu / réel :{" "}
-                <strong>
-                  {stage.budget_prevu ?? "—"} / {stage.budget_reel ?? "—"} MAD
-                </strong>
-              </li>
-            </ul>
-            {auto.conflits.length > 0 && (
-              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                <p className="mb-1 font-medium">Conflits infrastructure</p>
-                <ul className="list-disc space-y-1 pl-4">
-                  {auto.conflits.map((c) => (
-                    <li key={c.infrastructure_id}>{c.message}</li>
-                  ))}
-                </ul>
+                <dd>{notesAffichables}</dd>
               </div>
             )}
-          </Card>
-        </div>
+          </dl>
+        </Card>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="premium p-4">
-            <h3 className="mb-2 font-semibold">Infrastructures</h3>
-            <p className="text-sm text-muted">
-              {infraLabels.length ? infraLabels.join(", ") : "Aucune affectée"}
-            </p>
-          </Card>
-          <Card className="premium p-4">
-            <h3 className="mb-2 font-semibold">Entraîneurs</h3>
-            <p className="text-sm text-muted">
-              {coachLabels.length ? coachLabels.join(", ") : "Aucun affecté"}
-            </p>
-          </Card>
-          <Card className="premium p-4">
-            <h3 className="mb-2 font-semibold">Matériel</h3>
-            <p className="text-sm text-muted">
-              {stage.materiel_assignations.length
-                ? stage.materiel_assignations.map((m) => `${m.quantite} unité(s)`).join(" · ")
-                : "Aucun"}
-            </p>
-          </Card>
-        </div>
+        <StageDetailSections stage={stage} logistique={logistique} infraLabels={infraLabels} />
+
+        <Card className="premium p-5">
+          <h3 className="mb-3 font-semibold">Synthèse automatique</h3>
+          <ul className="space-y-2 text-sm">
+            <li>
+              Budget estimé : <strong>{auto.budget_estime.toLocaleString("fr-FR")} MAD</strong>
+            </li>
+            {auto.conflits.length > 0 && (
+              <li className="text-red-300">
+                Conflits : {auto.conflits.map((c) => c.message).join(" · ")}
+              </li>
+            )}
+          </ul>
+        </Card>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleSync} disabled={syncing}>
+          <Button onClick={handleSync} disabled={syncing || !logistique}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            Synchroniser planning & matériel
+            Synchroniser planning & services
           </Button>
           <Button
             variant="secondary"
-            onClick={() =>
-              openPrintReport(buildStageFicheReport(stage, auto, infraLabels, coachLabels))
-            }
+            onClick={() => {
+              const r = ficheReport();
+              if (r) openPrintReport(r);
+            }}
           >
             <Printer className="h-4 w-4" />
             Imprimer
           </Button>
           <Button variant="secondary" onClick={exportPdf}>
             <FileDown className="h-4 w-4" />
-            PDF
+            Export PDF
           </Button>
           <Link href="/planning">
             <Button variant="secondary">Planning</Button>
           </Link>
-          <Link href="/occupation">
-            <Button variant="secondary">Occupation</Button>
+          <Link href="/calendrier">
+            <Button variant="secondary">Calendrier</Button>
           </Link>
           <Link href="/hebergement">
             <Button variant="secondary">Hébergement</Button>
+          </Link>
+          <Link href="/restauration">
+            <Button variant="secondary">Restauration</Button>
+          </Link>
+          <Link href={`/budget/previsionnels/nouveau?stage_id=${id}&type=stage`}>
+            <Button variant="secondary">Créer budget lié au stage</Button>
           </Link>
         </div>
       </main>

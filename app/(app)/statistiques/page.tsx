@@ -1,5 +1,5 @@
-import { AnalyticsClient } from "@/components/analytics/AnalyticsClient";
+import { redirect } from "next/navigation";
 
 export default function StatistiquesPage() {
-  return <AnalyticsClient />;
+  redirect("/v2/statistiques");
 }

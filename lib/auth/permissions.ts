@@ -21,13 +21,12 @@ export function resolveFrmtRole(user: AuthUser | null): RoleUtilisateur {
 
 const HREF_MODULE: Record<string, PermissionModule | null> = {
   "/dashboard": null,
-  "/centre-national": null,
   "/joueurs": "joueurs",
   "/entraineurs": "entraineurs",
   "/budget": "budget",
   "/budget/deplacements": "budget",
+  "/budget/previsionnels": "budget",
   "/groupes": "joueurs",
-  "/courts": "joueurs",
   "/infrastructures": "joueurs",
   "/materiel": "logistique",
   "/reservations": "joueurs",
@@ -35,18 +34,11 @@ const HREF_MODULE: Record<string, PermissionModule | null> = {
   "/planning": "joueurs",
   "/hebergement": "hebergement",
   "/stages": "stages",
-  "/occupation": "occupation",
   "/restauration": "logistique",
-  "/logistique": "logistique",
-  "/billets-avion": "logistique",
-  "/passeport": "logistique",
-  "/performances": "joueurs",
   "/rapports": "budget",
   "/historique": null,
-  "/statistiques": "budget",
   "/admin": "admin",
   "/parametres": null,
-  "/import-cne": "import_excel",
 };
 
 export function moduleForHref(href: string): PermissionModule | null {

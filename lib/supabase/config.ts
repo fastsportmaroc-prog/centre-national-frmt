@@ -1,5 +1,6 @@
 /**
- * Config Supabase (process.env — compatible Edge middleware + client).
+ * Config Supabase — accès statique à process.env pour que Next.js inline
+ * NEXT_PUBLIC_* dans le bundle client (process.env[name] dynamique ne marche pas côté browser).
  */
 
 export const SUPABASE_ENV = {
@@ -16,8 +17,12 @@ const PLACEHOLDER_MARKERS = [
   "example.com",
 ];
 
-function readEnv(name: string): string {
-  const raw = process.env[name];
+/** Références statiques — requises pour l'inlining client Next.js. */
+const ENV_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const ENV_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ENV_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+function trimEnv(raw: string | undefined): string {
   if (typeof raw !== "string") return "";
   return raw.trim().replace(/^["']|["']$/g, "");
 }
@@ -28,15 +33,15 @@ function isPlaceholder(value: string): boolean {
 }
 
 function readAnonKey(): string {
-  const anon = readEnv(SUPABASE_ENV.ANON_KEY);
-  const pub = readEnv(SUPABASE_ENV.PUBLISHABLE_KEY);
+  const anon = trimEnv(ENV_ANON_KEY);
+  const pub = trimEnv(ENV_PUBLISHABLE_KEY);
   if (anon && !isPlaceholder(anon)) return anon;
   if (pub && !isPlaceholder(pub)) return pub;
   return anon || pub;
 }
 
 export function getSupabasePublicEnv(): { url: string; anonKey: string } {
-  const url = readEnv(SUPABASE_ENV.URL);
+  const url = trimEnv(ENV_URL);
   return { url: isPlaceholder(url) ? "" : url, anonKey: readAnonKey() };
 }
 

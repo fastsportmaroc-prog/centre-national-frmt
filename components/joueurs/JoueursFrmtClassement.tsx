@@ -16,6 +16,7 @@ type FrmtApiPayload = {
   garcons: number;
   filles: number;
   groups: FrmtYearSexeGroup[];
+  players?: FrmtClassementPlayer[];
 };
 
 type Props = {

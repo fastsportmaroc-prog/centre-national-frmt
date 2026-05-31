@@ -73,6 +73,15 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
+  const isPublic =
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/api/auth") ||
+    request.nextUrl.pathname === "/api/health" ||
+    request.nextUrl.pathname === "/api/status" ||
+    request.nextUrl.pathname === "/api/stages/count" ||
+    request.nextUrl.pathname.startsWith("/api/frmt-logo");
+
   let user = null;
 
   try {
@@ -83,10 +92,12 @@ export async function updateSession(request: NextRequest) {
 
     if (error && isInvalidRefreshTokenError(error)) {
       await supabase.auth.signOut();
-      return redirectLoginWithClearedCookies(request, response);
+      if (!isPublic && !isAuthRoute) {
+        return redirectLoginWithClearedCookies(request, response);
+      }
+    } else {
+      user = authUser;
     }
-
-    user = authUser;
   } catch (error) {
     if (isInvalidRefreshTokenError(error)) {
       try {
@@ -94,17 +105,11 @@ export async function updateSession(request: NextRequest) {
       } catch {
         /* ignore */
       }
-      return redirectLoginWithClearedCookies(request, response);
+      if (!isPublic && !isAuthRoute) {
+        return redirectLoginWithClearedCookies(request, response);
+      }
     }
   }
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
-  const isPublic =
-    request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/api/auth") ||
-    request.nextUrl.pathname === "/api/health" ||
-    request.nextUrl.pathname === "/api/status" ||
-    request.nextUrl.pathname.startsWith("/api/frmt-logo");
 
   if (!user && !isAuthRoute && !isPublic) {
     const redirectUrl = request.nextUrl.clone();

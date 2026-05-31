@@ -1,5 +1,8 @@
 import { logHistorique } from "@/lib/audit/historique";
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { supabaseDataOrFallback } from "@/lib/supabase/read-fallback";
+import { localGetMateriels } from "@/lib/local-test/data-access";
 import type {
   Materiel,
   MaterielInput,
@@ -8,20 +11,26 @@ import type {
 } from "@/lib/types/materiel";
 
 export async function getMateriels(): Promise<Materiel[]> {
+  if (shouldUseLocalTestStorage()) return localGetMateriels();
+  if (!(await isSupabaseDataClientReady())) return [];
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase.from("materiels").select("*").order("nom");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Materiel[];
+  return supabaseDataOrFallback((data ?? []) as Materiel[], error, "materiels select", []);
 }
 
 export async function getMouvementsMateriel(): Promise<MouvementMateriel[]> {
+  if (!(await isSupabaseDataClientReady())) return [];
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("mouvements_materiel")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as MouvementMateriel[];
+  return supabaseDataOrFallback(
+    (data ?? []) as MouvementMateriel[],
+    error,
+    "mouvements_materiel select",
+    []
+  );
 }
 
 export async function createMateriel(input: MaterielInput): Promise<Materiel> {

@@ -4,62 +4,53 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { getOccupationAlertes, getOccupationCentreResume } from "@/lib/data/occupation-cne";
-import { getStagesProchains } from "@/lib/data/stages";
-import type { StageProgramme } from "@/lib/types/stages";
-import type { OccupationCneSnapshot } from "@/lib/types/occupation-cne";
+import { getStagesProchainsAvecAlertes } from "@/lib/data/stage-besoins";
+import { getStagesProgramme } from "@/lib/data/stages";
 import { formatDate } from "@/lib/utils/dates";
-import { AlertTriangle, CalendarDays, Percent } from "lucide-react";
+import { statutStageLabel } from "@/lib/utils/stage-automation";
+import { AlertTriangle, CalendarDays, Trophy, Users } from "lucide-react";
 
 export function CneDashboardSection() {
-  const [prochains, setProchains] = useState<StageProgramme[]>([]);
-  const [resume, setResume] = useState<Awaited<ReturnType<typeof getOccupationCentreResume>> | null>(
-    null
-  );
-  const [alertes, setAlertes] = useState<OccupationCneSnapshot[]>([]);
+  const [prochains, setProchains] = useState<
+    Awaited<ReturnType<typeof getStagesProchainsAvecAlertes>>
+  >([]);
+  const [totalStages, setTotalStages] = useState(0);
 
   useEffect(() => {
-    Promise.all([getStagesProchains(4), getOccupationCentreResume(), getOccupationAlertes()]).then(
-      ([s, r, a]) => {
-        setProchains(s);
-        setResume(r);
-        setAlertes(a.slice(0, 3));
-      }
-    );
+    Promise.all([getStagesProchainsAvecAlertes(5), getStagesProgramme()]).then(([s, all]) => {
+      setProchains(s);
+      const today = new Date().toISOString().split("T")[0]!;
+      setTotalStages(all.filter((x) => x.date_fin >= today && x.statut !== "annule").length);
+    });
   }, []);
+
+  const alertCount = prochains.reduce((n, p) => n + p.alertes.length, 0);
 
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Centre National — CNE</h2>
-        <Link href="/stages" className="text-sm text-frmt-red hover:underline">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-frmt-green" />
+          Stages — hub central
+        </h2>
+        <Link href="/stages" className="text-sm text-frmt-green hover:underline">
           Voir tout
         </Link>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-1">
           <p className="text-sm text-muted flex items-center gap-1">
-            <Percent className="h-4 w-4" />
-            Occupation temps réel
+            <Users className="h-4 w-4" />
+            Stages à venir / en cours
           </p>
-          {resume ? (
-            <>
-              <p className="text-2xl font-semibold mt-1">{resume.taux_chambres_pct}%</p>
-              <p className="text-xs text-muted">
-                {resume.chambres_occupees}/{resume.chambres_total} chambres ·{" "}
-                {resume.terrains_occupes}/{resume.terrains_total} terrains
-              </p>
-              {resume.alertes_surcharge > 0 && (
-                <Badge variant="danger" className="mt-2">
-                  {resume.alertes_surcharge} alerte(s)
-                </Badge>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-muted mt-2">Chargement…</p>
+          <p className="text-2xl font-semibold mt-1">{totalStages}</p>
+          {alertCount > 0 && (
+            <Badge variant="warning" className="mt-2">
+              {alertCount} alerte(s) logistique
+            </Badge>
           )}
-          <Link href="/occupation" className="text-xs text-frmt-green mt-2 inline-block">
-            Détail occupation →
+          <Link href="/stages" className="text-xs text-frmt-green mt-2 inline-block">
+            Créer ou gérer un stage →
           </Link>
         </Card>
         <Card className="p-4 lg:col-span-2">
@@ -71,33 +62,41 @@ export function CneDashboardSection() {
             <p className="text-sm text-muted">Aucun stage à venir.</p>
           ) : (
             <ul className="space-y-2">
-              {prochains.map((s) => (
-                <li key={s.id} className="flex justify-between gap-2 text-sm border-b border-border pb-2 last:border-0">
-                  <span className="font-medium truncate">{s.stage_action}</span>
-                  <span className="text-muted shrink-0">
-                    {formatDate(s.date_debut)} · {s.categorie}
-                  </span>
+              {prochains.map(({ stage, alertes }) => (
+                <li
+                  key={stage.id}
+                  className="flex flex-col gap-1 border-b border-border pb-2 last:border-0 sm:flex-row sm:justify-between"
+                >
+                  <div>
+                    <Link
+                      href={`/stages/${stage.id}`}
+                      className="font-medium truncate hover:text-frmt-green hover:underline"
+                    >
+                      {stage.stage_action}
+                    </Link>
+                    <p className="text-xs text-muted">
+                      {formatDate(stage.date_debut)} · {stage.categorie} ·{" "}
+                      {statutStageLabel(stage.statut)}
+                    </p>
+                    {alertes.length > 0 && (
+                      <p className="text-xs text-amber-400 flex items-center gap-1 mt-0.5">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        {alertes[0]}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1 text-xs">
+                    {stage.hebergement && <Badge variant="muted">Héb.</Badge>}
+                    {stage.infrastructure_ids.length > 0 && (
+                      <Badge variant="muted">{stage.infrastructure_ids.length} infra</Badge>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </Card>
       </div>
-      {alertes.length > 0 && (
-        <Card className="p-4 border-amber-500/30">
-          <p className="text-sm font-medium flex items-center gap-1 text-amber-400">
-            <AlertTriangle className="h-4 w-4" />
-            Alertes occupation
-          </p>
-          <ul className="mt-2 text-sm text-muted">
-            {alertes.map((a) => (
-              <li key={a.id}>
-                {a.alerte ?? `Pav. ${a.pavillon} ch.${a.numero_chambre}`} — {a.taux_occupation_pct}%
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
     </section>
   );
 }

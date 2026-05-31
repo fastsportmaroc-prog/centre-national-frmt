@@ -20,7 +20,12 @@ import {
 } from "@/lib/data/hebergements";
 import type { Hebergement, HebergementInput, TypeChambreHebergement } from "@/lib/types/database";
 import { groupHebergementsByPavillon } from "@/lib/utils/hebergement";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, FileDown } from "lucide-react";
+import { exportPdfReport } from "@/lib/export/reports";
+import { buildFrmtReportMeta } from "@/lib/pdf/frmt-pdf";
+import { getStageProvisionSummaries } from "@/lib/data/stage-besoins";
+import type { StageProvisionSummary } from "@/lib/data/stage-besoins";
+import { StageProvisionList } from "@/components/stages/StageProvisionList";
 
 function emptyForm(pavillon = 1): HebergementInput {
   return {
@@ -38,10 +43,27 @@ export function HebergementClient() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Hebergement | null>(null);
   const [form, setForm] = useState<HebergementInput>(emptyForm());
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [stageProvisions, setStageProvisions] = useState<StageProvisionSummary[]>([]);
 
   const load = useCallback(async () => {
-    setItems(await getHebergements());
+    setLoadError(null);
+    try {
+      const [hebergements, provisions] = await Promise.all([
+        getHebergements(),
+        getStageProvisionSummaries(),
+      ]);
+      setItems(hebergements);
+      setStageProvisions(provisions);
+    } catch (err) {
+      console.warn("Chargement hébergement:", err);
+      setItems([]);
+      setStageProvisions([]);
+      setLoadError(
+        err instanceof Error ? err.message : "Impossible de charger l'hébergement"
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -58,7 +80,7 @@ export function HebergementClient() {
   function openCreate(pavillon?: number) {
     setEditing(null);
     setForm(emptyForm(pavillon ?? 1));
-    setError(null);
+    setFormError(null);
     setOpen(true);
   }
 
@@ -72,7 +94,7 @@ export function HebergementClient() {
       capacite: h.capacite,
       occupe: h.occupe,
     });
-    setError(null);
+    setFormError(null);
     setOpen(true);
   }
 
@@ -88,21 +110,25 @@ export function HebergementClient() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
     try {
       if (editing) await updateHebergement(editing.id, form);
       else await createHebergement(form);
       setOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
+      setFormError(err instanceof Error ? err.message : "Erreur");
     }
   }
 
   async function handleDelete(h: Hebergement) {
     if (!confirm(`Supprimer ${h.nom_chambre} ?`)) return;
-    await deleteHebergement(h.id);
-    await load();
+    try {
+      await deleteHebergement(h.id);
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Erreur lors de la suppression");
+    }
   }
 
   return (
@@ -110,8 +136,36 @@ export function HebergementClient() {
       <PageHeader
         title="Hébergement"
         description={`${PAVILLONS.length} pavillons · ${CHAMBRES_PAR_PAVILLON} chambres par pavillon (Simple / Double / Triple)`}
+        actions={
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={async () => {
+              const meta = buildFrmtReportMeta(
+                "Hébergement — inventaire chambres",
+                ["Pavillon", "Chambre", "Type", "Capacité", "Statut"],
+                items.map((h) => [
+                  String(h.pavillon),
+                  String(h.numero_chambre),
+                  h.type_chambre,
+                  String(h.capacite),
+                  h.occupe ? "Occupée" : "Libre",
+                ])
+              );
+              await exportPdfReport("hebergement.pdf", meta);
+            }}
+          >
+            <FileDown className="h-4 w-4" />
+            Export PDF
+          </Button>
+        }
       />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
+        {loadError && (
+          <Card className="border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+            {loadError}
+          </Card>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Card className="flex-1 min-w-[140px] p-4">
             <p className="text-sm text-muted">Chambres</p>
@@ -130,6 +184,12 @@ export function HebergementClient() {
             Ajouter une chambre
           </Button>
         </div>
+
+        <StageProvisionList
+          summaries={stageProvisions}
+          filter="hebergement"
+          emptyMessage="Aucun hébergement auto-provisionné par un stage. Créez un stage avec hébergement activé."
+        />
 
         {PAVILLONS.map((pavillon) => {
           const chambres = byPavillon.get(pavillon) ?? [];
@@ -182,7 +242,7 @@ export function HebergementClient() {
         title={editing ? "Modifier la chambre" : "Nouvelle chambre"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {formError && <p className="text-sm text-red-400">{formError}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="pavillon">Pavillon</Label>

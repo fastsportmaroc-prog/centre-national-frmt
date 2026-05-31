@@ -100,20 +100,25 @@ if (!user) {
   }
 }
 
-const { error: profErr } = await admin.from("profiles").upsert(
-  {
-    id: user.id,
-    email: user.email ?? email,
-    full_name: "FRMT Admin",
-    role: "admin",
-    frmt_role: "admin",
-  },
-  { onConflict: "id" }
-);
+let profPayload = {
+  id: user.id,
+  email: user.email ?? email,
+  full_name: "FRMT Admin",
+  role: "admin",
+  frmt_role: "admin",
+  actif: true,
+};
+
+let { error: profErr } = await admin.from("profiles").upsert(profPayload, { onConflict: "id" });
+
+if (profErr?.message?.includes("frmt_role")) {
+  const { frmt_role: _, ...withoutFrmt } = profPayload;
+  ({ error: profErr } = await admin.from("profiles").upsert(withoutFrmt, { onConflict: "id" }));
+}
 
 if (profErr) {
   console.error("profiles upsert:", profErr.message);
-  console.error("Executez dans Supabase SQL: supabase/migrations/020_auth_compte_frmt.sql");
+  console.error("Executez: supabase/fix-admin-s-abderrazzaq.sql (ou npm run fix:admin-profile)");
   process.exit(1);
 }
 

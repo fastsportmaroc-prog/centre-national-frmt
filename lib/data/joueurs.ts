@@ -1,6 +1,8 @@
 import { logHistorique } from "@/lib/audit/historique";
 import { softDeleteRecord } from "@/lib/data/soft-delete";
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { localGetJoueurs } from "@/lib/local-test/data-access";
 import {
   assertMoroccanPlayerProfile,
   isMoroccanPlayer,
@@ -10,6 +12,9 @@ import type { Joueur, JoueurInput, JoueurWithGroupe } from "@/lib/types/database
 import { getGroupes } from "./groupes";
 
 export async function getJoueurs(): Promise<Joueur[]> {
+  if (shouldUseLocalTestStorage()) return localGetJoueurs();
+  if (!(await isSupabaseDataClientReady())) return [];
+
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("joueurs")
@@ -17,8 +22,9 @@ export async function getJoueurs(): Promise<Joueur[]> {
     .is("deleted_at", null)
     .order("nom", { ascending: true });
   if (error) {
+    console.warn("[Supabase] joueurs:", error.message);
     const fallback = await supabase.from("joueurs").select("*").order("nom", { ascending: true });
-    if (fallback.error) throw new Error(fallback.error.message);
+    if (fallback.error) return [];
     return ((fallback.data ?? []) as (Joueur & { deleted_at?: string | null })[]).filter(
       (j) => !j.deleted_at
     );

@@ -1,5 +1,10 @@
 import { logHistorique } from "@/lib/audit/historique";
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import {
+  localCreateReservationInfrastructure,
+  localGetReservationsInfrastructure,
+} from "@/lib/local-test/provision-local";
 import { hasInfrastructureOverlap } from "@/lib/utils/stage-automation";
 import type {
   ReservationInfrastructure,
@@ -29,12 +34,17 @@ async function validateInfraSlot(
 }
 
 export async function getReservationsInfrastructure(): Promise<ReservationInfrastructure[]> {
+  if (shouldUseLocalTestStorage()) return localGetReservationsInfrastructure();
+  if (!(await isSupabaseDataClientReady())) return [];
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("reservations_infrastructure")
     .select("*")
     .order("date_debut", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] reservations_infrastructure:", error.message);
+    return [];
+  }
   return (data ?? []) as ReservationInfrastructure[];
 }
 
@@ -61,6 +71,9 @@ export async function getReservationsInfrastructureWithRelations(): Promise<
 export async function createReservationInfrastructure(
   input: ReservationInfrastructureInput
 ): Promise<ReservationInfrastructure> {
+  if (shouldUseLocalTestStorage()) {
+    return localCreateReservationInfrastructure(input);
+  }
   await validateInfraSlot(input);
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
@@ -103,6 +116,32 @@ export async function cancelReservationInfrastructure(id: string): Promise<void>
     entite_label: before?.infrastructure_id ?? null,
     ancienne_valeur: "confirmee",
     nouvelle_valeur: "annulee",
+    commentaire: null,
+  });
+}
+
+export async function deleteReservationInfrastructure(id: string): Promise<void> {
+  if (shouldUseLocalTestStorage()) {
+    const { readJson, writeJson } = await import("@/lib/local-test/storage");
+    const all = readJson<ReservationInfrastructure[]>("reservations", []);
+    writeJson(
+      "reservations",
+      all.filter((r) => r.id !== id)
+    );
+    return;
+  }
+  const { guardWriteAccess } = await import("@/lib/supabase/data-access-guard");
+  await guardWriteAccess();
+  const supabase = await getSupabaseDataClient();
+  const { error } = await supabase.from("reservations_infrastructure").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await logHistorique({
+    action: "suppression",
+    module: "reservations",
+    entite_id: id,
+    entite_label: "Réservation infrastructure",
+    ancienne_valeur: id,
+    nouvelle_valeur: null,
     commentaire: null,
   });
 }

@@ -16,6 +16,18 @@ import {
 import { getCourtsWithStats } from "@/lib/data/courts";
 import type { Infrastructure, InfrastructureInput, StatutInfrastructure, TypeInfrastructure } from "@/lib/types/infrastructures";
 import { isTerrainInfrastructure } from "@/lib/utils/infrastructure-court";
+import { getStageProvisionSummaries } from "@/lib/data/stage-besoins";
+import type { StageProvisionSummary } from "@/lib/data/stage-besoins";
+import { StageProvisionList } from "@/components/stages/StageProvisionList";
+import {
+  getOccupationCentre,
+  occupationBarColor,
+  type OccupationCentreResult,
+  type PeriodeOccupation,
+} from "@/lib/data/centre-occupation";
+import { getAllStagesForSelect } from "@/lib/data/dashboard-stages";
+import type { StageProgramme } from "@/lib/types/stages";
+import { formatDate } from "@/lib/utils/dates";
 import { Plus } from "lucide-react";
 
 const emptyForm: InfrastructureInput = {
@@ -46,12 +58,31 @@ export function InfrastructuresClient() {
   const [form, setForm] = useState<InfrastructureInput>(emptyForm);
   const [filtre, setFiltre] = useState<Filtre>("tous");
   const [loading, setLoading] = useState(false);
+  const [stageProvisions, setStageProvisions] = useState<StageProvisionSummary[]>([]);
+  const [occupationPeriode, setOccupationPeriode] = useState<PeriodeOccupation>("semaine");
+  const [occupationStageId, setOccupationStageId] = useState<string>("");
+  const [stagesSelect, setStagesSelect] = useState<StageProgramme[]>([]);
+  const [occupation, setOccupation] = useState<OccupationCentreResult | null>(null);
+
+  const loadOccupation = useCallback(async () => {
+    const periode = occupationPeriode;
+    const stageId = occupationPeriode === "stage" ? occupationStageId : undefined;
+    const occ = await getOccupationCentre(periode, stageId || undefined);
+    setOccupation(occ);
+  }, [occupationPeriode, occupationStageId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [infras, courts] = await Promise.all([getInfrastructures(), getCourtsWithStats()]);
+      const [infras, courts, provisions, stages] = await Promise.all([
+        getInfrastructures(),
+        getCourtsWithStats(),
+        getStageProvisionSummaries(),
+        getAllStagesForSelect(),
+      ]);
       setItems(infras);
+      setStageProvisions(provisions);
+      setStagesSelect(stages);
       setTerrainStats(
         new Map(courts.map((c) => [c.id, { count: c.reservations_count, rate: c.taux_occupation }]))
       );
@@ -63,6 +94,10 @@ export function InfrastructuresClient() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadOccupation();
+  }, [loadOccupation]);
 
   const filtered = useMemo(() => {
     if (filtre === "terrains") return items.filter(isTerrainInfrastructure);
@@ -91,13 +126,114 @@ export function InfrastructuresClient() {
       <main className="space-y-4 p-4 sm:p-6">
         <Card className="premium border-frmt-green/20 bg-frmt-green/5 p-4 text-sm">
           <p>
-            Les <strong>terrains / courts</strong> sont des infrastructures de type « terrain ».
-            Les réservations et le planning s&apos;appuient sur cette liste — plus de doublon avec une
-            rubrique séparée.
+            Les <strong>terrains / courts</strong>{" "}
+            sont des infrastructures de type « terrain ». Les réservations et le planning
+            s&apos;appuient sur cette liste — plus de doublon avec une rubrique séparée.
           </p>
           <Link href="/reservations" className="mt-2 inline-block text-frmt-green hover:underline">
             Gérer les réservations →
           </Link>
+        </Card>
+
+        <StageProvisionList
+          summaries={stageProvisions}
+          filter="terrains"
+          emptyMessage="Aucune réservation terrain auto-créée par un stage."
+        />
+
+        <Card className="premium p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Occupation du centre</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["semaine", "mois", "stage"] as const).map((p) => (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={occupationPeriode === p ? "primary" : "secondary"}
+                  onClick={() => setOccupationPeriode(p)}
+                >
+                  {p === "semaine" ? "Semaine" : p === "mois" ? "Mois" : "Par stage"}
+                </Button>
+              ))}
+              {occupationPeriode === "stage" && (
+                <Select
+                  value={occupationStageId}
+                  onChange={(e) => setOccupationStageId(e.target.value)}
+                  className="min-w-[200px]"
+                >
+                  <option value="">Choisir un stage…</option>
+                  {stagesSelect.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.stage_action} ({formatDate(s.date_debut)})
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </div>
+          </div>
+          {occupation && (
+            <p className="text-xs text-muted">
+              Période : {formatDate(occupation.date_debut)} → {formatDate(occupation.date_fin)}
+            </p>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-muted">
+                  <th className="p-3">Installation</th>
+                  <th className="p-3">Type</th>
+                  <th className="p-3">Capacité</th>
+                  <th className="p-3">Réservé</th>
+                  <th className="p-3">Libre</th>
+                  <th className="p-3">%</th>
+                  <th className="p-3">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!occupation || occupation.lignes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-4 text-muted">
+                      Aucune donnée d&apos;occupation pour cette période.
+                    </td>
+                  </tr>
+                ) : (
+                  occupation.lignes.map((l) => (
+                    <tr key={l.infrastructure_id} className="border-b border-border/50">
+                      <td className="p-3 font-medium">{l.nom}</td>
+                      <td className="p-3">{TYPE_LABELS[l.type] ?? l.type}</td>
+                      <td className="p-3">{l.capacite}</td>
+                      <td className="p-3">{l.reserve}</td>
+                      <td className="p-3">{l.libre}</td>
+                      <td className="p-3 min-w-[120px]">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${occupationBarColor(l.pct)}`}
+                              style={{ width: `${l.pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted w-8">{l.pct}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <Badge
+                          variant={
+                            l.statut === "disponible"
+                              ? "success"
+                              : l.statut === "maintenance"
+                                ? "warning"
+                                : "muted"
+                          }
+                        >
+                          {l.statut}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
 
         <div className="flex flex-wrap gap-2">

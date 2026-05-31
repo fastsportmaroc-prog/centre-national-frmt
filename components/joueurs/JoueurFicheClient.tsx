@@ -15,6 +15,7 @@ import { calculerAge } from "@/lib/utils/joueur";
 import { STATUTS_JOUEUR } from "@/lib/constants/joueurs";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
+import { StageParticipantLinks } from "@/components/stages/StageParticipantLinks";
 
 type Props = { id: string };
 
@@ -60,12 +61,19 @@ export function JoueurFicheClient({ id }: Props) {
         description="Fiche joueur complète"
       />
       <main className="flex-1 space-y-6 p-4 sm:p-6">
-        <Link href="/joueurs">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux joueurs
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/joueurs">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux joueurs
+            </Button>
+          </Link>
+          <Link href={`/budget/previsionnels/nouveau?joueur_id=${id}&type=joueur`}>
+            <Button variant="secondary" size="sm">
+              Créer budget prévisionnel
+            </Button>
+          </Link>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="flex flex-col items-center text-center lg:col-span-1">
@@ -149,6 +157,11 @@ export function JoueurFicheClient({ id }: Props) {
                 </div>
               </dl>
             </Card>
+            <StageParticipantLinks
+              kind="joueur"
+              entityId={id}
+              label={`${joueur.prenom} ${joueur.nom}`}
+            />
             <Card>
               <h3 className="mb-3 font-semibold">Compte dépenses</h3>
               <p className="text-2xl font-bold text-frmt-red">

@@ -4,7 +4,8 @@ import {
   CATEGORIE_LIGNE_BUDGET_LABELS,
   CATEGORIES_BUDGET_COACH,
 } from "@/lib/constants/budget-deplacement";
-import { formatDate } from "@/lib/utils/dates";
+import { formatPeriodePrint } from "@/lib/print/format-date";
+import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
 
 function daysBetween(start: string, end: string): number {
   const a = new Date(start.slice(0, 10));
@@ -115,8 +116,23 @@ export function buildBudgetDeplacementReport(
   return {
     titre: "Budget déplacement joueur",
     sousTitre: `${joueurNom} — ${budget.tournoi} · ${budget.destination}`,
-    filtres: `Du ${formatDate(budget.date_depart)} au ${formatDate(budget.date_retour)} · ${budget.devise} · Statut : ${budget.statut}${budget.valide_par ? ` · Validé par ${budget.valide_par}` : ""}`,
+    filtres: `${formatPeriodePrint(budget.date_depart, budget.date_retour)} · ${budget.devise}${budget.valide_par ? ` · Validé par ${budget.valide_par}` : ""}`,
+    periodeLabel: formatPeriodePrint(budget.date_depart, budget.date_retour),
+    mainTableTitle: "Lignes de dépenses",
+    kpis: [
+      { label: "Total", value: `${totalGeneral.toLocaleString("fr-FR")}`, sub: budget.devise },
+      { label: "Joueur", value: `${totalJoueur.toLocaleString("fr-FR")}`, sub: budget.devise },
+      { label: "Coach", value: `${totalCoach.toLocaleString("fr-FR")}`, sub: budget.devise },
+      {
+        label: "Coût / jour",
+        value: `${coutParJour.toLocaleString("fr-FR", { maximumFractionDigits: 0 })}`,
+        sub: `${jours} jour(s)`,
+      },
+    ],
     colonnes: ["Catégorie", "Description", "Qté", "Prix unit.", "Montant", "Type"],
+    headerAlign: ["left", "left", "center", "center", "center", "center"],
+    cellAlign: ["left", "left", "center", "center", "center", "center"],
     lignes: rows,
+    observations: DEFAULT_OBSERVATIONS,
   };
 }

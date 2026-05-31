@@ -1,9 +1,8 @@
-import { getBilletsAvion } from "@/lib/data/billets";
 import { getBesoinsRestauration } from "@/lib/data/restauration";
-import { getOccupationAlertes, getOccupationCentreResume } from "@/lib/data/occupation-cne";
-import { getPasseportVisaAlertes } from "@/lib/data/passeport";
 import { getMateriels } from "@/lib/data/materiel";
 import { getStagesProgramme } from "@/lib/data/stages";
+import { getStagesProchainsAvecAlertes, getDaysUntilStage } from "@/lib/data/stage-besoins";
+import { parseLogistiqueFromNotes } from "@/lib/stages/stage-logistique-serializer";
 
 export type FrmtInsight = {
   id: string;
@@ -18,53 +17,39 @@ function overlap(aStart: string, aEnd: string, bStart: string, bEnd: string): bo
 }
 
 export async function getFrmtInsights(): Promise<FrmtInsight[]> {
-  const [stages, alertes, resume, billets, besoins, passeportAlertes, materiels] =
-    await Promise.all([
-      getStagesProgramme(),
-      getOccupationAlertes(),
-      getOccupationCentreResume(),
-      getBilletsAvion(),
-      getBesoinsRestauration(),
-      getPasseportVisaAlertes(),
-      getMateriels(),
-    ]);
+  const [stages, besoins, materiels, stagesAlertes] = await Promise.all([
+    getStagesProgramme(),
+    getBesoinsRestauration(),
+    getMateriels(),
+    getStagesProchainsAvecAlertes(12),
+  ]);
 
   const insights: FrmtInsight[] = [];
   const today = new Date().toISOString().split("T")[0]!;
 
-  if (resume.alertes_surcharge > 0) {
-    insights.push({
-      id: "occ-surcharge",
-      level: "error",
-      title: "Surcharge hébergement",
-      message: `${resume.alertes_surcharge} chambre(s) en surcharge aujourd'hui.`,
-      href: "/occupation",
-    });
-  }
-
-  if (resume.taux_chambres_pct >= 85) {
-    insights.push({
-      id: "occ-high",
-      level: "warn",
-      title: "Occupation élevée",
-      message: `Taux chambres ${resume.taux_chambres_pct}% — anticiper les affectations.`,
-      href: "/occupation",
-    });
-  }
-
-  for (const a of alertes.slice(0, 3)) {
-    if (a.alerte) {
+  for (const { stage, alertes } of stagesAlertes) {
+    for (const msg of alertes) {
       insights.push({
-        id: `occ-${a.id}`,
+        id: `stage-${stage.id}-${msg.slice(0, 24)}`,
+        level: msg.includes("Conflit") ? "error" : "warn",
+        title: stage.stage_action,
+        message: msg,
+        href: `/stages/${stage.id}`,
+      });
+    }
+    const jours = getDaysUntilStage(stage);
+    if (jours >= 0 && jours < 7) {
+      insights.push({
+        id: `stage-soon-${stage.id}`,
         level: "warn",
-        title: "Alerte chambre",
-        message: a.alerte,
-        href: "/occupation",
+        title: "Stage imminent",
+        message: `"${stage.stage_action}" débute dans ${jours} jour(s).`,
+        href: `/stages/${stage.id}`,
       });
     }
   }
 
-  const upcoming = stages.filter((s) => s.date_fin >= today);
+  const upcoming = stages.filter((s) => s.date_fin >= today && s.statut !== "annule");
   for (let i = 0; i < upcoming.length; i++) {
     for (let j = i + 1; j < upcoming.length; j++) {
       const a = upcoming[i]!;
@@ -88,34 +73,28 @@ export async function getFrmtInsights(): Promise<FrmtInsight[]> {
     }
   }
 
-  for (const a of passeportAlertes.slice(0, 5)) {
-    insights.push({
-      id: a.id,
-      level: a.severite === "expire" ? "error" : "warn",
-      title: a.type === "passeport" ? "Passeport" : `Visa ${a.pays ?? ""}`.trim(),
-      message: `${a.joueur_nom} — ${a.message}`,
-      href: `/passeport?joueur=${a.joueur_id}`,
-    });
+  for (const s of upcoming) {
+    const pack = parseLogistiqueFromNotes(s.notes);
+    if (pack?.terrains?.actif && s.infrastructure_ids.length === 0) {
+      insights.push({
+        id: `no-terrain-${s.id}`,
+        level: "error",
+        title: "Stage sans terrain",
+        message: `"${s.stage_action}" : terrains demandés mais aucune réservation.`,
+        href: `/stages/${s.id}`,
+      });
+    }
   }
 
-  const billetsAttente = billets.filter((b) => b.statut === "en_attente");
-  if (billetsAttente.length > 0) {
+  const besoinsStage = besoins.filter(
+    (b) => b.notes?.includes("stage_id:") && b.statut === "planifie"
+  );
+  if (besoinsStage.length > 0) {
     insights.push({
-      id: "billets-attente",
-      level: "info",
-      title: "Billets en attente d'accord",
-      message: `${billetsAttente.length} demande(s) à valider (prix + retour).`,
-      href: "/billets-avion",
-    });
-  }
-
-  const besoinsActifs = besoins.filter((b) => !["paye", "annule", "brouillon"].includes(b.statut));
-  if (besoinsActifs.length > 0) {
-    insights.push({
-      id: "resto-besoins",
-      level: "info",
-      title: "Restauration — événements actifs",
-      message: `${besoinsActifs.length} besoin(s) en cours de traitement.`,
+      id: "resto-stage-planifie",
+      level: "warn",
+      title: "Restauration stage non confirmée",
+      message: `${besoinsStage.length} besoin(s) stage en statut « planifié ».`,
       href: "/restauration",
     });
   }
@@ -145,9 +124,9 @@ export async function getFrmtInsights(): Promise<FrmtInsight[]> {
       level: "info",
       title: "Estimation coûts stages en cours",
       message: `~${est.toLocaleString("fr-FR")} MAD (estimation repas/logistique).`,
-      href: "/stages",
+      href: "/budget",
     });
   }
 
-  return insights.slice(0, 8);
+  return insights.slice(0, 10);
 }

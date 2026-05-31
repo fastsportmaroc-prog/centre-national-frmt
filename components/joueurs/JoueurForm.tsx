@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Input";
-import { CATEGORIES_AGE, NIVEAUX, STATUTS_JOUEUR } from "@/lib/constants/joueurs";
+import { NIVEAUX, STATUTS_JOUEUR } from "@/lib/constants/joueurs";
+import { CategorySelect } from "@/components/v2/ui/CategorySelect";
 import {
   MOROCCO_COUNTRY_CODE,
   MOROCCO_FEDERATION,
@@ -36,11 +38,14 @@ export function JoueurForm({
   submitLabel,
   error,
 }: Props) {
+  const [manualCategorie, setManualCategorie] = useState(false);
+
   function onNaissanceChange(date: string) {
     setForm({
       ...form,
       date_naissance: date,
-      categorie_age: date ? categorieDepuisNaissance(date) : form.categorie_age,
+      categorie_age:
+        !manualCategorie && date ? categorieDepuisNaissance(date) : form.categorie_age,
     });
   }
 
@@ -80,19 +85,30 @@ export function JoueurForm({
         </div>
         <div>
           <Label htmlFor="categorie">Catégorie d&apos;âge</Label>
-          <Select
-            id="categorie"
+          <CategorySelect
             value={form.categorie_age}
-            onChange={(e) =>
-              setForm({ ...form, categorie_age: e.target.value as JoueurInput["categorie_age"] })
+            onChange={(categorie_age) =>
+              setForm({ ...form, categorie_age: categorie_age as JoueurInput["categorie_age"] })
             }
-          >
-            {CATEGORIES_AGE.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
+            disabled={!manualCategorie}
+          />
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={manualCategorie}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setManualCategorie(enabled);
+                if (!enabled && form.date_naissance) {
+                  setForm({
+                    ...form,
+                    categorie_age: categorieDepuisNaissance(form.date_naissance),
+                  });
+                }
+              }}
+            />
+            Modifier manuellement la catégorie
+          </label>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -144,6 +160,15 @@ export function JoueurForm({
           />
         </div>
       </div>
+      <div>
+        <Label htmlFor="club">Club</Label>
+        <Input
+          id="club"
+          placeholder="Club du joueur"
+          value={form.club ?? ""}
+          onChange={(e) => setForm({ ...form, club: e.target.value })}
+        />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="niveau">Niveau</Label>
@@ -161,9 +186,10 @@ export function JoueurForm({
           </Select>
         </div>
         <div>
-          <Label htmlFor="classement">Classement</Label>
+          <Label htmlFor="classement">Classement (optionnel)</Label>
           <Input
             id="classement"
+            placeholder="Laisser vide si non classé"
             value={form.classement ?? ""}
             onChange={(e) => setForm({ ...form, classement: e.target.value })}
           />

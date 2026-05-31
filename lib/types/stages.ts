@@ -1,6 +1,6 @@
 /** Stage / programme — aligné sur Calendrier CNE V3 FINALE.xlsx */
 
-export type StatutStage = "prevu" | "en_cours" | "termine" | "annule";
+export type StatutStage = "prevu" | "confirme" | "en_cours" | "termine" | "annule";
 
 export type StageMaterielAssignation = {
   materiel_id: string;

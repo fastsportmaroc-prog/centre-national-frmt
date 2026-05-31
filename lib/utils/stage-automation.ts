@@ -104,6 +104,7 @@ export function detecterConflitsStage(
 export function statutStageLabel(statut: StageProgramme["statut"]): string {
   const map: Record<StageProgramme["statut"], string> = {
     prevu: "Prévu",
+    confirme: "Confirmé",
     en_cours: "En cours",
     termine: "Terminé",
     annule: "Annulé",

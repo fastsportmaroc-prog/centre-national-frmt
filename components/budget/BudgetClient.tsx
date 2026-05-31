@@ -93,6 +93,9 @@ export function BudgetClient() {
             <Button variant="secondary" onClick={downloadCsv}>
               Export CSV
             </Button>
+            <Link href="/budget/previsionnels">
+              <Button variant="secondary">Budgets prévisionnels</Button>
+            </Link>
             <Link href="/budget/deplacements">
               <Button variant="secondary">Budget déplacement</Button>
             </Link>

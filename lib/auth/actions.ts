@@ -3,15 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { mapAuthErrorMessage } from "@/lib/auth/errors";
+import type { AuthFormState } from "@/lib/auth/form-state";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-export type AuthFormState = {
-  error: string | null;
-  message: string | null;
-};
-
-export const initialAuthState: AuthFormState = { error: null, message: null };
 
 async function signInEmailPassword(email: string, password: string) {
   const supabase = await createSupabaseServerClient();

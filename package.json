@@ -11,11 +11,13 @@
     "dev:clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && next dev --port 3001",
     "kill-port": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port-3000.ps1 -Port 3000",
     "kill-port:3001": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port-3000.ps1 -Port 3001",
+    "restart:3001": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port-3000.ps1 -Port 3001; npm run dev:3001",
     "demarrer": "npm run dev:3001",
     "demarrer:clean": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/DEMARRER.ps1",
     "verify:supabase": "node scripts/verify-supabase-auth.mjs",
     "fix:password": "node scripts/fix-user-password.mjs",
     "repair:compte": "node scripts/repair-compte-frmt.mjs",
+    "fix:admin-profile": "node scripts/promote-profile-admin.mjs",
     "integrate:frmt": "node scripts/import-frmt-classement.mjs --use-json",
     "local": "npm run build && next start --port 3000",
     "publish": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/PUBLIER-MAINTENANT.ps1",
@@ -28,31 +30,37 @@
     "import:frmt-classement": "node scripts/import-frmt-classement.mjs",
     "import:frmt-classement:debug": "node scripts/import-frmt-classement.mjs --debug",
     "debug:frmt": "node scripts/capture-frmt-response.mjs",
-    "backup:snapshot": "node scripts/snapshot-backup.mjs"
+    "backup:snapshot": "node scripts/snapshot-backup.mjs",
+    "scrape:frmt": "node scripts/scraper-frmt.js",
+    "import:joueurs-frmt": "node scripts/import-joueurs-supabase.js --dry-run",
+    "import:joueurs-frmt:execute": "node scripts/import-joueurs-supabase.js --execute",
+    "db:equipement-tailles": "node scripts/apply-equipement-tailles-migration.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "docx": "^9.7.0",
+    "framer-motion": "^11.18.2",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.511.0",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "framer-motion": "^11.18.2",
     "server-only": "0.0.1"
   },
   "devDependencies": {
-    "xlsx": "^0.18.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "puppeteer": "^25.0.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   }
 }

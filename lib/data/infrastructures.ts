@@ -1,5 +1,7 @@
 import { logHistorique } from "@/lib/audit/historique";
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { localGetInfrastructures } from "@/lib/local-test/data-access";
 import type {
   Infrastructure,
   InfrastructureInput,
@@ -8,9 +10,14 @@ import type {
 } from "@/lib/types/infrastructures";
 
 export async function getInfrastructures(): Promise<Infrastructure[]> {
+  if (shouldUseLocalTestStorage()) return localGetInfrastructures();
+  if (!(await isSupabaseDataClientReady())) return [];
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase.from("infrastructures").select("*").order("nom");
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] infrastructures:", error.message);
+    return [];
+  }
   return (data ?? []) as Infrastructure[];
 }
 
@@ -100,11 +107,24 @@ export async function getInfrastructureUsage(
     .select("*")
     .eq("infrastructure_id", infrastructureId)
     .order("date_debut", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] infrastructure_usages:", error.message);
+    return [];
+  }
   return (data ?? []) as InfrastructureUsage[];
 }
 
 export async function addInfrastructureUsage(input: InfrastructureUsage): Promise<void> {
+  if (shouldUseLocalTestStorage()) {
+    const { readJson, writeJson, newLocalId } = await import("@/lib/local-test/storage");
+    const usages = readJson<(InfrastructureUsage & { id: string })[]>(
+      "infrastructure_usages",
+      []
+    );
+    usages.push({ ...input, id: newLocalId() });
+    writeJson("infrastructure_usages", usages.slice(0, 2000));
+    return;
+  }
   const supabase = await getSupabaseDataClient();
   const { error } = await supabase.from("infrastructure_usages").insert(input);
   if (error) throw new Error(error.message);

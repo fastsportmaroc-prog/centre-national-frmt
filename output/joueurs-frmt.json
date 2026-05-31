@@ -1,0 +1,674 @@
+[
+  {
+    "nom": "AHAMOUT",
+    "prenom": "TASNIME",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "TCMT",
+    "categorie": "U18"
+  },
+  {
+    "nom": "BAKKALI KASMI",
+    "prenom": "AMIRA",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "TCMT",
+    "categorie": "U18"
+  },
+  {
+    "nom": "DERKAOUI",
+    "prenom": "MALAK",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "ATC",
+    "categorie": "U18"
+  },
+  {
+    "nom": "FALAHI",
+    "prenom": "LAYLA",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "USCM",
+    "categorie": "U18"
+  },
+  {
+    "nom": "RAISS",
+    "prenom": "RITA",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "RIAD",
+    "categorie": "U18"
+  },
+  {
+    "nom": "SAKKAT",
+    "prenom": "MALAK",
+    "date_naissance": "2008-01-01",
+    "sexe": "F",
+    "club": "OCC",
+    "categorie": "U18"
+  },
+  {
+    "nom": "CHERKAOUI",
+    "prenom": "MEHDI",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "USCM",
+    "categorie": "U18"
+  },
+  {
+    "nom": "KOUMBA DARLIN",
+    "prenom": "CHRISTOPHER",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "CSA",
+    "categorie": "U18"
+  },
+  {
+    "nom": "LENNY",
+    "prenom": "PETIT",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "RTCMA",
+    "categorie": "U18"
+  },
+  {
+    "nom": "MISSOUM",
+    "prenom": "ALI",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "USCM",
+    "categorie": "U18"
+  },
+  {
+    "nom": "OULED ABBOU",
+    "prenom": "ISMAIL",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U18"
+  },
+  {
+    "nom": "ZOUAOUI",
+    "prenom": "NEIL",
+    "date_naissance": "2008-01-01",
+    "sexe": "M",
+    "club": "USCM",
+    "categorie": "U18"
+  },
+  {
+    "nom": "ABADLI",
+    "prenom": "AYA",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "OCC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "ACHOURI",
+    "prenom": "WASSILA",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "BEZZA",
+    "prenom": "LINA",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "ASAS",
+    "categorie": "U16"
+  },
+  {
+    "nom": "ELLOUZI",
+    "prenom": "ACHOUAK",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "MOUCHREK",
+    "prenom": "LINA",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "SEBBAR",
+    "prenom": "GHITA",
+    "date_naissance": "2009-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "GUENNOUNI",
+    "prenom": "ABDELAZIZ",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "KOMAT",
+    "prenom": "GHALI",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "RTCA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "LOUTFI MOHAMED",
+    "prenom": "YAZID",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "RTCMO",
+    "categorie": "U16"
+  },
+  {
+    "nom": "MYEL",
+    "prenom": "FAHD",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "RTCMO",
+    "categorie": "U16"
+  },
+  {
+    "nom": "SALAHEDDINE",
+    "prenom": "GHALI",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "RUC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "TAHIRI ALAOUI",
+    "prenom": "MEHDI",
+    "date_naissance": "2009-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "ACHOURI",
+    "prenom": "MERYEM",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "BENNANI",
+    "prenom": "INES",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "OCC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "DOUYEB",
+    "prenom": "YASMINE",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "RUC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "FARAJ",
+    "prenom": "LARA",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "FORSADOU",
+    "prenom": "GHITA",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "OCC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "TAFARKI",
+    "prenom": "RANYA",
+    "date_naissance": "2010-01-01",
+    "sexe": "F",
+    "club": "RTCA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "AHFER",
+    "prenom": "ZAYED",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "USCM",
+    "categorie": "U16"
+  },
+  {
+    "nom": "BERRADA",
+    "prenom": "HAMZA",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "USM/TCC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "EL AOUNI",
+    "prenom": "REDA",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "GRARI",
+    "prenom": "HADY",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U16"
+  },
+  {
+    "nom": "IRAQI HOUSSEYNI",
+    "prenom": "SAMY",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "RIAD",
+    "categorie": "U16"
+  },
+  {
+    "nom": "LAABI",
+    "prenom": "MEHDI",
+    "date_naissance": "2010-01-01",
+    "sexe": "M",
+    "club": "OCC",
+    "categorie": "U16"
+  },
+  {
+    "nom": "ALAMI",
+    "prenom": "ALIA",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "RTCMO",
+    "categorie": "U14"
+  },
+  {
+    "nom": "BENNANI",
+    "prenom": "ZAHRA",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "HANNAOUI",
+    "prenom": "HIND",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "RTCMO",
+    "categorie": "U14"
+  },
+  {
+    "nom": "NOUINOU",
+    "prenom": "MARYAM",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "TCMT",
+    "categorie": "U14"
+  },
+  {
+    "nom": "OUAZZANI HASSANI",
+    "prenom": "ZINEB",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ZAHIM",
+    "prenom": "AMIRA",
+    "date_naissance": "2011-01-01",
+    "sexe": "F",
+    "club": "TCMT",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ERRAJI",
+    "prenom": "GHALI",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "OCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "GHALAS",
+    "prenom": "ADAM",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "RTCMO",
+    "categorie": "U14"
+  },
+  {
+    "nom": "HAKMI",
+    "prenom": "YOUSSEF",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "RTCMO",
+    "categorie": "U14"
+  },
+  {
+    "nom": "MAGHFOUR",
+    "prenom": "JAD",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U14"
+  },
+  {
+    "nom": "RAISS",
+    "prenom": "KAMIL",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "RIAD",
+    "categorie": "U14"
+  },
+  {
+    "nom": "RHAZALI",
+    "prenom": "KAMIL",
+    "date_naissance": "2011-01-01",
+    "sexe": "M",
+    "club": "WIFAQ",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ADLAL",
+    "prenom": "HANANE",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "RUC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "EL FALAKI",
+    "prenom": "CHADA",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "EL OUAZZANI",
+    "prenom": "JOUMANA",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U14"
+  },
+  {
+    "nom": "NAFAA",
+    "prenom": "HIBA",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "OCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "TALBI",
+    "prenom": "CELYA",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "COBM",
+    "categorie": "U14"
+  },
+  {
+    "nom": "TAOUTAOU",
+    "prenom": "LYLIA",
+    "date_naissance": "2012-01-01",
+    "sexe": "F",
+    "club": "COC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ALLOU",
+    "prenom": "AYMAN",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "TCK",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ASSO",
+    "prenom": "YOUSSEF",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "USM/TCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "DHIMNI",
+    "prenom": "REDA",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "TCK",
+    "categorie": "U14"
+  },
+  {
+    "nom": "JAMJI",
+    "prenom": "SOULAYMANE",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "OCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "SLAOUI",
+    "prenom": "ALI",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "USM/TCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "SMIHI",
+    "prenom": "ADAM",
+    "date_naissance": "2012-01-01",
+    "sexe": "M",
+    "club": "OCC",
+    "categorie": "U14"
+  },
+  {
+    "nom": "ABIDINE",
+    "prenom": "SOFIA",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "RTCMO",
+    "categorie": "U12"
+  },
+  {
+    "nom": "ALAOUI",
+    "prenom": "DOUAE",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "TCF",
+    "categorie": "U12"
+  },
+  {
+    "nom": "JAOID",
+    "prenom": "DINA",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "COBM",
+    "categorie": "U12"
+  },
+  {
+    "nom": "LAMZIBRI",
+    "prenom": "NARIMANE",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "LOULIDI",
+    "prenom": "YASSMINE",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "TOUIMY",
+    "prenom": "NOUHA",
+    "date_naissance": "2013-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "BENHIMA",
+    "prenom": "OTHMANE",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "BENKIRANE",
+    "prenom": "ISMAIL",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "USM/TCC",
+    "categorie": "U12"
+  },
+  {
+    "nom": "ESSADKI",
+    "prenom": "ABDELJABBAR",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "KAHCHA",
+    "prenom": "HAYTAM",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "TCF",
+    "categorie": "U12"
+  },
+  {
+    "nom": "MOUAFFAK",
+    "prenom": "NASSER",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "RTCMA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "YAHYAOUI",
+    "prenom": "ILYASS",
+    "date_naissance": "2013-01-01",
+    "sexe": "M",
+    "club": "RUC",
+    "categorie": "U12"
+  },
+  {
+    "nom": "ALLALI JOUMANA",
+    "prenom": "ELBATOUL",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "WIFAQ",
+    "categorie": "U12"
+  },
+  {
+    "nom": "BAHLAOUAN",
+    "prenom": "OMAR",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "RTCMO",
+    "categorie": "U12"
+  },
+  {
+    "nom": "EL RHAFFOULI",
+    "prenom": "YACOUT",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "RTCMA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "JELLOULE",
+    "prenom": "LILYA",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "NAIMI",
+    "prenom": "SHAMA",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "SALAHEDDINE",
+    "prenom": "YOUSRA",
+    "date_naissance": "2014-01-01",
+    "sexe": "F",
+    "club": "RIAD",
+    "categorie": "U12"
+  },
+  {
+    "nom": "AMRHAR",
+    "prenom": "ADAM",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "RTCA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "BAHLAOUAN",
+    "prenom": "OMAR",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "RTCMO",
+    "categorie": "U12"
+  },
+  {
+    "nom": "EL KINANI",
+    "prenom": "MOHAMED",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "CAST",
+    "categorie": "U12"
+  },
+  {
+    "nom": "EL RHAFFOULI",
+    "prenom": "YACOUT",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "RTCMA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "JELLOULE",
+    "prenom": "LILYA",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U12"
+  },
+  {
+    "nom": "LAHLOU MED",
+    "prenom": "REDA",
+    "date_naissance": "2014-01-01",
+    "sexe": "M",
+    "club": "ACSA",
+    "categorie": "U12"
+  }
+]

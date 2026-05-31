@@ -1,0 +1,14 @@
+Modèle Word officiel FRMT — lettres de stage
+==========================================
+
+Placez ici le fichier fourni par la FRMT :
+
+  lettre-officielle-frmt.docx
+
+(copie de « Lettre de réservation Centre National stage national … .docx »)
+
+La génération actuelle reproduit la mise en page officielle (logo, bordures rouges,
+pied de page, signature) via le moteur intégré. Ce fichier sert de référence visuelle
+et pour une future fusion Word si besoin.
+
+Ne pas renommer le bucket Storage Supabase : admin-documents (autre module).

@@ -5,6 +5,7 @@ export { isSupabaseConfigured, getSupabasePublicEnv } from "./config";
 export { assertSupabaseConfigured } from "./assert-configured";
 export { createSupabaseBrowserClient } from "./browser";
 
+/** @deprecated Préférer getSafeSupabaseClient() pour V2 */
 export function getSupabaseBrowserClient(): SupabaseClient {
   const client = createSupabaseBrowserClient();
   if (!client) {
@@ -13,4 +14,13 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     );
   }
   return client;
+}
+
+/** Client Supabase sans exception — V2 */
+export function getSafeSupabaseClient(): SupabaseClient | null {
+  return createSupabaseBrowserClient();
+}
+
+export function isLocalFallbackMode(): boolean {
+  return getSafeSupabaseClient() === null;
 }

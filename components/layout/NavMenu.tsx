@@ -26,29 +26,10 @@ export function NavMenu({ sections, onNavigate, variant = "sidebar" }: Props) {
       {sections.map((section) => (
         <div
           key={section.id}
-          className={cn(
-            section.id === "logistique_frmt" && "border-t border-border/80 pt-4",
-            section.id === "systeme" && "border-t border-border/80 pt-4"
-          )}
+          className={cn(section.id === "systeme" && "border-t border-border/80 pt-4")}
         >
-          {section.id !== "general" && (
-            <p
-              className={cn(
-                "mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider",
-                section.id === "logistique_frmt"
-                  ? "text-frmt-red/90"
-                  : section.id === "centre_national"
-                    ? "text-frmt-green/90"
-                    : "text-muted"
-              )}
-            >
-              {section.label}
-            </p>
-          )}
-          {section.description && (
-            <p className="mb-2 px-3 text-[11px] leading-snug text-muted/80">
-              {section.description}
-            </p>
+          {section.id === "systeme" && (
+            <p className="v2-sidebar-section-label mx-1">{section.label}</p>
           )}
           <ul className="space-y-0.5">
             {section.items.map(({ href, label, icon: Icon }) => {
@@ -72,7 +53,7 @@ export function NavMenu({ sections, onNavigate, variant = "sidebar" }: Props) {
                     <Icon
                       className={cn(
                         "h-4 w-4 shrink-0",
-                        active && (mobile ? "text-frmt-green" : "text-frmt-green")
+                        active && "text-frmt-green"
                       )}
                     />
                     <span className="truncate">{label}</span>

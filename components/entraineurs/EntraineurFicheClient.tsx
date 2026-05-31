@@ -29,6 +29,7 @@ import { getStagesProgramme } from "@/lib/data/stages";
 import type { EntraineurDepenseInput } from "@/lib/types/entraineurs";
 import { formatDate } from "@/lib/utils/dates";
 import { ArrowLeft, Plus } from "lucide-react";
+import { StageParticipantLinks } from "@/components/stages/StageParticipantLinks";
 
 const CATEGORIES_DEPENSE = [
   { value: "billet_avion", label: "Billet avion" },
@@ -200,6 +201,12 @@ export function EntraineurFicheClient({ id }: { id: string }) {
           <p className="mt-1 text-xs text-muted">{budgetPct}% consommé</p>
         </Card>
       </div>
+
+      <StageParticipantLinks
+        kind="coach"
+        entityId={id}
+        label={`${entraineur.prenom} ${entraineur.nom}`}
+      />
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
         {tabs.map((t) => (

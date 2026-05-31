@@ -40,7 +40,10 @@ export async function getOccupationCne(): Promise<OccupationCneSnapshot[]> {
     .from("occupation_cne")
     .select("*")
     .order("date", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] occupation_cne:", error.message);
+    return [];
+  }
   return (data ?? []) as OccupationCneSnapshot[];
 }
 

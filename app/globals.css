@@ -11,6 +11,23 @@
   --frmt-red: #c1272d;
   --frmt-green: #006233;
   --frmt-green-bright: #0a8f4a;
+  --frmt-navy: #1a3c5e;
+  --frmt-gold: #c9a227;
+  --frmt-success: #1d9e75;
+  --frmt-alert: #e67e22;
+  --frmt-danger: #e74c3c;
+  /* Federation UI v2 */
+  --bg-sidebar: #0f1923;
+  --bg-main: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2330;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --success: #1d9e75;
+  --warning: #e67e22;
+  --danger: #e74c3c;
+  --info: #3498db;
   /* Accent UI (navigation active) */
   --accent: var(--frmt-green);
   --accent-dim: #004d28;
@@ -27,16 +44,20 @@
   --color-muted: var(--muted);
   --color-frmt-red: var(--frmt-red);
   --color-frmt-green: var(--frmt-green);
+  --color-frmt-navy: var(--frmt-navy);
+  --color-frmt-gold: var(--frmt-gold);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-card: var(--bg-card);
   --color-tennis: var(--tennis);
   --color-tennis-dim: var(--tennis-dim);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-sans);
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 98, 51, 0.12), transparent),
     radial-gradient(ellipse 60% 40% at 100% 0%, rgba(193, 39, 45, 0.06), transparent);
@@ -145,4 +166,95 @@ body {
 }
 .frmt-stagger-list .frmt-stagger-item:nth-child(n + 6) {
   animation-delay: 0.18s;
+}
+
+/* Sidebar fédération */
+.v2-sidebar {
+  background: var(--bg-sidebar);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--bg-sidebar));
+}
+
+/* Titres de rubriques du menu latéral — accent FRMT discret */
+.v2-sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.625rem;
+  padding: 0 0.5rem 0.375rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--frmt-red) 28%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e8c4c6;
+  text-decoration: none;
+}
+
+.v2-sidebar-section-label::before {
+  content: "";
+  flex-shrink: 0;
+  width: 3px;
+  height: 0.75rem;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--frmt-red) 0%,
+    color-mix(in srgb, var(--frmt-red) 55%, var(--frmt-gold)) 100%
+  );
+}
+
+.v2-sidebar-nav-link {
+  color: #8899aa;
+  border-left: 3px solid transparent;
+}
+
+.v2-sidebar-nav-link:hover {
+  background: color-mix(in srgb, var(--bg-card-hover) 80%, transparent);
+  color: #ffffff;
+}
+
+.v2-sidebar-nav-link--active {
+  background: color-mix(in srgb, var(--frmt-navy) 40%, var(--bg-sidebar));
+  color: #ffffff;
+  border-left-color: var(--frmt-gold);
+}
+
+.v2-kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  border-top-width: 2px;
+}
+
+.v2-stage-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.v2-stage-card:hover {
+  border-color: color-mix(in srgb, var(--frmt-gold) 50%, var(--border));
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.v2-data-table thead {
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.v2-data-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.v2-data-table tbody tr:nth-child(even) {
+  background: var(--bg-main);
+}
+
+.v2-data-table tbody tr:hover {
+  background: var(--bg-card);
 }

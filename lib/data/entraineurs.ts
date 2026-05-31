@@ -1,4 +1,6 @@
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { localGetEntraineurs } from "@/lib/local-test/data-access";
 import { logHistorique } from "@/lib/audit/historique";
 import { softDeleteRecord } from "@/lib/data/soft-delete";
 import { coachReferentLabel } from "@/lib/constants/entraineurs";
@@ -14,6 +16,8 @@ import type {
 } from "@/lib/types/entraineurs";
 
 export async function getEntraineurs(): Promise<Entraineur[]> {
+  if (shouldUseLocalTestStorage()) return localGetEntraineurs();
+  if (!(await isSupabaseDataClientReady())) return [];
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("entraineurs")
@@ -21,8 +25,9 @@ export async function getEntraineurs(): Promise<Entraineur[]> {
     .is("deleted_at", null)
     .order("nom");
   if (error) {
+    console.warn("[Supabase] entraineurs:", error.message);
     const fallback = await supabase.from("entraineurs").select("*").order("nom");
-    if (fallback.error) throw new Error(fallback.error.message);
+    if (fallback.error) return [];
     return ((fallback.data ?? []) as (Entraineur & { deleted_at?: string | null })[]).filter(
       (e) => !e.deleted_at
     );

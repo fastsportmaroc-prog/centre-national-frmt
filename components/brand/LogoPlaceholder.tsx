@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
@@ -6,25 +7,22 @@ type Props = {
 };
 
 const sizes = {
-  sm: "h-10 w-10 text-[8px]",
-  md: "h-14 w-14 text-[9px]",
-  lg: "h-20 w-20 text-[10px]",
+  sm: 40,
+  md: 56,
+  lg: 80,
 };
 
-/** Zone réservée — logo officiel FRMT à intégrer plus tard */
+/** Logo officiel FRMT (public/logo-frmt.png). */
 export function LogoPlaceholder({ size = "md", className }: Props) {
+  const px = sizes[size];
   return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-lg border border-dashed border-frmt-green/40 bg-surface-elevated/80 text-center font-medium uppercase tracking-wide text-muted",
-        sizes[size],
-        className
-      )}
-      title="Logo officiel à intégrer"
-    >
-      Logo
-      <br />
-      FRMT
-    </div>
+    <Image
+      src="/logo-frmt.png"
+      alt="Logo FRMT"
+      width={px}
+      height={px}
+      className={cn("shrink-0 object-contain", className)}
+      priority={size === "lg"}
+    />
   );
 }

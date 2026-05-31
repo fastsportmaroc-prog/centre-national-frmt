@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import { getNavSectionsForUser } from "./nav-items";
+import { getNavSectionsForUser, type NavSection } from "./nav-items";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFrmtRole } from "@/components/auth/FrmtRoleProvider";
 import { Button } from "@/components/ui/Button";
@@ -12,14 +12,18 @@ import { NavMenu } from "./NavMenu";
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** Navigation V2 ou autre override */
+  sectionsOverride?: NavSection[];
 };
 
-export function MobileNav({ open, onClose }: Props) {
+export function MobileNav({ open, onClose, sectionsOverride }: Props) {
   const { user } = useAuth();
   const { frmtRole } = useFrmtRole();
   const sections = useMemo(
-    () => getNavSectionsForUser(user?.role === "admin", frmtRole),
-    [user?.role, frmtRole]
+    () =>
+      sectionsOverride ??
+      getNavSectionsForUser(user?.role === "admin", frmtRole),
+    [sectionsOverride, user?.role, frmtRole]
   );
 
   if (!open) return null;

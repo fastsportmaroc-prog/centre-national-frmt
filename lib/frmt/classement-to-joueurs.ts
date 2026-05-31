@@ -31,7 +31,7 @@ export type FrmtClassementFile = {
 };
 
 /** Noms des groupes Supabase (migration 003) — pas des ids mock g1/g6 */
-export const GROUPE_NOM_BY_CATEGORIE: Record<CategorieAge, string> = {
+export const GROUPE_NOM_BY_CATEGORIE: Record<string, string> = {
   U8: "U12",
   U10: "U12",
   U12: "U12",
@@ -39,11 +39,12 @@ export const GROUPE_NOM_BY_CATEGORIE: Record<CategorieAge, string> = {
   U16: "U16",
   U18: "U18",
   Senior: "Préparation compétition",
+  "Elite Pro": "Élite",
 };
 
 export function groupeIdForCategorie(
   groupes: { id: string; nom: string }[],
-  categorie: CategorieAge
+  categorie: string
 ): string | null {
   const nom = GROUPE_NOM_BY_CATEGORIE[categorie];
   return groupes.find((g) => g.nom === nom)?.id ?? null;
@@ -59,7 +60,8 @@ function titleCase(s: string): string {
 
 export function frmtPlayerToJoueurInput(
   p: FrmtClassementPlayer,
-  index: number
+  index: number,
+  groupeId: string | null = null
 ): JoueurInput {
   const date_naissance = `${p.annee_naissance}-01-01`;
   const sexe = p.sexe as SexeJoueur;

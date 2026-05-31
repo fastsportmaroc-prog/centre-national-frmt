@@ -1,4 +1,6 @@
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { localGetInfrastructures } from "@/lib/local-test/data-access";
 import type { Court, CourtInput, CourtWithStats, Reservation } from "@/lib/types/database";
 import type { Infrastructure } from "@/lib/types/infrastructures";
 import {
@@ -15,6 +17,11 @@ import { getReservations } from "./reservations";
 import { isToday } from "@/lib/utils/dates";
 
 export async function getCourts(): Promise<Court[]> {
+  if (shouldUseLocalTestStorage()) {
+    return localGetInfrastructures()
+      .filter((i) => i.type === "terrain")
+      .map(infrastructureToCourt);
+  }
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("infrastructures")
@@ -25,7 +32,10 @@ export async function getCourts(): Promise<Court[]> {
     return (data as Infrastructure[]).map(infrastructureToCourt);
   }
   const legacy = await supabase.from("courts").select("*").order("nom");
-  if (legacy.error) throw new Error(legacy.error.message);
+  if (legacy.error) {
+    console.warn("[Supabase] courts legacy:", legacy.error.message);
+    return [];
+  }
   return (legacy.data ?? []) as Court[];
 }
 

@@ -1,5 +1,5 @@
-import { InfrastructuresClient } from "@/components/infrastructures/InfrastructuresClient";
+import { InfrastructuresV2Client } from "@/components/v2/infrastructures/InfrastructuresV2Client";
 
 export default function InfrastructuresPage() {
-  return <InfrastructuresClient />;
+  return <InfrastructuresV2Client />;
 }

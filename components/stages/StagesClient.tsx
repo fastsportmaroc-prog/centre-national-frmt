@@ -18,14 +18,27 @@ import {
 } from "@/lib/data/stages";
 import { getInfrastructures } from "@/lib/data/infrastructures";
 import { getEntraineurs } from "@/lib/data/entraineurs";
+import { getJoueurs } from "@/lib/data/joueurs";
 import { getMateriels } from "@/lib/data/materiel";
-import type { StatutStage } from "@/lib/types/stages";
+import { StageAddForm } from "@/components/stages/StageAddForm";
+import { provisionStageAfterCreate } from "@/lib/stages/provision-stage";
+import {
+  emptyLogistiquePack,
+  embedLogistiqueInNotes,
+  parseLogistiqueFromNotes,
+  stripLogistiqueFromNotes,
+} from "@/lib/stages/stage-logistique-serializer";
+import type { StageLogistiquePack } from "@/lib/types/stage-logistique";
+import type { Infrastructure } from "@/lib/types/infrastructures";
 import { statutStageLabel } from "@/lib/utils/stage-automation";
 import type { StageProgramme, StageProgrammeInput } from "@/lib/types/stages";
 import { logHistorique } from "@/lib/audit/historique";
 import { exportPdfReport, openPrintReport } from "@/lib/export/reports";
 import { buildCalendrierStagesReport } from "@/lib/reports/stages-calendrier";
 import { formatDate } from "@/lib/utils/dates";
+import { LocalTestBadge } from "@/components/ui/LocalTestBadge";
+import { isBrowserSupabaseReady, isLocalTestModeClient } from "@/lib/local-test/mode";
+import { validateStageForm } from "@/lib/stages/validate-stage-form";
 import { Calendar, Copy, FileDown, List, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 
 type Vue = "liste" | "mois" | "annee";
@@ -41,7 +54,7 @@ function emptyStage(): StageProgrammeInput {
     date_fin: today,
     nombre_joueurs: 0,
     nombre_encadrants: 0,
-    hebergement: true,
+    hebergement: false,
     chambres: 0,
     lieu: "Centre National Rabat",
     notes: "",
@@ -65,20 +78,41 @@ export function StagesClient() {
   const [editing, setEditing] = useState<StageProgramme | null>(null);
   const [form, setForm] = useState<StageProgrammeInput>(emptyStage());
   const [infrastructures, setInfrastructures] = useState<{ id: string; nom: string }[]>([]);
-  const [entraineurs, setEntraineurs] = useState<{ id: string; nom: string }[]>([]);
+  const [infraFull, setInfraFull] = useState<Infrastructure[]>([]);
+  const [entraineurs, setEntraineurs] = useState<{ id: string; label: string }[]>([]);
+  const [joueurs, setJoueurs] = useState<{ id: string; label: string }[]>([]);
   const [materiels, setMateriels] = useState<{ id: string; nom: string }[]>([]);
+  const [logistique, setLogistique] = useState<StageLogistiquePack>(emptyLogistiquePack());
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [provisionInfo, setProvisionInfo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [stages, infras, coaches, mats] = await Promise.all([
-      getStagesProgramme(),
-      getInfrastructures(),
-      getEntraineurs(),
-      getMateriels(),
-    ]);
-    setItems(stages);
-    setInfrastructures(infras.map((i) => ({ id: i.id, nom: i.nom })));
-    setEntraineurs(coaches.map((e) => ({ id: e.id, nom: `${e.prenom} ${e.nom}` })));
-    setMateriels(mats.map((m) => ({ id: m.id, nom: m.nom })));
+    setLoadError(null);
+    try {
+      const stages = await getStagesProgramme();
+      setItems(stages);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Impossible de charger les stages");
+      setItems([]);
+    }
+    try {
+      const [infras, coaches, mats, jlist] = await Promise.all([
+        getInfrastructures(),
+        getEntraineurs(),
+        getMateriels(),
+        getJoueurs(),
+      ]);
+      setInfraFull(infras);
+      setInfrastructures(infras.map((i) => ({ id: i.id, nom: i.nom })));
+      setEntraineurs(
+        coaches.map((e) => ({ id: e.id, label: `${e.prenom} ${e.nom}` }))
+      );
+      setJoueurs(jlist.map((j) => ({ id: j.id, label: `${j.prenom} ${j.nom}` })));
+      setMateriels(mats.map((m) => ({ id: m.id, nom: m.nom })));
+    } catch {
+      /* formulaire reste utilisable sans listes auxiliaires */
+    }
   }, []);
 
   useEffect(() => {
@@ -112,20 +146,73 @@ export function StagesClient() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setFormError(null);
+    setProvisionInfo(null);
+    const validation = validateStageForm(form);
+    if (!validation.ok) {
+      setFormError(validation.message);
+      return;
+    }
+    const userNotes = stripLogistiqueFromNotes(form.notes ?? null) || null;
+    const notes = embedLogistiqueInNotes(userNotes, logistique);
     const payload = {
       ...form,
       lieu: form.lieu || null,
-      notes: form.notes || null,
+      notes,
+      nombre_joueurs: logistique.joueur_ids.length || form.nombre_joueurs,
+      nombre_encadrants: logistique.entraineur_ids.length || form.nombre_encadrants,
+      entraineur_ids: logistique.entraineur_ids.length
+        ? logistique.entraineur_ids
+        : form.entraineur_ids,
+      hebergement: !!logistique.hebergement?.actif,
     };
-    if (editing) await updateStageProgramme(editing.id, payload);
-    else await createStageProgramme(payload);
-    setOpen(false);
+    try {
+      if (editing) {
+        await updateStageProgramme(editing.id, payload);
+      } else {
+        const created = await createStageProgramme(payload);
+        const result = await provisionStageAfterCreate(created.id, logistique);
+        const parts: string[] = ["Stage créé ✓"];
+        if (result.hebergement_cree) parts.push("Hébergement généré ✓");
+        if (result.restauration_cree) parts.push("Restauration générée ✓");
+        if (result.planning_crees) parts.push("Planning créé ✓");
+        if (result.reservations_crees) {
+          parts.push(`${result.reservations_crees} courts réservés ✓`);
+        }
+        const localPrefix = created.id.startsWith("local-") ? "Mode local · " : "";
+        setProvisionInfo(`${localPrefix}${parts.join(" | ")}`);
+        await load();
+        return;
+      }
+      setOpen(false);
+      setEditing(null);
+      setLogistique(emptyLogistiquePack());
+      setForm(emptyStage());
+      await load();
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Impossible d'enregistrer le stage."
+      );
+    }
+  }
+
+  function openCreate() {
     setEditing(null);
-    await load();
+    setForm(emptyStage());
+    setLogistique(emptyLogistiquePack());
+    setFormError(null);
+    setProvisionInfo(null);
+    setOpen(true);
   }
 
   function openEdit(s: StageProgramme) {
     setEditing(s);
+    const pack = parseLogistiqueFromNotes(s.notes) ?? emptyLogistiquePack();
+    setLogistique({
+      ...pack,
+      joueur_ids: pack.joueur_ids.length ? pack.joueur_ids : [],
+      entraineur_ids: pack.entraineur_ids.length ? pack.entraineur_ids : s.entraineur_ids,
+    });
     setForm({
       id_excel: s.id_excel,
       source: s.source,
@@ -138,7 +225,7 @@ export function StagesClient() {
       hebergement: s.hebergement,
       chambres: s.chambres,
       lieu: s.lieu ?? "",
-      notes: s.notes ?? "",
+      notes: stripLogistiqueFromNotes(s.notes) ?? "",
       budget_prevu: s.budget_prevu,
       budget_reel: s.budget_reel,
       statut: s.statut,
@@ -238,13 +325,54 @@ export function StagesClient() {
     });
   }
 
+  async function handleDeleteStage(s: StageProgramme) {
+    if (!confirm(`Supprimer le stage « ${s.stage_action} » et toutes les données liées ?`)) return;
+    try {
+      await deleteStageProgramme(s.id);
+      await load();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Suppression impossible");
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Programme & stages"
         description="Calendrier CNE — import Excel FRMT · filtres · vues mensuelle et annuelle"
+        actions={<LocalTestBadge />}
       />
       <main className="flex-1 space-y-4 p-4 sm:p-6">
+        {loadError && !isLocalTestModeClient() && (
+          <Card className="border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+            {loadError}
+            <p className="mt-2 text-xs text-muted">
+              Vérifiez Supabase (.env.local) et redémarrez le serveur, ou utilisez le mode local test.
+            </p>
+          </Card>
+        )}
+        {isLocalTestModeClient() && (
+          <Card className="border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-200">
+            Mode local test actif — les stages sont enregistrés dans le navigateur (localStorage).
+            Aucune écriture sur Supabase production.
+            {!isBrowserSupabaseReady() && (
+              <span className="mt-2 block text-xs">
+                Astuce : redémarrez <code className="text-sky-100">npm run dev:3001</code> après
+                modification de <code className="text-sky-100">.env.local</code>, ou vérifiez{" "}
+                <a href="/api/health" className="underline" target="_blank" rel="noreferrer">
+                  /api/health
+                </a>
+                .
+              </span>
+            )}
+          </Card>
+        )}
+        {!loadError && items.length === 0 && (
+          <Card className="p-4 text-sm text-muted">
+            Aucun stage affiché. Les données en base peuvent exister — vérifiez{" "}
+            <code>/api/stages/count</code> ou réimportez via Import Excel CNE.
+          </Card>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Button variant={vue === "liste" ? "primary" : "ghost"} size="sm" onClick={() => setVue("liste")}>
             <List className="h-4 w-4" />
@@ -283,16 +411,9 @@ export function StagesClient() {
               Import Excel CNE
             </Button>
           </Link>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setForm(emptyStage());
-              setOpen(true);
-            }}
-          >
+          <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4" />
-            Nouveau stage
+            Ajouter stage
           </Button>
         </div>
 
@@ -345,16 +466,11 @@ export function StagesClient() {
               key={s.id}
               stage={s}
               onEdit={() => openEdit(s)}
-              onDelete={async () => {
-                if (confirm("Supprimer ce stage ?")) {
-                  await deleteStageProgramme(s.id);
-                  await load();
-                }
-              }}
               onDuplicate={async () => {
                 await duplicateStageProgramme(s.id);
                 await load();
               }}
+              onDelete={() => handleDeleteStage(s)}
             />
           ))}
 
@@ -374,16 +490,11 @@ export function StagesClient() {
                     stage={s}
                     compact
                     onEdit={() => openEdit(s)}
-                    onDelete={async () => {
-                      if (confirm("Supprimer ?")) {
-                        await deleteStageProgramme(s.id);
-                        await load();
-                      }
-                    }}
                     onDuplicate={async () => {
                       await duplicateStageProgramme(s.id);
                       await load();
                     }}
+                    onDelete={() => handleDeleteStage(s)}
                   />
                 ))}
               </div>
@@ -402,16 +513,11 @@ export function StagesClient() {
                   stage={s}
                   compact
                   onEdit={() => openEdit(s)}
-                  onDelete={async () => {
-                    if (confirm("Supprimer ?")) {
-                      await deleteStageProgramme(s.id);
-                      await load();
-                    }
-                  }}
                   onDuplicate={async () => {
                     await duplicateStageProgramme(s.id);
                     await load();
                   }}
+                  onDelete={() => handleDeleteStage(s)}
                 />
               ))}
             </div>
@@ -422,157 +528,64 @@ export function StagesClient() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? "Modifier le stage" : "Nouveau stage"}
-      >
-        <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label>Stage / Action *</Label>
-              <Input
-                required
-                value={form.stage_action}
-                onChange={(e) => setForm({ ...form, stage_action: e.target.value })}
-              />
+        title={editing ? "Modifier le stage" : "Ajouter stage"}
+        panelClassName="max-w-3xl w-full"
+        footer={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              {formError && (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  {formError}
+                </p>
+              )}
+              {provisionInfo && (
+                <p className="rounded-lg border border-frmt-green/30 bg-frmt-green/10 px-3 py-2 text-sm text-frmt-green">
+                  {provisionInfo}
+                </p>
+              )}
             </div>
-            <div>
-              <Label>Source</Label>
-              <Select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-                {SOURCES_STAGE.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label>Catégorie</Label>
-              <Select
-                value={form.categorie}
-                onChange={(e) => setForm({ ...form, categorie: e.target.value })}
-              >
-                {CATEGORIES_STAGE.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label>Date début</Label>
-              <Input
-                type="date"
-                required
-                value={form.date_debut}
-                onChange={(e) => setForm({ ...form, date_debut: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Date fin</Label>
-              <Input
-                type="date"
-                required
-                value={form.date_fin}
-                onChange={(e) => setForm({ ...form, date_fin: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Joueurs</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.nombre_joueurs}
-                onChange={(e) =>
-                  setForm({ ...form, nombre_joueurs: Number(e.target.value) || 0 })
-                }
-              />
-            </div>
-            <div>
-              <Label>Encadrants</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.nombre_encadrants}
-                onChange={(e) =>
-                  setForm({ ...form, nombre_encadrants: Number(e.target.value) || 0 })
-                }
-              />
-            </div>
-            <div>
-              <Label>Chambres</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.chambres}
-                onChange={(e) => setForm({ ...form, chambres: Number(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <Label>Statut</Label>
-              <Select
-                value={form.statut}
-                onChange={(e) => setForm({ ...form, statut: e.target.value as StatutStage })}
-              >
-                <option value="prevu">Prévu</option>
-                <option value="en_cours">En cours</option>
-                <option value="termine">Terminé</option>
-                <option value="annule">Annulé</option>
-              </Select>
-            </div>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={form.hebergement}
-                onChange={(e) => setForm({ ...form, hebergement: e.target.checked })}
-              />
-              Hébergement requis
-            </label>
-            <div className="sm:col-span-2">
-              <Label>Infrastructures utilisées</Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {infrastructures.map((i) => (
-                  <label key={i.id} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs">
-                    <input type="checkbox" checked={form.infrastructure_ids.includes(i.id)} onChange={() => toggleInfra(i.id)} />
-                    {i.nom}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Entraîneurs affectés</Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {entraineurs.map((e) => (
-                  <label key={e.id} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs">
-                    <input type="checkbox" checked={form.entraineur_ids.includes(e.id)} onChange={() => toggleCoach(e.id)} />
-                    {e.nom}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Matériel</Label>
-              <div className="mt-2 space-y-2">
-                {materiels.length === 0 ? (
-                  <p className="text-xs text-muted">Aucun matériel enregistré.</p>
-                ) : (
-                  materiels.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 text-sm">
-                      <span className="min-w-[120px]">{m.nom}</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        className="w-20"
-                        value={materielQty(m.id)}
-                        onChange={(e) => setMaterielQty(m.id, Number(e.target.value) || 0)}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
+            <div className="flex shrink-0 gap-2 justify-end">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" form="stage-add-form">
+                {editing ? "Enregistrer" : "Créer stage"}
+              </Button>
             </div>
           </div>
-          <Button type="submit" className="w-full">
-            Enregistrer
-          </Button>
+        }
+      >
+        <form id="stage-add-form" onSubmit={handleSubmit} className="space-y-4">
+          <StageAddForm
+            form={form}
+            logistique={logistique}
+            joueurs={joueurs}
+            entraineurs={entraineurs}
+            infrastructures={infraFull}
+            onFormChange={setForm}
+            onLogistiqueChange={setLogistique}
+          />
+          <div className="rounded-lg border border-border p-3 overflow-hidden">
+            <Label>Matériel (optionnel)</Label>
+            <div className="mt-2 space-y-2">
+              {materiels.length === 0 ? (
+                <p className="text-xs text-muted">Aucun matériel enregistré.</p>
+              ) : (
+                materiels.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 text-sm">
+                    <span className="min-w-[120px]">{m.nom}</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-20"
+                      value={materielQty(m.id)}
+                      onChange={(e) => setMaterielQty(m.id, Number(e.target.value) || 0)}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </form>
       </Modal>
     </>
@@ -583,14 +596,14 @@ function StageCard({
   stage: s,
   compact,
   onEdit,
-  onDelete,
   onDuplicate,
+  onDelete,
 }: {
   stage: StageProgramme;
   compact?: boolean;
   onEdit: () => void;
-  onDelete: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Card className={compact ? "p-3" : ""}>
@@ -625,8 +638,8 @@ function StageCard({
           <Button size="sm" variant="ghost" onClick={onDuplicate}>
             <Copy className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="danger" onClick={onDelete}>
-            <Trash2 className="h-4 w-4" />
+          <Button size="sm" variant="ghost" onClick={onDelete} title="Supprimer">
+            <Trash2 className="h-4 w-4 text-red-400" />
           </Button>
         </div>
       </div>

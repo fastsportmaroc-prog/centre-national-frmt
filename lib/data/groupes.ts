@@ -11,7 +11,10 @@ export async function getGroupes(): Promise<Groupe[]> {
     .order("nom");
   if (error) {
     const fallback = await supabase.from("groupes").select("*").order("nom");
-    if (fallback.error) throw new Error(fallback.error.message);
+    if (fallback.error) {
+      console.warn("[Supabase] groupes:", fallback.error.message);
+      return [];
+    }
     return ((fallback.data ?? []) as (Groupe & { deleted_at?: string | null })[]).filter(
       (g) => !g.deleted_at
     );
@@ -62,6 +65,9 @@ export async function countJoueursInGroupe(groupeId: string): Promise<number> {
     .from("joueurs")
     .select("*", { count: "exact", head: true })
     .eq("groupe_id", groupeId);
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] count joueurs groupe:", error.message);
+    return 0;
+  }
   return count ?? 0;
 }

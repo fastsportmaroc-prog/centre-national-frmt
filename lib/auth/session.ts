@@ -1,11 +1,11 @@
 import type { AuthUser } from "@/lib/types/auth";
+import { authUserIsAppAdmin } from "@/lib/auth/admin-access";
 import { isInvalidRefreshTokenError } from "@/lib/auth/session-errors";
 
-/** Session utilisateur via API serveur (cookies HTTP). */
+/** Session client via /api/auth/me (pas d'import serveur — évite fuite server-only). */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   if (typeof window === "undefined") {
-    const { getAuthUserFromServer } = await import("@/lib/auth/server-session");
-    return getAuthUserFromServer();
+    return null;
   }
 
   try {
@@ -36,5 +36,5 @@ export function handleAuthClientError(error: unknown): boolean {
 }
 
 export function isAdmin(user: AuthUser | null): boolean {
-  return user?.role === "admin" || user?.frmtRole === "admin";
+  return user ? authUserIsAppAdmin(user) : false;
 }

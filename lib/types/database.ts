@@ -1,5 +1,6 @@
 // ——— Catégories & énumérations ———
-export type CategorieAge = "U8" | "U10" | "U12" | "U14" | "U16" | "U18" | "Senior";
+/** @deprecated Préférer `string` — catégories configurables dans Paramètres V2. */
+export type CategorieAge = string;
 export type SexeJoueur = "M" | "F" | "Autre";
 export type StatutJoueur = "actif" | "blesse" | "absent" | "suspendu";
 export type CourtStatut = "disponible" | "occupe" | "maintenance" | "ferme";
@@ -41,6 +42,7 @@ export type Joueur = {
   is_frmt_tracked?: boolean;
   email: string | null;
   telephone: string | null;
+  club?: string | null;
   niveau: string | null;
   classement: string | null;
   groupe_id: string | null;

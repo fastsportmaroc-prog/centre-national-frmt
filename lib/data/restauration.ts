@@ -1,4 +1,7 @@
-import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { getSupabaseDataClient, isSupabaseDataClientReady } from "@/lib/supabase/data-client";
+import { shouldUseLocalTestStorage } from "@/lib/local-test/mode";
+import { localGetBesoinsRestauration } from "@/lib/local-test/data-access";
+import { localCreateBesoinRestauration } from "@/lib/local-test/provision-local";
 import { logHistorique } from "@/lib/audit/historique";
 import { computePrestataireEtats, syncBesoinStatutFromFacture } from "@/lib/utils/restauration";
 import type {
@@ -20,16 +23,25 @@ async function resolvePrestataireNom(prestataireId: string | null): Promise<stri
 // ——— Prestataires ———
 
 export async function getPrestatairesRestauration(): Promise<PrestataireRestauration[]> {
+  if (shouldUseLocalTestStorage() || !(await isSupabaseDataClientReady())) {
+    return [];
+  }
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("prestataires_restauration")
     .select("*")
     .order("nom");
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] prestataires_restauration:", error.message);
+    return [];
+  }
   return (data ?? []) as PrestataireRestauration[];
 }
 
 export async function getPrestataireById(id: string): Promise<PrestataireRestauration | null> {
+  if (shouldUseLocalTestStorage() || !(await isSupabaseDataClientReady())) {
+    return null;
+  }
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("prestataires_restauration")
@@ -115,18 +127,30 @@ export async function deletePrestataireRestauration(id: string): Promise<void> {
 // ——— Besoins / événements ———
 
 export async function getBesoinsRestauration(): Promise<BesoinRestauration[]> {
+  if (shouldUseLocalTestStorage()) {
+    return localGetBesoinsRestauration();
+  }
+  if (!(await isSupabaseDataClientReady())) {
+    return [];
+  }
   const supabase = await getSupabaseDataClient();
   const { data, error } = await supabase
     .from("besoins_restauration")
     .select("*")
     .order("date_besoin", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("[Supabase] besoins_restauration:", error.message);
+    return [];
+  }
   return (data ?? []) as BesoinRestauration[];
 }
 
 export async function createBesoinRestauration(
   input: BesoinRestaurationInput
 ): Promise<BesoinRestauration> {
+  if (shouldUseLocalTestStorage()) {
+    return localCreateBesoinRestauration(input);
+  }
   const prestataire_nom = await resolvePrestataireNom(input.prestataire_id);
   const payload = { ...input, prestataire_nom };
   const supabase = await getSupabaseDataClient();

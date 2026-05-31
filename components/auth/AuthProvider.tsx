@@ -14,6 +14,7 @@ import { logoutAction } from "@/lib/auth/actions";
 import { purgeInvalidSession } from "@/lib/auth/purge-session.client";
 import { isInvalidRefreshTokenError } from "@/lib/auth/session-errors";
 import { setAuditUser } from "@/lib/audit/historique";
+import { setSupabaseAuthActive } from "@/lib/local-test/mode";
 import type { AuthUser } from "@/lib/types/auth";
 
 type AuthContextValue = {
@@ -40,13 +41,19 @@ export function AuthProvider({ children, initialUser = null }: Props) {
   const [loading, setLoading] = useState(initialUser === null);
   const refreshing = useRef(false);
 
+  useEffect(() => {
+    setSupabaseAuthActive(!!initialUser);
+  }, [initialUser]);
+
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
     refreshing.current = true;
-    setLoading(true);
+    // Ne pas masquer l'app au retour d'onglet : spinner uniquement si pas encore connecté.
+    setLoading((prev) => (user === null ? true : prev));
     try {
       const u = await getCurrentUser();
       setUser(u);
+      setSupabaseAuthActive(!!u);
       if (u) setAuditUser(u.fullName ?? u.email, u.frmtRole ?? u.role);
     } catch (error) {
       if (isInvalidRefreshTokenError(error)) {
@@ -57,7 +64,7 @@ export function AuthProvider({ children, initialUser = null }: Props) {
       setLoading(false);
       refreshing.current = false;
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!initialUser) void refresh();
@@ -73,10 +80,12 @@ export function AuthProvider({ children, initialUser = null }: Props) {
     } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
+        setSupabaseAuthActive(false);
         setLoading(false);
         return;
       }
       if (event === "SIGNED_IN") {
+        setSupabaseAuthActive(true);
         await refresh();
         return;
       }

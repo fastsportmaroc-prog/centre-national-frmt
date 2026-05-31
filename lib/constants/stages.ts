@@ -9,14 +9,7 @@ export const SOURCES_STAGE = [
   "Autre",
 ] as const;
 
-export const CATEGORIES_STAGE = [
-  "U12",
-  "U14",
-  "U16",
-  "U18",
-  "Seniors",
-  "Elite F",
-  "Encadrement",
-  "Global",
-  "Terrains",
-] as const;
+import { categoryCodes, getDefaultAgeCategories } from "@/lib/v2/categories-age-store";
+
+/** Liste par défaut (stages / filtres) — synchronisée avec les catégories d'âge configurables. */
+export const CATEGORIES_STAGE = categoryCodes(getDefaultAgeCategories()) as readonly string[];
