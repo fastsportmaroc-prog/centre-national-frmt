@@ -723,28 +723,56 @@ export function exportCalendrierPDF(
 export function exportPlanningPDF(
   seances: {
     date: string;
-    heure_debut: string;
-    heure_fin: string;
-    court?: string;
-    surface?: string;
-    coach?: string;
-    groupe?: string;
-    statut: string;
+    jour?: string;
+    creneau?: string;
+    horaire?: string;
+    heure_debut?: string;
+    heure_fin?: string;
     stage?: string;
+    categorie?: string;
+    statut: string;
+    nombre_joueurs?: number;
+    nombre_coachs?: number;
+    hebergement?: string;
+    restauration?: string;
+    terrains?: string;
+    terrains_supplementaires?: string;
+    lettre_envoyee?: string;
+    licences_verifiees?: string;
+    observations?: string;
   }[],
-  stageName?: string
+  options?: string | {
+    weekLabel?: string;
+    generatedBy?: string;
+    summary?: {
+      totalSeances: number;
+      stagesActifs: number;
+      totalJoueurs: number;
+      totalCoachs: number;
+      creneauxMatin: number;
+      creneauxApresMidi: number;
+    };
+  }
 ) {
   const data = [...seances]
-    .sort((a, b) => `${a.date}${a.heure_debut}`.localeCompare(`${b.date}${b.heure_debut}`))
+    .sort((a, b) => `${a.date}${a.horaire ?? a.heure_debut ?? ""}`.localeCompare(`${b.date}${b.horaire ?? b.heure_debut ?? ""}`))
     .map((r) => ({
       date: formatDateFR(r.date),
-      creneau: `${r.heure_debut} – ${r.heure_fin}`,
-      horaires: `${r.heure_debut} – ${r.heure_fin}`,
-      court: safePdfCell(r.court),
-      surface: safePdfCell(r.surface),
-      coach: safePdfCell(r.coach),
-      groupe: safePdfCell(r.groupe),
-      statut: formatStatutPdf(r.statut),
+      jour: safePdfCell(r.jour ?? ""),
+      creneau: safePdfCell(r.creneau ?? ""),
+      horaire: safePdfCell(r.horaire ?? `${r.heure_debut ?? "—"} – ${r.heure_fin ?? "—"}`),
+      stage: safePdfCell(r.stage ?? "—"),
+      categorie: safePdfCell(r.categorie ?? "—"),
+      statut: formatStatutPdf(r.statut ?? "prevu"),
+      joueurs: String(r.nombre_joueurs ?? 0),
+      coachs: String(r.nombre_coachs ?? 0),
+      hebergement: safePdfCell(r.hebergement ?? "Non"),
+      restauration: safePdfCell(r.restauration ?? "Non"),
+      terrains: safePdfCell(r.terrains ?? "Non"),
+      terrainsSupp: safePdfCell(r.terrains_supplementaires ?? "Non"),
+      lettreEnvoyee: safePdfCell(r.lettre_envoyee ?? "Non"),
+      licencesVerifiees: safePdfCell(r.licences_verifiees ?? "Non"),
+      observations: safePdfCell(r.observations ?? "—"),
     }));
 
   const dates = seances.map((s) => s.date).filter(Boolean).sort();
@@ -755,22 +783,57 @@ export function exportPlanningPDF(
         ? formatDateFR(dates[0]!)
         : undefined;
 
+  const optsObj = typeof options === "string" ? { weekLabel: options } : options;
+  const generatedBy = optsObj?.generatedBy ?? "Utilisateur FRMT";
+  const periodeWithMeta = `${optsObj?.weekLabel ?? periode ?? "Période non définie"} • Date export: ${formatDateFR(new Date().toISOString())} • Généré par: ${generatedBy}`;
+  const summary = optsObj?.summary;
+
   runFrmPdf({
-    title: "Planning des Séances",
-    subtitle: stageName,
-    periode,
+    title: "Planning hebdomadaire des séances",
+    subtitle: "Fédération Royale Marocaine de Tennis • Centre National",
+    periode: periodeWithMeta,
     orientation: "landscape",
-    filename: `Planning_${stageName ?? "Centre_National"}.pdf`.replace(/\s+/g, "_"),
+    filename: `Planning_Hebdomadaire_${new Date().toISOString().slice(0, 10)}.pdf`.replace(/\s+/g, "_"),
     columns: [
-      { header: "Date", key: "date", width: 28, align: "center" },
-      { header: "Horaires", key: "horaires", width: 22, align: "center" },
-      { header: "Court", key: "court", width: 25, align: "left" },
-      { header: "Surface", key: "surface", width: 22, align: "center" },
-      { header: "Coach", key: "coach", width: 35, align: "left" },
-      { header: "Groupe", key: "groupe", width: 22, align: "center" },
-      { header: "Statut", key: "statut", width: 18, align: "center" },
+      { header: "Date", key: "date", width: 16, align: "center" },
+      { header: "Jour", key: "jour", width: 14, align: "center" },
+      { header: "Créneau", key: "creneau", width: 18, align: "center" },
+      { header: "Horaire", key: "horaire", width: 14, align: "center" },
+      { header: "Stage", key: "stage", width: 24, align: "left" },
+      { header: "Catégorie", key: "categorie", width: 12, align: "center" },
+      { header: "Statut", key: "statut", width: 12, align: "center" },
+      { header: "Nb joueurs", key: "joueurs", width: 10, align: "center" },
+      { header: "Nb coachs", key: "coachs", width: 10, align: "center" },
+      { header: "Héb.", key: "hebergement", width: 8, align: "center" },
+      { header: "Rest.", key: "restauration", width: 8, align: "center" },
+      { header: "Terr.", key: "terrains", width: 8, align: "center" },
+      { header: "Terr. supp.", key: "terrainsSupp", width: 12, align: "center" },
+      { header: "Lettre", key: "lettreEnvoyee", width: 9, align: "center" },
+      { header: "Licences", key: "licencesVerifiees", width: 10, align: "center" },
+      { header: "Observations", key: "observations", width: 18, align: "left" },
     ],
     data,
+    sections:
+      summary ?
+        [
+          {
+            title: "Résumé hebdomadaire",
+            columns: [
+              { header: "Indicateur", key: "label", width: 55, align: "left" },
+              { header: "Valeur", key: "value", width: 45, align: "right" },
+            ],
+            data: [
+              { label: "Nombre total de séances", value: String(summary.totalSeances), _isTotal: true },
+              { label: "Nombre de stages actifs", value: String(summary.stagesActifs), _isTotal: true },
+              { label: "Total joueurs", value: String(summary.totalJoueurs), _isTotal: true },
+              { label: "Total coachs", value: String(summary.totalCoachs), _isTotal: true },
+              { label: "Créneaux matin", value: String(summary.creneauxMatin), _isTotal: false },
+              { label: "Créneaux après-midi", value: String(summary.creneauxApresMidi), _isTotal: false },
+            ],
+          },
+        ]
+      : [],
+    footerNote: "Document généré automatiquement par FRMT Centre National V2",
   });
 }
 
