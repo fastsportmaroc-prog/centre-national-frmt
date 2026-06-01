@@ -10,15 +10,18 @@ import { V2PageActions } from "@/components/v2/V2PageActions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
-import { getPlanning, getStages } from "@/lib/supabase/queries";
+import { getPlanning, getReservationsEnriched, getStages } from "@/lib/supabase/queries";
+import type { ReservationEnrichedV2 } from "@/lib/types/v2";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
 import type { StageProgrammeV2 } from "@/lib/types/v2";
 import {
   buildPlanningSessionsForWeek,
   formatPlanningSlotLabel,
   type PlanningCreneauSlot,
+  type PlanningReservationInput,
   type PlanningSessionRow,
 } from "@/lib/v2/planning-creneaux";
+import { normalizeStatut } from "@/lib/v2/reservations-utils";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -97,9 +100,10 @@ function pickStageDate(stage: StageProgrammeV2, kind: "start" | "end"): Date | n
 export function generatePlanningSessionsFromStages(
   stages: StageProgrammeV2[],
   planningRows: Awaited<ReturnType<typeof getPlanning>>,
-  selectedWeekStart: Date
+  selectedWeekStart: Date,
+  reservations: PlanningReservationInput[] = []
 ): PlanningSession[] {
-  return buildPlanningSessionsForWeek(stages, planningRows, selectedWeekStart);
+  return buildPlanningSessionsForWeek(stages, planningRows, selectedWeekStart, reservations);
 }
 
 export function PlanningV2Client() {
@@ -109,6 +113,7 @@ export function PlanningV2Client() {
   const stageFromUrl = searchParams.get("stage") ?? "";
   const [stages, setStages] = useState<StageProgrammeV2[]>([]);
   const [planningRows, setPlanningRows] = useState<Awaited<ReturnType<typeof getPlanning>>>([]);
+  const [reservations, setReservations] = useState<PlanningReservationInput[]>([]);
   const [stageFilter, setStageFilter] = useState(stageFromUrl);
   const [statusFilter, setStatusFilter] = useState<StageStatusFilter>("tous");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -118,11 +123,25 @@ export function PlanningV2Client() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, p] = await Promise.all([getStages(), getPlanning()]);
+    const [s, p, r] = await Promise.all([getStages(), getPlanning(), getReservationsEnriched()]);
     setStages(s);
     setPlanningRows(p);
+    setReservations(
+      r
+        .filter((row): row is ReservationEnrichedV2 & { stage_id: string } => Boolean(row.stage_id))
+        .filter((row) => normalizeStatut(row.statut) !== "annule")
+        .map((row) => ({
+          stage_id: row.stage_id,
+          date_debut: row.date_debut,
+          date_fin: row.date_fin,
+          creneau: row.creneau,
+          heure_debut: row.heure_debut,
+          heure_fin: row.heure_fin,
+          statut: row.statut,
+        }))
+    );
     if (isDev) {
-      console.info("[PlanningV2] stages loaded:", s.length);
+      console.info("[PlanningV2] stages loaded:", s.length, "reservations stage:", r.length);
     }
     setLoading(false);
   }, []);
@@ -147,8 +166,8 @@ export function PlanningV2Client() {
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const generatedSessions = useMemo(
-    () => generatePlanningSessionsFromStages(stages, planningRows, weekStart),
-    [stages, planningRows, weekStart]
+    () => generatePlanningSessionsFromStages(stages, planningRows, weekStart, reservations),
+    [stages, planningRows, weekStart, reservations]
   );
 
   const stageById = useMemo(
@@ -226,7 +245,7 @@ export function PlanningV2Client() {
         description={
           loading ?
             "Chargement des stages…"
-          : "Créneaux alignés sur les terrains stage : matin 09-13, après-midi 14-18, journée 09-18"
+          : "Synchronisé avec les réservations terrains (Stages + Réservations) — matin 09-13, après-midi 14-18, journée 09-18"
         }
         actions={
           <V2PageActions
@@ -352,7 +371,8 @@ export function PlanningV2Client() {
         {filteredSessions.length === 0 ? (
           <Card className="border border-amber-500/25 bg-amber-500/5 p-3 text-sm text-muted">
             Aucun créneau réservé sur cette semaine avec les filtres actuels. Les jours en gris sont
-            disponibles — configurez les terrains sur la fiche stage (onglet Terrains).
+            disponibles — les créneaux réservés apparaissent dès qu&apos;une réservation terrain existe
+            (onglet Terrains du stage ou rubrique Réservations).
           </Card>
         ) : null}
 

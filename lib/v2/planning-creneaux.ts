@@ -1,6 +1,7 @@
 import { parseTerrainsBesoinsFromNotes } from "@/lib/data/terrains";
-import type { PlanningSeanceV2, StageProgrammeV2 } from "@/lib/types/v2";
-import { creneauHorairesFixed, type CreneauType } from "@/lib/v2/reservations-utils";
+import type { PlanningSeanceV2, ReservationEnrichedV2, StageProgrammeV2 } from "@/lib/types/v2";
+import { dateOnlyString } from "@/lib/v2/calendar-dates";
+import { creneauHorairesFixed, resolveCreneauType, type CreneauType } from "@/lib/v2/reservations-utils";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 import { addDays, endOfWeek, format, startOfWeek } from "date-fns";
 
@@ -41,6 +42,11 @@ export function horairesForPlanningSlot(slot: PlanningCreneauSlot): {
   const { debut, fin } = creneauHorairesFixed(type);
   return { heure_debut: debut, heure_fin: fin };
 }
+
+export type PlanningReservationInput = Pick<
+  ReservationEnrichedV2,
+  "stage_id" | "date_debut" | "date_fin" | "creneau" | "heure_debut" | "heure_fin" | "statut"
+>;
 
 export type PlanningSessionRow = {
   id: string;
@@ -105,11 +111,20 @@ function normalizeStageCategory(raw: unknown): string {
   return value || "—";
 }
 
-/** Séances planning semaine : table `planning` + besoins terrains stage (09-13 / 14-18 / 09-18). */
+function reservationIsActive(statut: string | null | undefined): boolean {
+  const s = String(statut ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  return s !== "annule" && s !== "annulee" && s !== "annulé" && s !== "annulée";
+}
+
+/** Séances planning semaine : table `planning` + réservations terrains + besoins stage. */
 export function buildPlanningSessionsForWeek(
   stages: StageProgrammeV2[],
   planningRows: PlanningSeanceV2[],
-  selectedWeekStart: Date
+  selectedWeekStart: Date,
+  reservations: PlanningReservationInput[] = []
 ): PlanningSessionRow[] {
   const weekStart = startOfWeek(selectedWeekStart, { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -144,6 +159,35 @@ export function buildPlanningSessionsForWeek(
       creneau,
       heure_debut: p.heure_debut?.slice(0, 5) || horaires.heure_debut,
       heure_fin: p.heure_fin?.slice(0, 5) || horaires.heure_fin,
+      ...stageMeta(stage, statut),
+    });
+  }
+
+  for (const r of reservations) {
+    if (!r.stage_id || !reservationIsActive(r.statut)) continue;
+    const stage = stageById.get(r.stage_id);
+    if (!stage) continue;
+    const statut = normalizeStageStatus(stage.statut);
+    if (!shouldIncludeStageStatus(statut)) continue;
+
+    const day = dateOnlyString(r.date_debut);
+    if (!day) continue;
+    const dayDate = new Date(`${day}T12:00:00`);
+    if (dayDate < weekStart || dayDate > weekEnd) continue;
+
+    const creneauType = resolveCreneauType(r);
+    const creneau: PlanningCreneauSlot =
+      creneauType === "apres_midi" ? "apres_midi" : creneauType === "matin" ? "matin" : "journee";
+    const horaires = horairesForPlanningSlot(creneau);
+    push({
+      id: `resa-${r.stage_id}-${day}-${creneau}`,
+      stageId: stage.id,
+      stageName: stage.stage_action ?? "Stage",
+      categorie: normalizeStageCategory(stage.categorie),
+      date: day,
+      creneau,
+      heure_debut: r.heure_debut?.slice(0, 5) || horaires.heure_debut,
+      heure_fin: r.heure_fin?.slice(0, 5) || horaires.heure_fin,
       ...stageMeta(stage, statut),
     });
   }

@@ -74,7 +74,7 @@ export function FacturationClubClient() {
       date_emission: new Date().toISOString().slice(0, 10),
       date_paiement: statut === "paye" ? new Date().toISOString().slice(0, 10) : null,
       reference_paiement: statut === "paye" ? `V-${Math.floor(Math.random() * 999)}` : null,
-      notes: "Facturation Club de l'Agriculture",
+      notes: "Facturation CNE",
     });
     setHistory(await getFacturesClub());
   }
@@ -97,7 +97,8 @@ export function FacturationClubClient() {
   return (
     <>
       <V2PageHeader
-        title="Facturation Club de l'Agriculture"
+        title="Facturation CNE"
+        description="Bon de commande et suivi des factures — Centre National d'Entraînement"
         actions={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={exportFacturePdf}>

@@ -11,5 +11,6 @@ export async function reconcileStageTerrainReservationsAction(): Promise<{ clean
   const cleaned = await cleanupDuplicateMatinWhenJourneeExists();
   revalidatePath("/v2/reservations");
   revalidatePath("/v2/stages");
+  revalidatePath("/v2/planning");
   return { cleaned };
 }

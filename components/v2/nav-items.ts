@@ -108,7 +108,7 @@ export const v2NavSections: V2NavSection[] = [
       { href: `${V2_PREFIX}/billets-avion`, label: "Billets avion", icon: Plane, badgeKey: "billets" },
       { href: `${V2_PREFIX}/lettres`, label: "Lettres officielles", icon: BookText },
       { href: `${V2_PREFIX}/administratif/documents`, label: "Documents", icon: ClipboardCheck },
-      { href: `${V2_PREFIX}/budget/facturation-club`, label: "Facturation club", icon: Landmark },
+      { href: `${V2_PREFIX}/budget/facturation-club`, label: "Facturation CNE", icon: Landmark },
     ],
   },
   {

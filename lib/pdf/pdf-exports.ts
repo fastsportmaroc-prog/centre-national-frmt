@@ -908,7 +908,6 @@ export function exportLogistiquePDF(rows: Record<string, string>[]) {
 
 export function exportStagesLogistiquePDF(params: {
   periodeLabel: string;
-  generatedBy: string;
   rows: {
     stage: string;
     categorie: string;
@@ -919,14 +918,13 @@ export function exportStagesLogistiquePDF(params: {
     chambres: string;
     hebergement: string;
     terrains: string;
-    terrainsSupp: string;
   }[];
   totals: { joueurs: number; coachs: number; chambres: number };
 }) {
   return runFrmPdf({
     title: "Planification Logistique des Stages",
     subtitle: "CENTRE NATIONAL FRMT",
-    periode: `${params.periodeLabel} • Généré le ${formatDateFR(new Date().toISOString())} • Généré: ${params.generatedBy}`,
+    periode: `${params.periodeLabel} • Export le ${formatDateFR(new Date().toISOString())}`,
     orientation: "landscape",
     filename: buildPdfFilename("LOGISTIQUE-STAGES", "planification", new Date().toISOString().slice(0, 10)),
     columns: [
@@ -939,7 +937,6 @@ export function exportStagesLogistiquePDF(params: {
       { header: "Chambres", key: "chambres", width: 16, align: "center" },
       { header: "Héb.", key: "hebergement", width: 14, align: "center" },
       { header: "Terr.", key: "terrains", width: 14, align: "center" },
-      { header: "T.supp.", key: "terrainsSupp", width: 14, align: "center" },
     ],
     data: params.rows.length ? params.rows : [{
       stage: "—",
@@ -951,7 +948,6 @@ export function exportStagesLogistiquePDF(params: {
       chambres: "0",
       hebergement: "Non",
       terrains: "Non",
-      terrainsSupp: "Non",
     }],
     sections: [
       {

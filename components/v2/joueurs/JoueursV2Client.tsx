@@ -34,11 +34,29 @@ import { calcAge } from "@/lib/v2/status-styles";
 import { useDebounced } from "@/lib/hooks/useDebounced";
 import { normalizeSearchText } from "@/lib/v2/global-search";
 import type { JoueurV2 } from "@/lib/types/v2";
-import { LayoutGrid, List, Pencil, Trash2, Users } from "lucide-react";
+import { JoueursFiltersBar } from "@/components/v2/joueurs/JoueursFiltersBar";
+import { JoueursRepartitionPanel } from "@/components/v2/joueurs/JoueursRepartitionPanel";
+import {
+  countActiveFilters,
+  joueurDocsComplete,
+} from "@/components/v2/joueurs/joueurs-display-stats";
+import { StatsKpiRow } from "@/components/v2/statistiques/StatsKpiCard";
+import {
+  LayoutGrid,
+  List,
+  Pencil,
+  PieChart,
+  Trash2,
+  UserCheck,
+  Users,
+  Users2,
+} from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 import { useRole } from "@/lib/hooks/useRole";
 import { upsertOwnerPasseportDocument } from "@/lib/passeport/upsert-owner-passeport";
 
 type ViewMode = "list" | "grid";
+type PageTab = "annuaire" | "repartitions";
 
 type JoueurForm = {
   nom: string;
@@ -89,6 +107,7 @@ export function JoueursV2Client() {
   const [stageCounts, setStageCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("list");
+  const [pageTab, setPageTab] = useState<PageTab>("annuaire");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search);
   const [sexe, setSexe] = useState("");
@@ -194,6 +213,37 @@ export function JoueursV2Client() {
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => filtered.some((j) => j.id === id)));
   }, [filtered]);
+
+  const activeFilterCount = countActiveFilters({
+    search: debouncedSearch,
+    sexe,
+    categorie,
+    annee,
+    statut,
+    clubFilter,
+  });
+
+  const summary = useMemo(() => {
+    let actifs = 0;
+    let enStage = 0;
+    let docsOk = 0;
+    for (const j of filtered) {
+      if ((j.statut ?? "actif") === "actif") actifs++;
+      if ((stageCounts[j.id] ?? 0) > 0) enStage++;
+      if (joueurDocsComplete(j)) docsOk++;
+    }
+    return { actifs, enStage, docsOk };
+  }, [filtered, stageCounts]);
+
+  function resetFilters() {
+    setSearch("");
+    setSexe("");
+    setCategorie("");
+    setAnnees("");
+    setStatut("");
+    setClubFilter("");
+    setSortMode("nom");
+  }
 
   function openCreate() {
     setEditTarget(null);
@@ -489,17 +539,20 @@ export function JoueursV2Client() {
   return (
     <>
       <V2PageHeader
-        title={`Joueurs (${items.length})`}
+        title="Joueurs — Centre national"
+        description={`Annuaire de ${items.length} licencié${items.length !== 1 ? "s" : ""} · fiches, filtres et répartitions par catégorie, club et stages`}
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setView(view === "list" ? "grid" : "list")}
-              title={view === "list" ? "Vue grille" : "Vue liste"}
-            >
-              {view === "list" ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
-            </Button>
+            {pageTab === "annuaire" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setView(view === "list" ? "grid" : "list")}
+                title={view === "list" ? "Vue grille" : "Vue liste"}
+              >
+                {view === "list" ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+              </Button>
+            )}
             <V2PageActions canAdd={canManageJoueurs} onAdd={openCreate} onExportPdf={exportPdf} />
             <Button
               variant="secondary"
@@ -517,58 +570,90 @@ export function JoueursV2Client() {
         }
       />
       <main className="space-y-4 p-4 sm:p-6">
-        <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <Input placeholder="Rechercher…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Select value={sexe} onChange={(e) => setSexe(e.target.value)}>
-            <option value="">Sexe — Tous</option>
-            <option value="M">Masculin</option>
-            <option value="F">Féminin</option>
-          </Select>
-          <Select value={categorie} onChange={(e) => setCategorie(e.target.value)}>
-            <option value="">Catégorie / année — Toutes</option>
-            {ageCategories.map((c) => (
-              <option key={c.id} value={c.code}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
-          <Select value={annee} onChange={(e) => setAnnees(e.target.value)}>
-            <option value="">Année naissance</option>
-            {birthYears.map((y) => (
-              <option key={y} value={String(y)}>
-                {y}
-              </option>
-            ))}
-          </Select>
-          <Select value={statut} onChange={(e) => setStatut(e.target.value)}>
-            <option value="">Statut — Tous</option>
-            <option value="actif">Actif</option>
-            <option value="inactif">Inactif</option>
-            <option value="blesse">Blessé</option>
-            <option value="suspendu">Suspendu</option>
-          </Select>
-          <Select value={clubFilter} onChange={(e) => setClubFilter(e.target.value)}>
-            <option value="">Club — Tous</option>
-            {clubOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={sortMode}
-            onChange={(e) =>
-              setSortMode(e.target.value as "nom" | "club" | "classement_asc" | "classement_desc")
-            }
+        <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+          <button
+            type="button"
+            onClick={() => setPageTab("annuaire")}
+            className={cn(
+              "inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              pageTab === "annuaire"
+                ? "border-frmt-green text-frmt-green"
+                : "border-transparent text-muted hover:text-[var(--fg)]"
+            )}
           >
-            <option value="nom">Tri : Nom A→Z</option>
-            <option value="club">Tri : Club A→Z</option>
-            <option value="classement_asc">Tri : Classement ↑</option>
-            <option value="classement_desc">Tri : Classement ↓</option>
-          </Select>
-        </Card>
+            <Users2 className="h-4 w-4" />
+            Annuaire
+          </button>
+          <button
+            type="button"
+            onClick={() => setPageTab("repartitions")}
+            className={cn(
+              "inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              pageTab === "repartitions"
+                ? "border-frmt-green text-frmt-green"
+                : "border-transparent text-muted hover:text-[var(--fg)]"
+            )}
+          >
+            <PieChart className="h-4 w-4" />
+            Répartitions
+          </button>
+        </div>
 
-        {filtered.length === 0 ? (
+        <JoueursFiltersBar
+          search={search}
+          onSearchChange={setSearch}
+          sexe={sexe}
+          onSexeChange={setSexe}
+          categorie={categorie}
+          onCategorieChange={setCategorie}
+          annee={annee}
+          onAnneeChange={setAnnees}
+          statut={statut}
+          onStatutChange={setStatut}
+          clubFilter={clubFilter}
+          onClubFilterChange={setClubFilter}
+          sortMode={sortMode}
+          onSortModeChange={setSortMode}
+          ageCategories={ageCategories}
+          birthYears={birthYears}
+          clubOptions={clubOptions}
+          activeFilterCount={activeFilterCount}
+          resultCount={filtered.length}
+          totalCount={items.length}
+          onReset={resetFilters}
+        />
+
+        <StatsKpiRow
+          items={[
+            {
+              label: "Effectif filtré",
+              value: filtered.length,
+              sub: `${items.length} au total`,
+            },
+            {
+              label: "Actifs",
+              value: summary.actifs,
+              sub: "Statut actif",
+              progress: filtered.length ? (summary.actifs / filtered.length) * 100 : 0,
+            },
+            {
+              label: "En stage",
+              value: summary.enStage,
+              sub: "Au moins 1 stage",
+              progress: filtered.length ? (summary.enStage / filtered.length) * 100 : 0,
+            },
+            {
+              label: "Dossiers complets",
+              value: summary.docsOk,
+              sub: "Passeport renseigné",
+              progress: filtered.length ? (summary.docsOk / filtered.length) * 100 : 0,
+            },
+          ]}
+        />
+
+        {pageTab === "repartitions" ? (
+          <JoueursRepartitionPanel joueurs={filtered} stageCounts={stageCounts} />
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={Users}
             title="Aucun joueur"
@@ -579,7 +664,10 @@ export function JoueursV2Client() {
         ) : view === "grid" ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((j) => (
-              <Card key={j.id} className="card-premium p-4">
+              <Card
+                key={j.id}
+                className="card-premium overflow-hidden border border-border/80 transition hover:border-frmt-green/40"
+              >
                 {canDeleteJoueurs && (
                   <div className="mb-2 flex justify-end">
                     <input
@@ -612,13 +700,26 @@ export function JoueursV2Client() {
                     {j.sexe === "F" ? "Féminin" : "Masculin"}
                   </span>
                   <div className="mt-2 flex flex-wrap justify-center gap-2 text-[11px]">
-                    <span>🎾 {stageCounts[j.id] ?? 0} stage(s)</span>
-                    <span className="text-[var(--success)]">✅ Docs OK</span>
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+                      {stageCounts[j.id] ?? 0} stage{(stageCounts[j.id] ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5",
+                        joueurDocsComplete(j)
+                          ? "bg-emerald-500/10 text-emerald-300"
+                          : "bg-amber-500/10 text-amber-300"
+                      )}
+                    >
+                      {joueurDocsComplete(j) ? "Dossier OK" : "À compléter"}
+                    </span>
                   </div>
                   <StatusBadge statut={j.statut ?? "actif"} />
                 </Link>
                 <div className="mt-3 flex justify-between border-t border-border pt-2">
-                  <span className="text-xs text-muted">{stageCounts[j.id] ?? 0} stage(s)</span>
+                  <span className="text-xs text-muted">
+                    {j.classement ? `Cl. ${j.classement}` : "Non classé"}
+                  </span>
                   <div className="flex gap-1">
                     {canManageJoueurs && (
                       <Button variant="secondary" size="sm" onClick={() => void openEdit(j)}>
@@ -636,11 +737,18 @@ export function JoueursV2Client() {
             ))}
           </div>
         ) : (
-          <Card className="overflow-x-auto">
+          <Card className="overflow-hidden border border-border/80">
+            <div className="flex items-center justify-between border-b border-border bg-surface-elevated/80 px-4 py-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Annuaire — {filtered.length} joueur{filtered.length !== 1 ? "s" : ""}
+              </p>
+              <p className="text-xs text-muted">Cliquez sur un nom pour ouvrir la fiche</p>
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-elevated text-left text-muted">
-                  <th className="p-3">
+              <thead className="sticky top-0 z-10 bg-surface-elevated shadow-sm">
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
+                  <th className="p-3 w-10">
                     {canDeleteJoueurs && (
                       <input
                         type="checkbox"
@@ -652,7 +760,7 @@ export function JoueursV2Client() {
                       />
                     )}
                   </th>
-                  <th className="p-3" />
+                  <th className="p-3 w-12" />
                   <th className="p-3">Nom</th>
                   <th className="p-3">Prénom</th>
                   <th className="p-3">Sexe</th>
@@ -660,16 +768,20 @@ export function JoueursV2Client() {
                   <th className="p-3">Âge</th>
                   <th className="p-3">Classement</th>
                   <th className="p-3">Club</th>
-                  <th className="p-3">Stages</th>
+                  <th className="p-3 text-center">Stages</th>
+                  <th className="p-3">Dossier</th>
                   <th className="p-3">Statut</th>
-                  <th className="p-3" />
+                  <th className="p-3 w-24" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((j, i) => (
                   <tr
                     key={j.id}
-                    className={`border-b border-border/50 ${i % 2 === 1 ? "bg-surface-elevated/30" : ""}`}
+                    className={cn(
+                      "border-b border-border/50 transition-colors hover:bg-frmt-green/[0.04]",
+                      i % 2 === 1 && "bg-surface-elevated/20"
+                    )}
                   >
                     <td className="p-3">
                       {canDeleteJoueurs && (
@@ -707,7 +819,21 @@ export function JoueursV2Client() {
                     <td className="p-3">{calcAge(j.date_naissance) ?? "—"}</td>
                     <td className="p-3">{j.classement ?? "—"}</td>
                     <td className="p-3">{j.club ?? "—"}</td>
-                    <td className="p-3">{stageCounts[j.id] ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums">
+                      <span className="inline-flex min-w-[1.5rem] justify-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                        {stageCounts[j.id] ?? 0}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {joueurDocsComplete(j) ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Complet
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-300">À compléter</span>
+                      )}
+                    </td>
                     <td className="p-3">
                       {canManageJoueurs ? (
                         <Select
@@ -750,6 +876,7 @@ export function JoueursV2Client() {
                 ))}
               </tbody>
             </table>
+            </div>
           </Card>
         )}
       </main>

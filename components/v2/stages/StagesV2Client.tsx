@@ -29,7 +29,6 @@ import {
 import { exportStagePDF, exportStagesLogistiquePDF } from "@/lib/pdf/pdf-exports";
 import { emptyStageForm } from "@/lib/v2/form-defaults";
 import { loadAllStageCards, type StageDashboardCard } from "@/lib/v2/dashboard-data";
-import { hasTerrainsSupplementairesInNotes } from "@/lib/v2/stage-terrain-status";
 import { getCategoryStyle } from "@/lib/v2/category-colors";
 import { useDebounced } from "@/lib/hooks/useDebounced";
 import { matchesParticipantSearch } from "@/lib/v2/global-search";
@@ -416,10 +415,6 @@ export function StagesV2Client() {
     return value.includes("T") ? value : `${value}T12:00:00`;
   }
 
-  function hasTerrainsSupp(notes: string | null | undefined): boolean {
-    return hasTerrainsSupplementairesInNotes(notes);
-  }
-
   async function handleExportLogistiquePdf() {
     const rows = filtered.map((s) => ({
       stage: s.stage_action,
@@ -431,7 +426,6 @@ export function StagesV2Client() {
       chambres: String(s.chambres ?? 0),
       hebergement: yesNo(Boolean(s.has_hebergement)),
       terrains: yesNo(Boolean(s.has_terrains)),
-      terrainsSupp: yesNo(hasTerrainsSupp(s.notes)),
     }));
 
     const totals = rows.reduce(
@@ -443,13 +437,12 @@ export function StagesV2Client() {
       { joueurs: 0, coachs: 0, chambres: 0 }
     );
 
-    const generatedBy = user?.fullName ?? user?.email ?? "Utilisateur FRMT";
     const periodeLabel =
       filtered.length > 0 ?
         `Du ${format(parseISO(toDateIso(filtered[0]!.date_debut)), "dd/MM/yyyy")} au ${format(parseISO(toDateIso(filtered[filtered.length - 1]!.date_fin)), "dd/MM/yyyy")}`
       : "Aucune période";
 
-    await exportStagesLogistiquePDF({ rows, totals, generatedBy, periodeLabel });
+    await exportStagesLogistiquePDF({ rows, totals, periodeLabel });
   }
 
   function toggleId(list: string[], id: string): string[] {

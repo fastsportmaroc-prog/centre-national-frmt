@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import { exportReservationsPDF } from "@/lib/pdf/pdf-exports";
+import { syncPlanningAfterReservationChangeAction } from "@/lib/actions/reservation-planning-sync";
 import { reconcileStageTerrainReservationsAction } from "@/lib/actions/reservations-sync-actions";
 import {
   createReservationInfrastructure,
@@ -189,6 +190,7 @@ export function ReservationsV2Client() {
     toast("Réservation mise à jour");
     setEditRow(null);
     setEditForm(null);
+    await syncPlanningAfterReservationChangeAction(editForm.stage_id || editRow.stage_id);
     await load();
   }
 
@@ -231,7 +233,9 @@ export function ReservationsV2Client() {
       return;
     }
     toast("Réservation supprimée");
+    const stageId = deleteRow.stage_id;
     setDeleteRow(null);
+    await syncPlanningAfterReservationChangeAction(stageId);
     await load();
   }
 
