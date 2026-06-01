@@ -14,11 +14,19 @@ import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import { syncAllStagesPlanningAction } from "@/lib/actions/stage-planning-actions";
-import { deleteSeance, getInfrastructures, getPlanning, getStages } from "@/lib/supabase/queries";
+import {
+  createSeance,
+  deleteSeance,
+  getInfrastructures,
+  getPlanning,
+  getPlanningByStage,
+  getStages,
+} from "@/lib/supabase/queries";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
 import type { InfrastructureV2, PlanningSeanceV2, StageProgrammeV2 } from "@/lib/types/v2";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 
 type Creneau = "matin" | "apres_midi";
 type StageViewMode = "prevus" | "tous";
@@ -31,6 +39,31 @@ function slotForHeure(h: string): Creneau {
 
 function slotLabel(slot: Creneau): string {
   return slot === "matin" ? "Matin (09:00-13:00)" : "Après-midi (14:00-18:00)";
+}
+
+async function ensurePlanningFromStagesClient(stages: StageProgrammeV2[]): Promise<number> {
+  let created = 0;
+  for (const stage of stages) {
+    if (stage.statut === "annule") continue;
+    const existing = await getPlanningByStage(stage.id);
+    if (existing.length > 0) continue;
+    const days = eachDayOfStage(stage.date_debut, stage.date_fin);
+    for (const day of days) {
+      const res = await createSeance({
+        stage_id: stage.id,
+        date: day,
+        heure_debut: "09:00",
+        heure_fin: "13:00",
+        infrastructure_id: null,
+        surface: null,
+        coach_id: null,
+        groupe: stage.categorie ?? null,
+        statut: "prevu",
+      });
+      if (!res.error && res.data) created++;
+    }
+  }
+  return created;
 }
 
 export function PlanningV2Client() {
@@ -89,9 +122,19 @@ export function PlanningV2Client() {
     (async () => {
       setSyncing(true);
       try {
-        const { created } = await syncAllStagesPlanningAction();
+        let created = 0;
+        try {
+          const serverSync = await syncAllStagesPlanningAction();
+          created += serverSync.created;
+        } catch {
+          // fallback client below
+        }
+
+        const currentStages = await getStages();
+        created += await ensurePlanningFromStagesClient(currentStages);
+
         if (created > 0) {
-          toast(`${created} séance(s) synchronisée(s) depuis les stages`, "success");
+          toast(`${created} séance(s) créées/synchronisées depuis les stages`, "success");
         }
       } catch {
         /* sync best-effort */
