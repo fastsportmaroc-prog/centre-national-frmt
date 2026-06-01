@@ -28,23 +28,27 @@ export function LoginStatus() {
 
   if (status === "loading") {
     if (isProd) return null;
-    return <p className="text-center text-xs text-muted">Vérification du serveur…</p>;
+    return (
+      <p className="login-v3-alert login-v3-alert--warn mx-7 mt-4 text-center text-xs sm:mx-9">
+        Vérification du serveur…
+      </p>
+    );
   }
 
   if (status === "error") {
     return (
-      <p className="mx-6 mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+      <div className="login-v3-alert login-v3-alert--error mx-7 mt-4 sm:mx-9" role="alert">
         {isProd
           ? "Service temporairement indisponible. Réessayez dans quelques instants ou contactez l'administrateur."
           : (devHint ?? "Serveur ou Supabase non prêt.")}
-      </p>
+      </div>
     );
   }
 
   if (isProd) return null;
 
   return (
-    <p className="text-center text-xs text-emerald-400">
+    <p className="login-v3-alert login-v3-alert--success mx-7 mt-4 text-center text-xs sm:mx-9">
       Serveur OK · Supabase connecté
       {devHint ? ` — ${devHint}` : ""}
     </p>

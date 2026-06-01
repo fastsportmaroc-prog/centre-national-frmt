@@ -14,7 +14,7 @@ export function SessionExpiredNotice() {
   if (!message) return null;
 
   return (
-    <div className="login-alert login-alert-warn mx-8 mt-6 text-sm" role="status">
+    <div className="login-v3-alert login-v3-alert--warn mx-7 mt-5 text-sm sm:mx-9" role="status">
       {message}
     </div>
   );

@@ -30,10 +30,10 @@ export function LoginForm({ projectRef, configured }: Props) {
 
   if (!configured) {
     return (
-      <div className="px-8 py-14 text-center">
-        <Lock className="mx-auto mb-4 h-7 w-7 text-white/30" strokeWidth={1.5} />
-        <p className="font-medium text-white/90">Service indisponible</p>
-        <p className="mt-2 text-sm text-white/45">
+      <div className="px-8 py-12 text-center">
+        <Lock className="mx-auto mb-4 h-7 w-7 text-neutral-300" strokeWidth={1.5} />
+        <p className="font-medium text-neutral-800">Service indisponible</p>
+        <p className="mt-2 text-sm text-neutral-500">
           {isProd ? "Contactez l'administrateur FRMT." : "Configurez Supabase dans .env.local."}
         </p>
       </div>
@@ -41,18 +41,18 @@ export function LoginForm({ projectRef, configured }: Props) {
   }
 
   return (
-    <div className="login-form-body px-7 pb-8 pt-7 sm:px-9">
-      <div className="login-tabs mb-7 flex gap-1 rounded-sm border border-white/[0.06] bg-black/20 p-1">
+    <div className="login-v3-form px-7 pb-8 pt-2 sm:px-9">
+      <div className="login-v3-tabs mb-6 flex border-b border-neutral-200">
         {(["login", "signup"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setMode(tab)}
             className={cn(
-              "login-tab flex-1 rounded-sm py-2.5 text-[13px] transition-all duration-200",
+              "login-v3-tab flex-1 pb-3 text-sm font-medium transition-colors",
               mode === tab
-                ? "login-tab--active bg-white/[0.07] text-white shadow-sm"
-                : "text-white/40 hover:text-white/60"
+                ? "login-v3-tab--active text-[var(--frmt-green)]"
+                : "text-neutral-400 hover:text-neutral-600"
             )}
           >
             {tab === "login" ? "Connexion" : "Inscription"}
@@ -61,15 +61,17 @@ export function LoginForm({ projectRef, configured }: Props) {
       </div>
 
       {!isProd && projectRef && (
-        <p className="mb-5 text-[10px] uppercase tracking-[0.2em] text-white/25">dev · {projectRef}</p>
+        <p className="mb-4 text-[10px] uppercase tracking-widest text-neutral-300">
+          dev · {projectRef}
+        </p>
       )}
 
-      <form action={formAction} className="space-y-6">
+      <form action={formAction} className="space-y-5">
         <input type="hidden" name="redirect" value={redirect} />
 
         {mode === "signup" && (
-          <div className="login-field-art">
-            <Label htmlFor="fullName" className="login-label-art">
+          <div>
+            <Label htmlFor="fullName" className="login-v3-label">
               Nom complet
             </Label>
             <Input
@@ -77,13 +79,13 @@ export function LoginForm({ projectRef, configured }: Props) {
               name="fullName"
               placeholder="Prénom Nom"
               autoComplete="name"
-              className="login-input-art"
+              className="login-v3-input"
             />
           </div>
         )}
 
-        <div className="login-field-art">
-          <Label htmlFor="email" className="login-label-art">
+        <div>
+          <Label htmlFor="email" className="login-v3-label">
             Adresse email
           </Label>
           <Input
@@ -93,12 +95,12 @@ export function LoginForm({ projectRef, configured }: Props) {
             required
             autoComplete="email"
             placeholder="nom@frmt.ma"
-            className="login-input-art"
+            className="login-v3-input"
           />
         </div>
 
-        <div className="login-field-art">
-          <Label htmlFor="password" className="login-label-art">
+        <div>
+          <Label htmlFor="password" className="login-v3-label">
             Mot de passe
           </Label>
           <Input
@@ -109,29 +111,29 @@ export function LoginForm({ projectRef, configured }: Props) {
             minLength={6}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             placeholder="••••••••"
-            className="login-input-art"
+            className="login-v3-input"
           />
         </div>
 
         {state.error && (
-          <div className="login-alert login-alert-error" role="alert">
+          <div className="login-v3-alert login-v3-alert--error" role="alert">
             {state.error}
           </div>
         )}
         {state.message && (
-          <div className="login-alert login-alert-success" role="status">
+          <div className="login-v3-alert login-v3-alert--success" role="status">
             {state.message}
           </div>
         )}
 
-        <Button type="submit" className="login-btn-art w-full" disabled={pending}>
+        <Button type="submit" className="login-v3-btn w-full" disabled={pending}>
           {pending ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="login-spinner" aria-hidden />
+              <span className="login-v3-spinner" aria-hidden />
               Connexion…
             </span>
           ) : mode === "login" ? (
-            "Entrer"
+            "Se connecter"
           ) : (
             "Créer le compte"
           )}
