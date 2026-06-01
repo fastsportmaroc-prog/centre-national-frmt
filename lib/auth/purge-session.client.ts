@@ -18,15 +18,20 @@ export async function purgeInvalidSession(options?: {
   const redirect = options?.redirect ?? true;
   const reason = options?.reason ?? "session_expired";
 
+  clearSupabaseBrowserStorage();
+
   try {
-    clearSupabaseBrowserStorage();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
     await fetch("/api/auth/clear", {
       method: "POST",
       credentials: "include",
       cache: "no-store",
+      signal: ctrl.signal,
     });
+    clearTimeout(timer);
   } catch {
-    /* réseau coupé */
+    /* réseau lent ou requête annulée — on redirige quand même */
   } finally {
     purging = false;
   }

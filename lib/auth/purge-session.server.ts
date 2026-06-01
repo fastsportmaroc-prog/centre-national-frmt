@@ -12,7 +12,10 @@ export async function purgeSupabaseAuthServer(): Promise<void> {
   const supabase = await createSupabaseServerClient();
   if (supabase) {
     try {
-      await supabase.auth.signOut();
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
     } catch {
       /* session déjà invalide */
     }
@@ -21,7 +24,7 @@ export async function purgeSupabaseAuthServer(): Promise<void> {
   const cookieStore = await cookies();
   for (const c of cookieStore.getAll()) {
     if (isSupabaseAuthCookie(c.name)) {
-      cookieStore.delete(c.name);
+      cookieStore.delete({ name: c.name, path: "/" });
     }
   }
 }

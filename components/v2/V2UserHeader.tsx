@@ -12,6 +12,7 @@ export function V2UserHeader() {
   const { logout } = useAuth();
   const { profile, role, loading } = useRole();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   if (loading) return <span className="text-xs text-muted">…</span>;
 
@@ -76,14 +77,16 @@ export function V2UserHeader() {
             </Link>
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-surface-elevated"
+              disabled={loggingOut}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-surface-elevated disabled:opacity-60"
               onClick={() => {
                 setOpen(false);
+                setLoggingOut(true);
                 void logout();
               }}
             >
               <LogOut className="h-4 w-4" />
-              Se déconnecter
+              {loggingOut ? "Déconnexion…" : "Se déconnecter"}
             </button>
           </div>
         </>

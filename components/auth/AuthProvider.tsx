@@ -10,7 +10,6 @@ import {
 } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getCurrentUser } from "@/lib/auth/session";
-import { logoutAction } from "@/lib/auth/actions";
 import { purgeInvalidSession } from "@/lib/auth/purge-session.client";
 import { isInvalidRefreshTokenError } from "@/lib/auth/session-errors";
 import { setAuditUser } from "@/lib/audit/historique";
@@ -98,14 +97,10 @@ export function AuthProvider({ children, initialUser = null }: Props) {
   }, [refresh]);
 
   async function logout() {
-    try {
-      await fetch("/api/auth/clear", { method: "POST", credentials: "include" });
-    } catch {
-      /* ignore */
-    }
-    const { clearSupabaseBrowserStorage } = await import("@/lib/auth/clear-client-storage");
-    clearSupabaseBrowserStorage();
-    await logoutAction();
+    setUser(null);
+    setSupabaseAuthActive(false);
+    setLoading(false);
+    await purgeInvalidSession({ redirect: true, reason: "logout" });
   }
 
   return (

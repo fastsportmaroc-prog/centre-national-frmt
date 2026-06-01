@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { mapAuthErrorMessage } from "@/lib/auth/errors";
 import type { AuthFormState } from "@/lib/auth/form-state";
+import { isProductionRuntime } from "@/lib/env/runtime";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -47,8 +48,9 @@ export async function loginAction(
 ): Promise<AuthFormState> {
   if (!isSupabaseConfigured()) {
     return {
-      error:
-        "Fichier .env.local manquant ou incomplet. Utilisez la cle anon eyJ... (Supabase → Settings → API).",
+      error: isProductionRuntime()
+        ? "Service d'authentification indisponible. Contactez l'administrateur."
+        : "Fichier .env.local manquant ou incomplet. Utilisez la clé anon eyJ… (Supabase → Settings → API).",
       message: null,
     };
   }
@@ -112,7 +114,7 @@ export async function signupAction(
 
   return {
     error: null,
-    message: "Compte cree. Connectez-vous (ou confirmez l email dans Supabase si demande).",
+    message: "Compte créé. Connectez-vous (ou confirmez l'email dans Supabase si demandé).",
   };
 }
 

@@ -1,4 +1,4 @@
-import { resetSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { resetSupabaseBrowserClient, createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 function shouldRemoveStorageKey(key: string): boolean {
   const k = key.toLowerCase();
@@ -25,6 +25,13 @@ export function clearSupabaseBrowserStorage(): void {
     }
   } catch {
     /* ignore quota / private mode */
+  }
+
+  try {
+    const client = createSupabaseBrowserClient();
+    if (client) void client.auth.signOut({ scope: "local" });
+  } catch {
+    /* ignore */
   }
 
   resetSupabaseBrowserClient();
