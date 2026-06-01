@@ -495,9 +495,9 @@ export function StagesV2Client() {
             onAction={openCreateStage}
           />
         ) : view === "grid" ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 frmt-stagger-list">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 frmt-stagger-list">
             {paged.map((s) => (
-              <div key={s.id} className="frmt-stagger-item">
+              <div key={s.id} className="frmt-stagger-item flex h-full min-h-0">
                 <StageCard
                   stage={s}
                   onPdf={() => void handleExportPdf(s)}

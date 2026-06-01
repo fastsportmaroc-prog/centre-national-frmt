@@ -5,32 +5,39 @@ import { FileDown, Pencil, Eye, Calendar } from "lucide-react";
 import { formatDateRangeShort } from "@/lib/v2/format-display-date";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { getCategoryStyle } from "@/lib/v2/category-colors";
-import type { StageDashboardCard } from "@/lib/v2/dashboard-data";
+import type { StageDashboardCard as StageCardData } from "@/lib/v2/dashboard-data";
+
+type VisualState = "prevu" | "encours" | "termine" | "annule";
+
+function stageVisualState(stage: StageCardData): VisualState {
+  if (stage.statut === "annule") return "annule";
+  if (stage.statut === "termine") return "termine";
+  const today = new Date().toISOString().slice(0, 10);
+  if (stage.date_debut <= today && stage.date_fin >= today) return "encours";
+  return "prevu";
+}
+
+function statutPresentation(statut: string, visual: VisualState) {
+  const map: Record<string, { label: string; badge: string }> = {
+    confirme: { label: "Confirmé", badge: "stage-card-badge--status-encours" },
+    prevu: { label: "Prévu", badge: "stage-card-badge--status-prevu" },
+    termine: { label: "Terminé", badge: "stage-card-badge--status-termine" },
+    annule: { label: "Annulé", badge: "stage-card-badge--status-annule" },
+  };
+  const base = map[statut] ?? map.prevu!;
+  if (visual === "encours" && statut !== "annule" && statut !== "termine") {
+    return { label: "En cours", badge: "stage-card-badge--status-encours" };
+  }
+  return base;
+}
 
 function ServiceBadge({ ok, label, icon }: { ok: boolean; label: string; icon: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]",
-        ok
-          ? "border-emerald-500/30 bg-[#0d3321] text-[#1d9e75]"
-          : "border-[#30363d] bg-[#1c2330] text-[#484f58]"
-      )}
-    >
-      {icon} {label} {ok ? "✓" : "✗"}
+    <span className={cn("stage-card-badge", ok ? "stage-card-badge--on" : "stage-card-badge--off")}>
+      <span aria-hidden>{icon}</span>
+      {label}
     </span>
   );
-}
-
-function statutLabel(statut: string) {
-  const map: Record<string, { label: string; className: string }> = {
-    confirme: { label: "Confirmé ✓", className: "border-emerald-500/30 bg-[#0d3321] text-[#1d9e75]" },
-    prevu: { label: "Prévu", className: "border-[#30363d] bg-[#1c2330] text-[#8b949e]" },
-    termine: { label: "Terminé", className: "border-[#30363d] bg-[#1a1f2e] text-[#6e7681] line-through" },
-    annule: { label: "Annulé", className: "border-red-500/30 bg-[#2d1010] text-[#e74c3c]" },
-  };
-  return map[statut] ?? map.prevu!;
 }
 
 export function StageDashboardCard({
@@ -38,78 +45,94 @@ export function StageDashboardCard({
   onPdf,
   onEdit,
 }: {
-  stage: StageDashboardCard;
+  stage: StageCardData;
   onPdf?: () => void;
   onEdit?: () => void;
 }) {
-  const cat = getCategoryStyle(stage.categorie);
-  const st = statutLabel(String(stage.statut));
+  const visual = stageVisualState(stage);
+  const st = statutPresentation(String(stage.statut), visual);
   const pct = Math.round((stage.checklist_done / stage.checklist_total) * 100);
   const periode = formatDateRangeShort(stage.date_debut, stage.date_fin);
+  const totalParticipants = stage.nb_joueurs + stage.nb_coachs;
 
   return (
-    <div
-      className="v2-stage-card overflow-hidden"
-      style={{ borderLeftWidth: 3, borderLeftColor: cat.border }}
-    >
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
+    <div className={cn("v2-stage-card", `v2-stage-card--${visual}`)}>
+      <div className="stage-card-body">
+        <div className="stage-card-head">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold text-[#e6edf3]">{stage.stage_action}</h3>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#8b949e]">
-              <span className="inline-flex items-center gap-1 font-medium text-[#c9d1d9]">
-                <Calendar className="h-3 w-3 shrink-0 text-frmt-gold" aria-hidden />
+            <h3 className="stage-card-title">{stage.stage_action}</h3>
+            <div className="stage-card-meta">
+              <span className="stage-card-meta-date">
+                <Calendar className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                 {periode}
               </span>
-              <span className="text-[#484f58]">·</span>
+              <span className="stage-card-meta-sep">·</span>
               <span>
                 {stage.jours_duree} jour{stage.jours_duree > 1 ? "s" : ""}
               </span>
-              <span className="text-[#484f58]">·</span>
-              <span>{stage.categorie}</span>
-            </p>
+            </div>
+            <div className="mt-2">
+              <span className="stage-card-badge stage-card-badge--category">{stage.categorie}</span>
+            </div>
           </div>
-          <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", st.className)}>
-            {st.label}
-          </span>
+          <span className={cn("stage-card-badge shrink-0", st.badge)}>{st.label}</span>
         </div>
 
-        <div className="my-3 border-t border-[#30363d]" />
+        <div className="stage-card-divider" />
 
-        <p className="text-sm text-[#8b949e]">
-          👥 {stage.nb_joueurs} joueur{stage.nb_joueurs !== 1 ? "s" : ""} · 👤 {stage.nb_coachs} coach
-          {stage.nb_coachs !== 1 ? "s" : ""} · {stage.nb_joueurs + stage.nb_coachs} participants
-        </p>
+        <div className="stage-card-stats">
+          <div className="stage-card-stat">
+            <p className="stage-card-stat-value">{stage.nb_joueurs}</p>
+            <p className="stage-card-stat-label">Joueurs</p>
+          </div>
+          <div className="stage-card-stat">
+            <p className="stage-card-stat-value">{stage.nb_coachs}</p>
+            <p className="stage-card-stat-label">Coachs</p>
+          </div>
+          <div className="stage-card-stat">
+            <p className="stage-card-stat-value">{totalParticipants}</p>
+            <p className="stage-card-stat-label">Total</p>
+          </div>
+        </div>
 
-        <div className="my-3 border-t border-[#30363d]" />
+        <div className="stage-card-divider" />
 
-        <div className="flex flex-wrap gap-1.5">
-          <ServiceBadge ok={stage.has_hebergement} label="Héberg." icon="🏨" />
+        <div className="stage-card-badges">
+          <ServiceBadge ok={stage.has_hebergement} label="Hébergement" icon="🏨" />
           <ServiceBadge ok={stage.has_restauration} label="Resto" icon="🍽️" />
           <ServiceBadge ok={stage.has_terrains} label="Terrains" icon="🎾" />
-          <span className="inline-flex items-center rounded-md border border-[#30363d] bg-[#1c2330] px-2 py-0.5 text-[11px] text-[#8b949e]">
-            📋 Checklist {stage.checklist_done}/{stage.checklist_total}
-          </span>
         </div>
 
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#0d1117]">
-          <div className="h-full rounded-full bg-frmt-gold transition-all" style={{ width: `${pct}%` }} />
+        <div className="stage-card-progress-wrap">
+          <div className="stage-card-progress-head">
+            <span>Checklist {stage.checklist_done}/{stage.checklist_total}</span>
+            <span className="stage-card-progress-pct">{pct}%</span>
+          </div>
+          <div className="stage-card-progress-track">
+            <div
+              className={cn("stage-card-progress-fill", `stage-card-progress-fill--${visual}`)}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="stage-card-actions">
           <Link href={`/v2/stages/${encodeURIComponent(stage.id)}`}>
-            <Button variant="secondary" className="h-8 gap-1 text-xs">
-              <Eye className="h-3.5 w-3.5" /> Détail
+            <Button variant="secondary" className="stage-card-btn">
+              <Eye aria-hidden />
+              Détail
             </Button>
           </Link>
           {onPdf && (
-            <Button variant="secondary" className="h-8 gap-1 text-xs" onClick={onPdf}>
-              <FileDown className="h-3.5 w-3.5" /> Fiche PDF
+            <Button variant="secondary" className="stage-card-btn" onClick={onPdf}>
+              <FileDown aria-hidden />
+              Fiche PDF
             </Button>
           )}
           {onEdit && (
-            <Button variant="secondary" className="h-8 gap-1 text-xs" onClick={onEdit}>
-              <Pencil className="h-3.5 w-3.5" /> Modifier
+            <Button variant="secondary" className="stage-card-btn" onClick={onEdit}>
+              <Pencil aria-hidden />
+              Modifier
             </Button>
           )}
         </div>

@@ -595,15 +595,268 @@ body {
 .kpi-card--pulse-amber { border-color: var(--color-amber); }
 
 .v2-stage-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
   background: var(--bg-card);
   border: 1px solid var(--border-main);
-  border-radius: 8px;
-  transition: border-color 0.2s;
+  border-radius: 10px;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .v2-stage-card:hover {
   border-color: var(--border-main);
   background: var(--bg-hover);
+}
+
+.v2-stage-card--prevu {
+  border-left: 3px solid rgba(201, 162, 39, 0.45);
+}
+
+.v2-stage-card--encours {
+  border-left: 3px solid rgba(39, 103, 73, 0.55);
+}
+
+.v2-stage-card--termine {
+  border-left: 3px solid rgba(99, 179, 237, 0.35);
+}
+
+.v2-stage-card--annule {
+  border-left: 3px solid rgba(197, 48, 48, 0.4);
+  opacity: 0.88;
+}
+
+.stage-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 14px 16px 16px;
+}
+
+.stage-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stage-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.stage-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.stage-card-meta-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+
+.stage-card-meta-sep {
+  color: var(--text-ghost);
+}
+
+.stage-card-divider {
+  margin: 12px 0;
+  height: 1px;
+  background: var(--border-light);
+}
+
+.stage-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stage-card-stat {
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-inset);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.stage-card-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-card-stat-label {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stage-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stage-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border-main);
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.stage-card-badge--status-prevu {
+  border-color: rgba(201, 162, 39, 0.35);
+  background: rgba(201, 162, 39, 0.08);
+  color: #d4b85a;
+}
+
+.stage-card-badge--status-encours {
+  border-color: rgba(104, 211, 145, 0.3);
+  background: rgba(39, 103, 73, 0.15);
+  color: #68d391;
+}
+
+.stage-card-badge--status-termine {
+  border-color: rgba(99, 179, 237, 0.25);
+  background: rgba(43, 108, 176, 0.12);
+  color: #90cdf4;
+}
+
+.stage-card-badge--status-annule {
+  border-color: rgba(252, 129, 129, 0.3);
+  background: rgba(197, 48, 48, 0.1);
+  color: #fc8181;
+}
+
+.stage-card-badge--category {
+  border-color: rgba(183, 148, 244, 0.28);
+  background: rgba(85, 60, 154, 0.12);
+  color: #b794f4;
+}
+
+.stage-card-badge--on {
+  border-color: rgba(104, 211, 145, 0.25);
+  background: rgba(13, 32, 16, 0.6);
+  color: #68d391;
+}
+
+.stage-card-badge--off {
+  border-color: var(--border-main);
+  background: var(--bg-inset);
+  color: var(--text-muted);
+}
+
+.stage-card-progress-wrap {
+  margin-top: 10px;
+}
+
+.stage-card-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.stage-card-progress-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.stage-card-progress-track {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--bg-inset);
+}
+
+.stage-card-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.stage-card-progress-fill--prevu {
+  background: rgba(201, 162, 39, 0.65);
+}
+
+.stage-card-progress-fill--encours {
+  background: rgba(104, 211, 145, 0.75);
+}
+
+.stage-card-progress-fill--termine {
+  background: rgba(99, 179, 237, 0.55);
+}
+
+.stage-card-progress-fill--annule {
+  background: rgba(160, 174, 192, 0.4);
+}
+
+.stage-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.stage-card-btn {
+  display: inline-flex !important;
+  height: 28px !important;
+  align-items: center !important;
+  gap: 5px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border-main) !important;
+  background: var(--bg-inset) !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--text-secondary) !important;
+  transition: background 0.15s, border-color 0.15s, color 0.15s !important;
+}
+
+.stage-card-btn:hover {
+  border-color: var(--border-main) !important;
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.stage-card-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .v2-data-table thead {

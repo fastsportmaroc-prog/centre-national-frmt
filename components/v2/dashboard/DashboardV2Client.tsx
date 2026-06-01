@@ -249,7 +249,7 @@ export function DashboardV2Client() {
                 ) : (
                   <div className="frmt-stagger-list grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {stagesToShow.map((s) => (
-                      <div key={s.id} className="frmt-stagger-item">
+                      <div key={s.id} className="frmt-stagger-item flex h-full min-h-0">
                         <StageDashboardCard
                           stage={s}
                           onPdf={() =>
