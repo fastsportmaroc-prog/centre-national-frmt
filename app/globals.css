@@ -594,9 +594,27 @@ body {
 .kpi-card--pulse-red { border-color: var(--color-red); }
 .kpi-card--pulse-amber { border-color: var(--color-amber); }
 
+/* Grille stages — cartes même largeur / hauteur par ligne */
+.frmt-stagger-list:has(.v2-stage-card) {
+  align-items: stretch;
+}
+
+.frmt-stagger-item:has(.v2-stage-card) {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+}
+
+.frmt-stagger-item:has(.v2-stage-card) > .v2-stage-card {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
 .v2-stage-card {
   display: flex;
   height: 100%;
+  min-height: 280px;
   flex-direction: column;
   background: var(--bg-card);
   border: 1px solid var(--border-main);
@@ -630,6 +648,8 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
+  width: 100%;
+  min-height: 0;
   padding: 14px 16px 16px;
 }
 
@@ -638,6 +658,14 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  min-height: 7.5rem;
+}
+
+/* Bloc titre toujours sur 2 lignes max → stats/badges alignés entre cartes */
+.stage-card-head > div:first-child {
+  display: flex;
+  flex-direction: column;
+  min-height: 6.75rem;
 }
 
 .stage-card-title {
@@ -652,6 +680,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: break-word;
+  min-height: calc(1.35em * 2);
 }
 
 .stage-card-meta {
@@ -838,11 +867,21 @@ body {
 }
 
 .stage-card-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: auto;
   padding-top: 14px;
+}
+
+.stage-card-actions > a,
+.stage-card-actions > button {
+  min-width: 0;
+}
+
+.stage-card-actions .stage-card-btn {
+  width: 100%;
+  justify-content: center !important;
 }
 
 .stage-card-btn {
