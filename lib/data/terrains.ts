@@ -394,6 +394,27 @@ export const getCalendrierMois = async (annee: number, mois: number) => {
   return buildLegacyCalendrierRows();
 };
 
+function dedupeStageTerrainRows(rows: any[]): any[] {
+  const byKey = new Map<string, any>();
+  for (const r of rows) {
+    const day = String(r.date_debut ?? "").slice(0, 10);
+    const creneau = String(r.creneau ?? "journee");
+    const terrainId = String(r.terrain_id ?? r.infrastructure_id ?? "");
+    const key = `${terrainId}|${day}|${creneau}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, r);
+      continue;
+    }
+    const prevId = String(prev.reservation_id ?? "");
+    const nextId = String(r.reservation_id ?? "");
+    if (prevId.length > nextId.length) byKey.set(key, r);
+  }
+  return [...byKey.values()].sort((a, b) =>
+    String(a.date_debut).localeCompare(String(b.date_debut))
+  );
+}
+
 /* ─── RÉSERVATIONS TERRAINS D'UN STAGE ─── */
 export const getReservationsStageTerrains = async (stageId: string) => {
   const supabase = await getSupabaseDataClient();
@@ -402,8 +423,10 @@ export const getReservationsStageTerrains = async (stageId: string) => {
     .select("*")
     .eq("stage_id", stageId)
     .order("date_debut", { ascending: true });
-  if (!error && (data?.length ?? 0) > 0) return enrichDispatchNames(data ?? []);
-  return buildLegacyCalendrierRows({ stageId });
+  if (!error && (data?.length ?? 0) > 0) {
+    return enrichDispatchNames(dedupeStageTerrainRows(data ?? []));
+  }
+  return dedupeStageTerrainRows(await buildLegacyCalendrierRows({ stageId }));
 };
 
 /* ─── VÉRIFIER CONFLITS ─── */
@@ -692,6 +715,7 @@ export const reserverTerrains = async (stage: any): Promise<{
             .eq("stage_id", stage.id)
             .gte("date_debut", `${jour}T00:00:00`)
             .lte("date_debut", `${jour}T23:59:59`)
+            .order("date_debut", { ascending: false })
             .limit(1);
           const existingRow = existingSameStage.data?.[0] as
             | { id: string; notes?: string | null; creneau?: string | null }
@@ -857,6 +881,8 @@ export const reserverTerrains = async (stage: any): Promise<{
             .eq("stage_id", stage.id)
             .gte("date_debut", `${jour}T00:00:00`)
             .lte("date_debut", `${jour}T23:59:59`)
+            .order("date_debut", { ascending: false })
+            .limit(1)
             .maybeSingle();
           if (existingMirror.data?.id) {
             await supabase
@@ -1044,14 +1070,17 @@ export async function cleanupDuplicateMatinWhenJourneeExists(): Promise<number> 
 }
 
 /** Recrée les réservations terrain depuis les métadonnées `[TERRAINS_BESOINS:…]` du stage. */
-export async function resyncStageTerrainsFromNotes(stage: {
-  id: string;
-  nom?: string;
-  stage_action?: string;
-  date_debut: string;
-  date_fin: string;
-  notes?: string | null;
-}): Promise<{ ok: string[]; conflits: string[] }> {
+export async function resyncStageTerrainsFromNotes(
+  stage: {
+    id: string;
+    nom?: string;
+    stage_action?: string;
+    date_debut: string;
+    date_fin: string;
+    notes?: string | null;
+  },
+  options?: { reserve?: boolean }
+): Promise<{ ok: string[]; conflits: string[] }> {
   const besoins = parseTerrainsBesoinsFromNotes(stage.notes);
   if (!besoins?.length) return { ok: [], conflits: [] };
   const normalized = besoins.map((b) => ({
@@ -1089,6 +1118,7 @@ export async function resyncStageTerrainsFromNotes(stage: {
         .in("creneau", ["matin", "apres_midi"]);
     }
   }
+  if (options?.reserve === false) return { ok: [], conflits: [] };
   return reserverTerrains({
     id: stage.id,
     nom: stage.nom ?? stage.stage_action ?? "Stage",
@@ -1103,16 +1133,12 @@ export async function resyncAllStageTerrainsFromNotes(): Promise<number> {
   const supabase = await getSupabaseDataClient();
   const { data: stages } = await supabase
     .from("stages_programme")
-    .select("id, stage_action, date_debut, date_fin, notes, statut, terrains")
+    .select("id, stage_action, date_debut, date_fin, notes, statut")
     .neq("statut", "annule");
   let synced = 0;
   await cleanupDuplicateMatinWhenJourneeExists();
   for (const s of stages ?? []) {
-    const hasBesoins = Boolean(s.notes?.includes("[TERRAINS_BESOINS:"));
-    if (s.terrains && !hasBesoins) {
-      await upgradeStageTerrainsMatinToJourneeInDb(s.id);
-    }
-    if (!hasBesoins && !s.terrains) continue;
+    const hasBesoins = Boolean(parseTerrainsBesoinsFromNotes(s.notes)?.length);
     if (!hasBesoins) continue;
     const { ok } = await resyncStageTerrainsFromNotes({
       id: s.id,

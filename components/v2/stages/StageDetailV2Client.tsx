@@ -59,7 +59,6 @@ import {
   getTerrains,
   getReservationsStageTerrains,
   reserverTerrains,
-  resyncStageTerrainsFromNotes,
   supprimerReservationTerrain,
   type Creneau,
 } from "@/services/terrainService";
@@ -128,7 +127,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const [terrainReservations, setTerrainReservations] = useState<any[]>([]);
   const [terrainId, setTerrainId] = useState("");
   const [terrainMode, setTerrainMode] = useState<"stage" | "dispatch">("stage");
-  const [terrainCreneaux, setTerrainCreneaux] = useState<Creneau[]>(["journee"]);
+  const [terrainCreneau, setTerrainCreneau] = useState<Creneau>("journee");
   const [terrainJours, setTerrainJours] = useState<string[]>([]);
   const [dispatchJoueurIds, setDispatchJoueurIds] = useState<string[]>([]);
   const [savingTerrain, setSavingTerrain] = useState(false);
@@ -187,16 +186,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
     setLoading(false);
     hasLoadedOnce.current = true;
   }, [id]);
-
-  function toggleTerrainCreneau(creneau: Creneau) {
-    setTerrainCreneaux((prev) =>
-      prev.includes(creneau)
-        ? prev.filter((c) => c !== creneau)
-        : creneau === "journee"
-          ? ["journee"]
-          : [...prev.filter((c) => c !== "journee"), creneau]
-    );
-  }
 
   function toggleDispatchJoueur(joueurId: string) {
     setDispatchJoueurIds((prev) =>
@@ -434,8 +423,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       toast("Sélectionnez un terrain", "warning");
       return;
     }
-    const creneauxEffectifs: Creneau[] =
-      terrainCreneaux.length > 0 ? terrainCreneaux : (["journee"] as Creneau[]);
+    const creneauxEffectifs: Creneau[] = [terrainCreneau];
     if (terrainJours.length === 0) {
       toast("Sélectionnez au moins un jour du stage", "warning");
       return;
@@ -483,13 +471,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
         );
       }
 
-      await resyncStageTerrainsFromNotes({
-        id: stage.id,
-        stage_action: stage.stage_action,
-        date_debut: stage.date_debut,
-        date_fin: stage.date_fin,
-        notes: updatedNotes,
-      });
       await syncStageLinkedViewsAction(stage.id);
       const [tr, p] = await Promise.all([
         getReservationsStageTerrains(stage.id).catch(() => []),
@@ -497,7 +478,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       ]);
       setTerrainReservations(tr);
       setPlanning(p);
-      setTerrainCreneaux(["journee"]);
+      setTerrainCreneau("journee");
       setTerrainJours(stageDays);
       setDispatchJoueurIds([]);
     } catch (e) {
@@ -869,21 +850,25 @@ export function StageDetailV2Client({ id }: { id: string }) {
                       ))}
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                    {(["matin", "apres-midi", "journee"] as Creneau[]).map((c) => (
-                      <label key={c} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={terrainCreneaux.includes(c)}
-                          onChange={() => toggleTerrainCreneau(c)}
-                        />
-                        {c === "matin"
-                          ? "Matin (09:00-13:00)"
-                          : c === "apres-midi"
-                            ? "Après-midi (14:00-18:00)"
-                            : "Journée complète (09:00-18:00)"}
-                      </label>
-                    ))}
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-muted">Créneau (un seul choix)</p>
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {(["matin", "apres-midi", "journee"] as Creneau[]).map((c) => (
+                        <label key={c} className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="terrain-creneau"
+                            checked={terrainCreneau === c}
+                            onChange={() => setTerrainCreneau(c)}
+                          />
+                          {c === "matin"
+                            ? "Matin (09:00-13:00)"
+                            : c === "apres-midi"
+                              ? "Après-midi (14:00-18:00)"
+                              : "Journée complète (09:00-18:00)"}
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   {terrainMode === "dispatch" && (
@@ -905,7 +890,11 @@ export function StageDetailV2Client({ id }: { id: string }) {
                   )}
 
                   <div className="mt-3">
-                    <Button onClick={() => void handleCreateTerrainReservation()} disabled={savingTerrain}>
+                    <Button
+                      type="button"
+                      onClick={() => void handleCreateTerrainReservation()}
+                      disabled={savingTerrain}
+                    >
                       {savingTerrain ? "Réservation..." : "Créer la demande terrain"}
                     </Button>
                   </div>

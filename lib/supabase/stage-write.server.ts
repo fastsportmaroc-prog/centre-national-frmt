@@ -6,6 +6,7 @@ import { resolveEffectiveAppRole } from "@/lib/auth/passeports-access";
 import { getAuthUserFromServer } from "@/lib/auth/server-session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin.server";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
+import { mutateOmitMissingColumns } from "@/lib/supabase/mutate-omit-missing-columns";
 import type {
   DemandeBilletAvionV2,
   PlanningSeanceV2,
@@ -81,16 +82,16 @@ export async function updateStageServer(
   const { supabase, error: authError } = await stageWriteClientForUser();
   if (authError || !supabase) return { ok: false, error: authError ?? "Client Supabase indisponible." };
 
-  const { error } = await supabase
-    .from(STAGES)
-    .update({ ...data, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    const msg = error.message;
-    if (msg.includes("row-level security")) return { ok: false, error: rlsHint(STAGES) };
-    return { ok: false, error: msg };
-  }
-  return { ok: true };
+  const payload = { ...data, updated_at: new Date().toISOString() };
+  return mutateOmitMissingColumns(payload as Record<string, unknown>, async (p) => {
+    const { error } = await supabase.from(STAGES).update(p).eq("id", id);
+    if (error) {
+      const msg = error.message;
+      if (msg.includes("row-level security")) return { ok: false, error: rlsHint(STAGES) };
+      return { ok: false, error: msg };
+    }
+    return { ok: true };
+  });
 }
 
 export async function deleteStageServer(id: string): Promise<{ ok: boolean; error?: string }> {
