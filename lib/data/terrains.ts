@@ -5,12 +5,8 @@ import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 import { hasConflict } from "@/services/conflictDetector";
 import { getCreneauRange } from "@/services/terrain-constants";
 
-/** Écritures serveur (session authentifiée) ; lectures client conservent le client navigateur. */
+/** Client Supabase (lectures + appels depuis Client Components). */
 async function getTerrainsSupabaseClient(): Promise<SupabaseClient> {
-  if (typeof window === "undefined") {
-    const { getSupabaseServerDataClient } = await import("@/lib/supabase/data-client.server");
-    return getSupabaseServerDataClient();
-  }
   return getSupabaseDataClient();
 }
 
