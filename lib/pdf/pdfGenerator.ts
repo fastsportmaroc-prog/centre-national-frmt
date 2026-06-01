@@ -4,21 +4,21 @@ import { getOfficialLogoDataUri } from "@/lib/brand/print-logo";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// ── PALETTE OFFICIELLE FRMT (logo : vert, rouge, or) ──
+// ── PALETTE OFFICIELLE FRMT (rouge, vert, blanc, gris) ──
 export const FRMT = {
   /** @deprecated Utiliser green — conservé pour compat catégories */
   navyBlue: [0, 98, 51] as [number, number, number],
-  gold: [201, 162, 39] as [number, number, number],
-  red: [193, 39, 45] as [number, number, number],
-  green: [0, 98, 51] as [number, number, number],
+  gold: [201, 31, 46] as [number, number, number],
+  red: [201, 31, 46] as [number, number, number],
+  green: [0, 107, 63] as [number, number, number],
   greenDark: [0, 77, 40] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
-  cream: [247, 250, 248] as [number, number, number],
-  mint: [232, 245, 236] as [number, number, number],
-  lightGray: [247, 250, 248] as [number, number, number],
-  midGray: [92, 107, 99] as [number, number, number],
-  darkGray: [26, 46, 36] as [number, number, number],
-  borderGray: [197, 221, 208] as [number, number, number],
+  cream: [245, 247, 250] as [number, number, number],
+  mint: [245, 247, 250] as [number, number, number],
+  lightGray: [245, 247, 250] as [number, number, number],
+  midGray: [45, 55, 72] as [number, number, number],
+  darkGray: [45, 55, 72] as [number, number, number],
+  borderGray: [229, 231, 235] as [number, number, number],
   categories: {
     U10: [244, 114, 182] as [number, number, number],
     U12: [56, 189, 248] as [number, number, number],
@@ -27,8 +27,8 @@ export const FRMT = {
     U18: [167, 139, 250] as [number, number, number],
     Junior: [45, 212, 191] as [number, number, number],
     Senior: [26, 60, 94] as [number, number, number],
-    Élite: [201, 162, 39] as [number, number, number],
-    Elite: [201, 162, 39] as [number, number, number],
+    Élite: [0, 107, 63] as [number, number, number],
+    Elite: [0, 107, 63] as [number, number, number],
     National: [239, 68, 68] as [number, number, number],
     Mixte: [148, 163, 184] as [number, number, number],
   },
@@ -61,6 +61,8 @@ export type PDFConfig = {
   categorieColor?: number[];
   footerNote?: string;
   customBody?: (doc: jsPDF, pageW: number, pageH: number, startY: number) => number;
+  generatedBy?: string;
+  appVersion?: string;
 };
 
 /** @deprecated compat */
@@ -110,18 +112,16 @@ export function getCategoryPdfColor(categorie?: string): number[] {
 
 const HEADER_H = 46;
 
-function drawTricolorBar(doc: jsPDF, pW: number, y: number, h = 2.5) {
-  const third = pW / 3;
+function drawFrmtBands(doc: jsPDF, pW: number, y: number, h = 2.5) {
+  const half = pW / 2;
   doc.setFillColor(...FRMT.red);
-  doc.rect(0, y, third, h, "F");
+  doc.rect(0, y, half, h, "F");
   doc.setFillColor(...FRMT.green);
-  doc.rect(third, y, third, h, "F");
-  doc.setFillColor(...FRMT.gold);
-  doc.rect(third * 2, y, third, h, "F");
+  doc.rect(half, y, half, h, "F");
 }
 
-function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string) {
-  drawTricolorBar(doc, pW, 0);
+function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string, generatedBy?: string) {
+  drawFrmtBands(doc, pW, 0);
 
   doc.setFillColor(...FRMT.cream);
   doc.rect(0, 2.5, pW, HEADER_H, "F");
@@ -143,10 +143,14 @@ function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...FRMT.greenDark);
+  doc.setTextColor(...FRMT.darkGray);
+  doc.text("CENTRE NATIONAL", textX, 20);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...FRMT.midGray);
+  if (generatedBy) {
+    doc.text(`GÉNÉRÉ PAR ${generatedBy}`, pW - 14, HEADER_H - 6, { align: "right" });
+  }
   doc.text(
     `GÉNÉRÉ LE ${format(new Date(), "dd MMMM yyyy", { locale: fr }).toLocaleUpperCase("fr-FR")}`,
     pW - 14,
@@ -156,7 +160,7 @@ function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string) {
 
   doc.setFillColor(...FRMT.green);
   doc.rect(0, 2.5 + HEADER_H, pW, 1.2, "F");
-  doc.setFillColor(...FRMT.gold);
+  doc.setFillColor(...FRMT.red);
   doc.rect(0, 3.7 + HEADER_H, pW, 0.6, "F");
 }
 
@@ -167,12 +171,13 @@ function drawPageFooter(
   pageNumber: number,
   totalPages: number,
   logo: string,
-  footerNote?: string
+  footerNote?: string,
+  appVersion?: string
 ) {
   const footerH = 12;
   const y0 = pH - footerH;
 
-  drawTricolorBar(doc, pW, y0 - 2.5, 1.2);
+  drawFrmtBands(doc, pW, y0 - 2.5, 1.2);
 
   doc.setFillColor(...FRMT.green);
   doc.rect(0, y0, pW, footerH, "F");
@@ -188,6 +193,10 @@ function drawPageFooter(
   );
   doc.setFont("helvetica", "bold");
   doc.text(`Page ${pageNumber} / ${totalPages}`, pW - 14, y0 + 5.5, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.text(`${format(new Date(), "dd/MM/yyyy HH:mm", { locale: fr })} • ${appVersion ?? "v2"}`, pW / 2, y0 + 9.5, {
+    align: "center",
+  });
 
   if (logo) {
     try {
@@ -340,6 +349,8 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     filename = "document.pdf",
     extraSections = [],
     categorieColor,
+    generatedBy,
+    appVersion,
   } = config;
 
   const doc = new jsPDF({ orientation, unit: "mm", format: "a4" }) as DocWithTable;
@@ -348,7 +359,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
   const margin = 12;
   const logo = getFRMTLogo();
 
-  drawInstitutionalHeader(doc, pW, logo);
+  drawInstitutionalHeader(doc, pW, logo, generatedBy);
 
   let cursorY = 2.5 + HEADER_H + 8;
 
@@ -381,7 +392,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     cursorY += 9;
   }
 
-  doc.setDrawColor(...FRMT.gold);
+  doc.setDrawColor(...FRMT.borderGray);
   doc.setLineWidth(0.8);
   doc.line(margin, cursorY + 2, pW - margin, cursorY + 2);
   cursorY += 8;
@@ -393,7 +404,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     doc.setTextColor(...FRMT.green);
     if (section.title) {
       doc.text(section.title.toUpperCase(), margin, cursorY + 4);
-      doc.setDrawColor(...FRMT.gold);
+      doc.setDrawColor(...FRMT.borderGray);
       doc.setLineWidth(0.6);
       doc.line(margin, cursorY + 6, margin + 40, cursorY + 6);
     }
@@ -417,14 +428,14 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     if (sec.title) {
       if (cursorY > pH - 50) {
         doc.addPage();
-        drawInstitutionalHeader(doc, pW, logo);
+        drawInstitutionalHeader(doc, pW, logo, generatedBy);
         cursorY = 2.5 + HEADER_H + 14;
       }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(...FRMT.green);
       doc.text(sec.title.toUpperCase(), margin, cursorY + 4);
-      doc.setDrawColor(...FRMT.gold);
+      doc.setDrawColor(...FRMT.borderGray);
       doc.setLineWidth(0.6);
       doc.line(margin, cursorY + 6, margin + 36, cursorY + 6);
       cursorY += 8;
@@ -450,7 +461,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     let sigY = cursorY + 12;
     if (sigY > pH - 70) {
       doc.addPage();
-      drawInstitutionalHeader(doc, pW, logo);
+      drawInstitutionalHeader(doc, pW, logo, generatedBy);
       sigY = 2.5 + HEADER_H + 14;
     }
     drawSignatairesBlock(doc, pW, pH, sigY);
@@ -459,7 +470,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    drawPageFooter(doc, pW, pH, i, totalPages, logo, config.footerNote);
+    drawPageFooter(doc, pW, pH, i, totalPages, logo, config.footerNote, appVersion);
   }
 
   const out = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;

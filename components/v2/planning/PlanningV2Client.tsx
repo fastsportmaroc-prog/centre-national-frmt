@@ -21,7 +21,6 @@ import {
   BadgeCheck,
   CalendarDays,
   Clock3,
-  ShieldCheck,
   Sun,
   Users,
   UserSquare2,

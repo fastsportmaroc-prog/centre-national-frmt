@@ -136,6 +136,8 @@ export function exportStagePDF(stage: {
         ? [{ title: "Kinésithérapie", content: stage.kinesitherapie }]
         : []),
     ],
+    generatedBy: "Utilisateur FRMT",
+    appVersion: "FRMT V2",
   });
 }
 
@@ -205,6 +207,8 @@ export function exportReservationsPDF(
     ],
     data,
     footerNote: `Total : ${reservations.length} réservation(s) — FRMT`,
+    generatedBy: "Utilisateur FRMT",
+    appVersion: "FRMT V2",
   });
 }
 
@@ -834,6 +838,8 @@ export function exportPlanningPDF(
         ]
       : [],
     footerNote: "Document généré automatiquement par FRMT Centre National V2",
+    generatedBy,
+    appVersion: "FRMT V2",
   });
 }
 
@@ -845,6 +851,8 @@ export function exportHebergementPDF(rows: Record<string, string>[], stageName?:
     filename: `Hebergement_${stageName ?? "Centre_National"}.pdf`.replace(/\s+/g, "_"),
     columns: keys.map((k) => ({ header: k, key: k })),
     data: rows,
+    generatedBy: "Utilisateur FRMT",
+    appVersion: "FRMT V2",
   });
 }
 
@@ -869,6 +877,8 @@ export function exportRestaurationPDF(
     columns: keys.map((k) => ({ header: k, key: k })),
     data: rows,
     sections,
+    generatedBy: "Utilisateur FRMT",
+    appVersion: "FRMT V2",
   });
 }
 
