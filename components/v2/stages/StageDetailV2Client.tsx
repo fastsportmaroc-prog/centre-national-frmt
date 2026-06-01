@@ -839,7 +839,11 @@ export function StageDetailV2Client({ id }: { id: string }) {
                           checked={terrainCreneaux.includes(c)}
                           onChange={() => toggleTerrainCreneau(c)}
                         />
-                        {c === "matin" ? "Matin" : c === "apres-midi" ? "Après-midi" : "Journée"}
+                        {c === "matin"
+                          ? "Matin (09:00-13:00)"
+                          : c === "apres-midi"
+                            ? "Après-midi (14:00-18:00)"
+                            : "Journée complète (09:00-18:00)"}
                       </label>
                     ))}
                   </div>

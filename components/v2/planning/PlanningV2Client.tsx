@@ -16,15 +16,21 @@ import { useToast } from "@/components/v2/ui/ToastProvider";
 import { syncAllStagesPlanningAction } from "@/lib/actions/stage-planning-actions";
 import { deleteSeance, getInfrastructures, getPlanning, getStages } from "@/lib/supabase/queries";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
-import type { InfrastructureV2, PlanningSeanceV2 } from "@/lib/types/v2";
+import type { InfrastructureV2, PlanningSeanceV2, StageProgrammeV2 } from "@/lib/types/v2";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 type Creneau = "matin" | "apres_midi";
+type StageViewMode = "prevus" | "tous";
+type StageMeta = Pick<StageProgrammeV2, "id" | "stage_action" | "statut" | "date_debut" | "date_fin" | "categorie">;
 
 function slotForHeure(h: string): Creneau {
   const hour = parseInt(h.split(":")[0] ?? "12", 10);
   return hour < 13 ? "matin" : "apres_midi";
+}
+
+function slotLabel(slot: Creneau): string {
+  return slot === "matin" ? "Matin (09:00-13:00)" : "Après-midi (14:00-18:00)";
 }
 
 export function PlanningV2Client() {
@@ -34,7 +40,9 @@ export function PlanningV2Client() {
   const [items, setItems] = useState<PlanningSeanceV2[]>([]);
   const [infrastructures, setInfrastructures] = useState<InfrastructureV2[]>([]);
   const [stageNames, setStageNames] = useState<Record<string, string>>({});
+  const [stageMeta, setStageMeta] = useState<Record<string, StageMeta>>({});
   const [stageFilter, setStageFilter] = useState(stageFromUrl);
+  const [viewMode, setViewMode] = useState<StageViewMode>("prevus");
   const [weekOffset, setWeekOffset] = useState(0);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(true);
@@ -44,6 +52,21 @@ export function PlanningV2Client() {
     setItems(p);
     setInfrastructures(infra.slice(0, 5));
     setStageNames(Object.fromEntries(s.map((x) => [x.id, x.stage_action])));
+    setStageMeta(
+      Object.fromEntries(
+        s.map((x) => [
+          x.id,
+          {
+            id: x.id,
+            stage_action: x.stage_action,
+            statut: x.statut,
+            date_debut: x.date_debut,
+            date_fin: x.date_fin,
+            categorie: x.categorie,
+          } satisfies StageMeta,
+        ])
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -92,6 +115,26 @@ export function PlanningV2Client() {
     [weekStart]
   );
 
+  const scopedItems = useMemo(() => {
+    return items.filter((seance) => {
+      if (stageFilter && seance.stage_id !== stageFilter) return false;
+      if (viewMode === "tous") return true;
+      const statut = String(stageMeta[seance.stage_id]?.statut ?? "").toLowerCase();
+      // Focus pro: on met en avant les stages à planifier / à exécuter.
+      return statut === "prevu" || statut === "confirme";
+    });
+  }, [items, stageFilter, viewMode, stageMeta]);
+
+  const weekItems = useMemo(() => {
+    return scopedItems
+      .filter((s) => weekDates.includes(s.date))
+      .sort((a, b) => {
+        const k1 = `${a.date}|${a.heure_debut}|${a.infrastructure_id ?? ""}`;
+        const k2 = `${b.date}|${b.heure_debut}|${b.infrastructure_id ?? ""}`;
+        return k1.localeCompare(k2);
+      });
+  }, [scopedItems, weekDates]);
+
   const grid = useMemo(() => {
     const courts = infrastructures.length
       ? infrastructures
@@ -99,9 +142,7 @@ export function PlanningV2Client() {
     const creneaux: Creneau[] = ["matin", "apres_midi"];
     const cells: Record<string, string> = {};
 
-    for (const seance of items) {
-      if (stageFilter && seance.stage_id !== stageFilter) continue;
-      if (!weekDates.includes(seance.date)) continue;
+    for (const seance of weekItems) {
       const slot = slotForHeure(seance.heure_debut);
       const courtId = seance.infrastructure_id ?? courts[0]?.id ?? "default";
       const key = `${seance.date}|${courtId}|${slot}`;
@@ -110,7 +151,14 @@ export function PlanningV2Client() {
     }
 
     return { courts, creneaux, cells };
-  }, [items, infrastructures, stageFilter, weekDates, stageNames]);
+  }, [weekItems, infrastructures, weekDates, stageNames]);
+
+  const weekSummary = useMemo(() => {
+    const uniqueStages = new Set(weekItems.map((s) => s.stage_id)).size;
+    const matin = weekItems.filter((s) => slotForHeure(s.heure_debut) === "matin").length;
+    const apm = weekItems.length - matin;
+    return { total: weekItems.length, uniqueStages, matin, apm };
+  }, [weekItems]);
 
   async function confirmDelete() {
     if (!deleteId) return;
@@ -124,13 +172,7 @@ export function PlanningV2Client() {
     <>
       <V2PageHeader
         title="Planning des séances"
-        description={
-          syncing ?
-            "Synchronisation avec les stages…"
-          : stageFilter && stageNames[stageFilter] ?
-            `Stage : ${stageNames[stageFilter]} · ${weekLabel}`
-          : weekLabel
-        }
+        description={syncing ? "Synchronisation avec les stages…" : `Vue auto planning · ${weekLabel}`}
         actions={
           <V2PageActions
             onExportPdf={() =>
@@ -162,6 +204,10 @@ export function PlanningV2Client() {
               </option>
             ))}
           </Select>
+          <Select value={viewMode} onChange={(e) => setViewMode(e.target.value as StageViewMode)} className="max-w-xs">
+            <option value="prevus">Stages prévus/confirmés</option>
+            <option value="tous">Tous les statuts</option>
+          </Select>
           {stageFilter && (
             <>
               <Link
@@ -191,7 +237,26 @@ export function PlanningV2Client() {
           </div>
         </Card>
 
-        {items.length === 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="p-3">
+            <p className="text-xs text-muted">Séances semaine</p>
+            <p className="text-xl font-semibold">{weekSummary.total}</p>
+          </Card>
+          <Card className="p-3">
+            <p className="text-xs text-muted">Stages actifs</p>
+            <p className="text-xl font-semibold">{weekSummary.uniqueStages}</p>
+          </Card>
+          <Card className="p-3">
+            <p className="text-xs text-muted">Créneaux matin</p>
+            <p className="text-xl font-semibold">{weekSummary.matin}</p>
+          </Card>
+          <Card className="p-3">
+            <p className="text-xs text-muted">Créneaux après-midi</p>
+            <p className="text-xl font-semibold">{weekSummary.apm}</p>
+          </Card>
+        </div>
+
+        {scopedItems.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
             title="Aucune séance planifiée"
@@ -216,7 +281,7 @@ export function PlanningV2Client() {
                   {grid.creneaux.map((slot) => (
                     <tr key={slot} className="border-b border-[var(--border)]">
                       <td className="p-3 font-medium text-[var(--text-secondary)]">
-                        {slot === "matin" ? "MATIN 09-13h" : "APM 14-18h"}
+                        {slotLabel(slot)}
                       </td>
                       {grid.courts.map((c) => {
                         const dayCells = weekDates
@@ -244,13 +309,13 @@ export function PlanningV2Client() {
             <Card className="p-4">
               <h3 className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Liste séances</h3>
               <div className="space-y-2">
-                {items
-                  .filter((r) => !stageFilter || r.stage_id === stageFilter)
+                {weekItems
                   .slice(0, 30)
                   .map((r) => (
                     <div key={r.id} className="flex items-center justify-between rounded border border-[var(--border)] p-2 text-sm">
                       <span>
-                        <strong>{r.date}</strong> {r.heure_debut}-{r.heure_fin} · {stageNames[r.stage_id] ?? "Stage"}
+                        <strong>{r.date}</strong> {r.heure_debut}-{r.heure_fin} · {stageNames[r.stage_id] ?? "Stage"} ·{" "}
+                        {r.infrastructure_id ?? "Terrain non défini"}
                       </span>
                       <Button variant="danger" size="sm" onClick={() => setDeleteId(r.id)}>
                         Suppr.

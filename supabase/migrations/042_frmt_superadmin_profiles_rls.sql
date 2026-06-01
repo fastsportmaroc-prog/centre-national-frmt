@@ -29,6 +29,12 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_user_role() TO authenticated;
 
+-- Compat schémas anciens: ajoute les colonnes manquantes sur profiles
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'viewer',
+  ADD COLUMN IF NOT EXISTS frmt_role TEXT DEFAULT 'directeur',
+  ADD COLUMN IF NOT EXISTS actif BOOLEAN DEFAULT true;
+
 -- Profils admin pour les comptes principaux
 UPDATE public.profiles
 SET

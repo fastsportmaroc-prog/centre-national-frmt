@@ -964,10 +964,10 @@ export function StagesV2Client() {
                                       />
                                       <span>
                                         {c === "matin"
-                                          ? "☀️ Matin"
+                                          ? "☀️ Matin (09:00-13:00)"
                                           : c === "apres-midi"
-                                            ? "🌤 Après-midi"
-                                            : "🌞 Toute la journée"}
+                                            ? "🌤 Après-midi (14:00-18:00)"
+                                            : "🌞 Journée complète (09:00-18:00)"}
                                       </span>
                                     </label>
                                   ))}
