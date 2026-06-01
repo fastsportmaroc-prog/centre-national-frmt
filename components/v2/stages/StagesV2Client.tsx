@@ -7,6 +7,7 @@ import { fr } from "date-fns/locale";
 import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { V2PageActions } from "@/components/v2/V2PageActions";
 import { StageDashboardCard as StageCard } from "@/components/v2/dashboard/StageDashboardCard";
+import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -78,6 +79,7 @@ export function StagesV2Client() {
   const { toast } = useToast();
   const { canWrite, canDelete } = useRole();
   const [deleteTarget, setDeleteTarget] = useState<StageProgrammeV2 | null>(null);
+  const [editTarget, setEditTarget] = useState<StageProgrammeV2 | null>(null);
   const [stages, setStages] = useState<StageDashboardCard[]>([]);
   const [joueurs, setJoueurs] = useState<Awaited<ReturnType<typeof getJoueurs>>>([]);
   const [entraineurs, setEntraineurs] = useState<Awaited<ReturnType<typeof getEntraineurs>>>([]);
@@ -501,7 +503,7 @@ export function StagesV2Client() {
                 <StageCard
                   stage={s}
                   onPdf={() => void handleExportPdf(s)}
-                  onEdit={canWrite ? () => setOpen(true) : undefined}
+                  onEdit={canWrite ? () => setEditTarget(s) : undefined}
                 />
               </div>
             ))}
@@ -546,6 +548,11 @@ export function StagesV2Client() {
                       </td>
                       <td className="p-3">
                         <div className="flex gap-1">
+                          {canWrite && (
+                            <Button variant="secondary" size="sm" onClick={() => setEditTarget(s)}>
+                              Modifier
+                            </Button>
+                          )}
                           <Button variant="secondary" size="sm" onClick={() => void handleExportPdf(s)}>
                             PDF
                           </Button>
@@ -1200,6 +1207,13 @@ export function StagesV2Client() {
           </div>
         )}
       </Modal>
+
+      <StageQuickEditModal
+        stage={editTarget}
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={() => void load()}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

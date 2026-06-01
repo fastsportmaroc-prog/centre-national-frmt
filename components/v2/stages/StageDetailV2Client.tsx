@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { addDays, format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, CalendarDays, FileDown, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, FileDown, FileText, Pencil, Trash2 } from "lucide-react";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import { StageLettreModal } from "@/components/v2/stages/StageLettreModal";
+import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
 import { StageHebergementSection } from "@/components/v2/stages/StageHebergementSection";
 import { StageKinesitherapieSection } from "@/components/v2/stages/StageKinesitherapieSection";
 import { StageParticipantsAssign } from "@/components/v2/stages/StageParticipantsAssign";
@@ -102,6 +103,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const tabFromUrl = searchParams.get("tab");
   const [tab, setTab] = useState<Tab>(isValidStageTab(tabFromUrl) ? tabFromUrl : "infos");
   const [lettreOpen, setLettreOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [editingLettre, setEditingLettre] = useState<LettreOfficielleRecord | null>(null);
   const [lettresStage, setLettresStage] = useState<LettreOfficielleRecord[]>([]);
   const [stage, setStage] = useState<StageProgrammeV2 | null>(null);
@@ -555,6 +557,11 @@ export function StageDetailV2Client({ id }: { id: string }) {
                 <CalendarDays className="h-4 w-4" /> Planning
               </Button>
             </Link>
+            {canWrite && (
+              <Button variant="secondary" className="gap-1" onClick={() => setEditOpen(true)}>
+                <Pencil className="h-4 w-4" /> Modifier
+              </Button>
+            )}
             {canDeleteStage && (
               <Button variant="danger" className="gap-1" onClick={() => void handleDeleteStage()}>
                 <Trash2 className="h-4 w-4" /> Supprimer stage
@@ -1151,6 +1158,16 @@ export function StageDetailV2Client({ id }: { id: string }) {
           onGenerated={() => void load()}
         />
       )}
+
+      <StageQuickEditModal
+        stage={stage}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={(patch) => {
+          setStage((prev) => (prev ? { ...prev, ...patch } : prev));
+          void load();
+        }}
+      />
     </>
   );
 }
