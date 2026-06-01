@@ -83,14 +83,15 @@ export function downloadBlob(blob: Blob, filename: string) {
 }
 
 export async function openPrintReport(meta: ReportMeta): Promise<void> {
-  const html = await buildReportHtml(meta);
-  const w = window.open("", "_blank");
-  if (!w) {
-    alert("Autorisez les pop-ups pour imprimer le rapport.");
-    return;
-  }
-  w.document.write(html);
-  w.document.close();
+  const enriched = enrichReportMeta(meta);
+  const slug = enriched.titre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+  const filename = `${slug || "rapport"}.pdf`;
+  await exportPdfReport(enriched, filename);
 }
 
 function isReportMeta(value: unknown): value is ReportMeta {

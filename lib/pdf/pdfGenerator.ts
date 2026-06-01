@@ -1,3 +1,5 @@
+"use client";
+
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getOfficialLogoDataUri } from "@/lib/brand/print-logo";
@@ -19,10 +21,10 @@ export const FRMT = {
   midGray: [45, 55, 72] as [number, number, number],
   darkGray: [45, 55, 72] as [number, number, number],
   borderGray: [229, 231, 235] as [number, number, number],
-  /** Tableaux — style corporate clair */
-  tableHeaderBg: [241, 245, 249] as [number, number, number],
-  tableHeaderText: [30, 41, 59] as [number, number, number],
-  tableHeaderLine: [203, 213, 225] as [number, number, number],
+  /** Tableaux — en-têtes ardoise clair (contraste net vs vert legacy) */
+  tableHeaderBg: [226, 232, 240] as [number, number, number],
+  tableHeaderText: [15, 23, 42] as [number, number, number],
+  tableHeaderLine: [148, 163, 184] as [number, number, number],
   tableStripe: [248, 250, 252] as [number, number, number],
   tableBorder: [226, 232, 240] as [number, number, number],
   tableTotalBg: [241, 245, 249] as [number, number, number],
@@ -41,6 +43,9 @@ export const FRMT = {
     Mixte: [148, 163, 184] as [number, number, number],
   },
 };
+
+/** Identifiant moteur PDF — visible en pied de page pour valider le déploiement */
+export const PDF_ENGINE_VERSION = "FRMT-PDF-PRO-3";
 
 export type PdfColumnDef = {
   header: string;
@@ -147,7 +152,7 @@ function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string, generated
   const textX = logo ? 54 : 14;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(...FRMT.green);
+  doc.setTextColor(...FRMT.darkGray);
   const fedLines = doc.splitTextToSize("FÉDÉRATION ROYALE MAROCAINE DE TENNIS", pW - textX - 14);
   doc.text(fedLines, textX, 14);
 
@@ -204,7 +209,7 @@ function drawPageFooter(
   doc.setFont("helvetica", "bold");
   doc.text(`Page ${pageNumber} / ${totalPages}`, pW - 14, y0 + 5.5, { align: "right" });
   doc.setFont("helvetica", "normal");
-  doc.text(`${format(new Date(), "dd/MM/yyyy HH:mm", { locale: fr })} • ${appVersion ?? "v2"}`, pW / 2, y0 + 9.5, {
+  doc.text(`${format(new Date(), "dd/MM/yyyy HH:mm", { locale: fr })} • ${appVersion ?? PDF_ENGINE_VERSION}`, pW / 2, y0 + 9.5, {
     align: "center",
   });
 

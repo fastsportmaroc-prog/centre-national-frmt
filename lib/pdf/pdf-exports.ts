@@ -1,3 +1,5 @@
+"use client";
+
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -37,10 +39,8 @@ function hexRgb(hex: string): [number, number, number] {
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
-function runFrmPdf(config: PDFConfig): void {
-  void generateFRMTPDF(config).catch((e) => {
-    console.error("[PDF] export failed:", e);
-  });
+async function runFrmPdf(config: PDFConfig): Promise<void> {
+  await generateFRMTPDF(config);
 }
 
 export function exportStagePDF(stage: {
@@ -104,7 +104,7 @@ export function exportStagePDF(stage: {
     });
   }
 
-  runFrmPdf({
+  return runFrmPdf({
     title: "Fiche de Stage",
     subtitle: stage.stage_action,
     periode: `Du ${formatDateFR(stage.date_debut)} au ${formatDateFR(stage.date_fin)}`,
@@ -143,7 +143,7 @@ export function exportStagePDF(stage: {
 
 export function exportJoueursPDF(joueurs: Record<string, string>[], filtres?: string) {
   const keys = Object.keys(joueurs[0] ?? { nom: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Liste des Joueurs",
     subtitle: filtres ? `Filtres : ${filtres}` : undefined,
     filename: buildPdfFilename("JOUEURS", filtres ?? "liste"),
@@ -159,7 +159,7 @@ export function exportJoueursPDF(joueurs: Record<string, string>[], filtres?: st
 
 export function exportEntraineursPDF(entraineurs: Record<string, string>[]) {
   const keys = Object.keys(entraineurs[0] ?? { nom: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Liste des entraîneurs",
     filename: "entraineurs.pdf",
     columns: keys.map((k) => ({ header: k, key: k })),
@@ -192,7 +192,7 @@ export function exportReservationsPDF(
       };
     });
 
-  runFrmPdf({
+  return runFrmPdf({
     title: "Planning des Réservations",
     subtitle: subtitle ?? undefined,
     periode: `${moisLabel} ${annee}`,
@@ -232,7 +232,7 @@ export function exportBilletsPDF(
   stageName?: string
 ) {
   const keys = Object.keys(rows[0] ?? { nom: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Demandes de billets d'avion",
     subtitle: stageName,
     filename: "billets-avion.pdf",
@@ -248,7 +248,7 @@ export function exportBudgetAnnuelPDF(
   totaux: { alloue: number; reel: number; engage: number }
 ) {
   const keys = Object.keys(lignes[0] ?? { categorie: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Budget annuel",
     subtitle: `Exercice ${annee}`,
     filename: `budget-annuel-${annee}.pdf`,
@@ -293,7 +293,7 @@ export function exportBudgetMissionPDF(
     },
   ];
 
-  runFrmPdf({
+  return runFrmPdf({
     title: "Budget Prévisionnel",
     subtitle: stageName,
     periode: `Du ${formatDateFR(dateDebut)} au ${formatDateFR(dateFin)}`,
@@ -421,7 +421,7 @@ export function exportStagesCneBudgetPdf(
   }[],
   totals: { hebergement: number; restauration: number; terrains: number; total: number }
 ) {
-  runFrmPdf({
+  return runFrmPdf({
     title: "Coût des stages — FRMT",
     subtitle: `Synthèse ${annee} — montants en MAD`,
     filename: buildPdfFilename("BUDGET-CNE", String(annee), `${annee}-01-01`),
@@ -604,7 +604,7 @@ export function exportCalendrierPDF(
     });
   }
 
-  runFrmPdf({
+  return runFrmPdf({
     title: "Calendrier des stages",
     subtitle: label,
     orientation: "landscape",
@@ -795,7 +795,7 @@ export function exportPlanningPDF(
   const periodeWithMeta = `${optsObj?.weekLabel ?? periode ?? "Période non définie"} • Date export: ${formatDateFR(new Date().toISOString())} • Généré: ${generatedBy}`;
   const summary = optsObj?.summary;
 
-  runFrmPdf({
+  return runFrmPdf({
     title: "Planning hebdomadaire des séances",
     subtitle: "Fédération Royale Marocaine de Tennis • Centre National",
     periode: periodeWithMeta,
@@ -848,7 +848,7 @@ export function exportPlanningPDF(
 
 export function exportHebergementPDF(rows: Record<string, string>[], stageName?: string) {
   const keys = Object.keys(rows[0] ?? { stage: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Fiche Hébergement",
     subtitle: stageName,
     filename: `Hebergement_${stageName ?? "Centre_National"}.pdf`.replace(/\s+/g, "_"),
@@ -873,7 +873,7 @@ export function exportRestaurationPDF(
       data: [totals],
     });
   }
-  runFrmPdf({
+  return runFrmPdf({
     title: "Fiche restauration",
     subtitle: stageName,
     filename: "restauration.pdf",
@@ -887,7 +887,7 @@ export function exportRestaurationPDF(
 
 export function exportPasseportsPDF(rows: Record<string, string>[]) {
   const keys = Object.keys(rows[0] ?? { nom: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Liste des documents officiels",
     subtitle: "Pour soumission aux autorités compétentes",
     filename: "passeports.pdf",
@@ -898,7 +898,7 @@ export function exportPasseportsPDF(rows: Record<string, string>[]) {
 
 export function exportLogistiquePDF(rows: Record<string, string>[]) {
   const keys = Object.keys(rows[0] ?? { stage: "" });
-  runFrmPdf({
+  return runFrmPdf({
     title: "Demandes logistiques",
     filename: "logistique.pdf",
     columns: keys.map((k) => ({ header: k, key: k })),
@@ -923,7 +923,7 @@ export function exportStagesLogistiquePDF(params: {
   }[];
   totals: { joueurs: number; coachs: number; chambres: number };
 }) {
-  runFrmPdf({
+  return runFrmPdf({
     title: "Planification Logistique des Stages",
     subtitle: "CENTRE NATIONAL FRMT",
     periode: `${params.periodeLabel} • Généré le ${formatDateFR(new Date().toISOString())} • Généré: ${params.generatedBy}`,
@@ -1005,7 +1005,7 @@ export function exportRapportMensuelPDF(
       data: data.financier,
     });
   }
-  runFrmPdf({
+  return runFrmPdf({
     title: "Rapport mensuel d'activité",
     subtitle: `Mois de ${label}`,
     filename: `rapport-mensuel-${annee}-${mois}.pdf`,
@@ -1025,9 +1025,9 @@ export function exportListePdf(
   rows: (string | number)[][],
   filename: string,
   showSignataires = false
-) {
+): Promise<void> {
   const keys = headers.map((_, i) => `c${i}`);
-  runFrmPdf({
+  return runFrmPdf({
     title,
     columns: headers.map((h, i) => ({ header: h, key: keys[i]!, align: i === 0 ? "left" : "center" })),
     data: rows.map((r) =>

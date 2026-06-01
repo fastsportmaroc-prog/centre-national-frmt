@@ -17,6 +17,7 @@ export const PRINT_COLORS = {
   slate200: "#E2E8F0",
   slate100: "#F1F5F9",
   slate50: "#F8FAFC",
+  slateHeader: "#E2E8F0",
 } as const;
 
 export function getPrintReportCss(options?: { legacy?: boolean }): string {
@@ -24,7 +25,7 @@ export function getPrintReportCss(options?: { legacy?: boolean }): string {
   const c = PRINT_COLORS;
 
   const proTableCss = `
-  .rt thead tr { background: ${c.slate100} !important; }
+  .rt thead tr { background: ${c.slateHeader} !important; }
   .rt thead th {
     color: ${c.slate800} !important;
     font-weight: bold !important;
@@ -32,7 +33,7 @@ export function getPrintReportCss(options?: { legacy?: boolean }): string {
     padding: 7px 9px !important;
     text-align: center !important;
     border: 0.5pt solid ${c.slate200} !important;
-    border-bottom: 1.5pt solid #CBD5E1 !important;
+    border-bottom: 2pt solid #94A3B8 !important;
     text-transform: uppercase !important;
     vertical-align: middle !important;
     white-space: nowrap !important;

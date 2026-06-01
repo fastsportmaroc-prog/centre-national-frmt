@@ -128,30 +128,32 @@ export function getFrmtPrintDocumentCss(): string {
     table-layout: fixed;
   }
   table.frmt-table thead th {
-    background: ${c.green} !important;
-    color: #fff !important;
+    background: #E2E8F0 !important;
+    color: #0F172A !important;
     font-weight: 700;
     text-transform: uppercase;
     font-size: 9px;
     letter-spacing: 0.05em;
     padding: 9px 8px;
-    border: 1px solid ${c.greenDark};
+    border: 1px solid #CBD5E1;
+    border-bottom: 2px solid #94A3B8;
     text-align: left;
   }
   table.frmt-table tbody td {
-    border: 1px solid ${c.border};
+    border: 1px solid #E2E8F0;
     padding: 7px 8px;
     vertical-align: top;
     word-break: break-word;
+    color: #334155;
   }
-  table.frmt-table tbody tr:nth-child(even) { background: ${c.cream}; }
-  table.frmt-table tbody tr:hover { background: ${c.mint}; }
+  table.frmt-table tbody tr:nth-child(even) { background: #F8FAFC; }
+  table.frmt-table tbody tr:hover { background: #F1F5F9; }
   .frmt-doc-footer {
     margin-top: 24px;
     padding: 10px 14px;
     font-size: 9px;
     color: rgba(255,255,255,0.92);
-    background: ${c.green};
+    background: #334155;
     border-radius: 4px;
     text-align: center;
   }

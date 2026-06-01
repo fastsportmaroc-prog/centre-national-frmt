@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  buildFrmtDocumentHtml,
-  downloadPdfViaPrint,
-  openPrintWindow,
-  type FrmtDocumentMeta,
-} from "@/lib/export/frmt-document";
+import { exportListePdf } from "@/lib/pdf/pdf-exports";
 
 export function exportModuleList(opts: {
   titre: string;
@@ -15,19 +10,18 @@ export function exportModuleList(opts: {
   colonnes: string[];
   lignes: string[][];
   mode: "print" | "pdf";
-}): void {
-  const meta: FrmtDocumentMeta = {
-    titre: opts.titre,
-    sousTitre: opts.sousTitre,
-    filtres: opts.filtres,
-    utilisateur: opts.utilisateur ?? "Utilisateur connecté",
-    colonnes: opts.colonnes,
-    lignes: opts.lignes,
-  };
-  const html = buildFrmtDocumentHtml(meta);
-  if (opts.mode === "print") {
-    openPrintWindow(html, opts.titre);
-  } else {
-    downloadPdfViaPrint(html, opts.titre);
-  }
+}): Promise<void> {
+  const slug = opts.titre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+  return exportListePdf(
+    opts.titre,
+    opts.colonnes,
+    opts.lignes,
+    `${slug || "export"}.pdf`,
+    false
+  );
 }

@@ -1,3 +1,5 @@
+"use client";
+
 /** @deprecated Utiliser lib/pdf/pdfGenerator.ts et lib/pdf/pdf-exports.ts */
 export {
   exportStagePDF as exportStagePdf,

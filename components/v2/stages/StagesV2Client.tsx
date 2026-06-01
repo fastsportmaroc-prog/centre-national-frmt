@@ -373,7 +373,7 @@ export function StagesV2Client() {
       getJoueursByStage(stage.id),
       getEntraineursByStage(stage.id),
     ]);
-    exportStagePDF({
+    await exportStagePDF({
       stage_action: stage.stage_action,
       categorie: stage.categorie,
       date_debut: stage.date_debut,
@@ -409,7 +409,7 @@ export function StagesV2Client() {
     }
   }
 
-  function handleExportLogistiquePdf() {
+  async function handleExportLogistiquePdf() {
     const rows = filtered.map((s) => ({
       stage: s.stage_action,
       categorie: s.categorie,
@@ -438,7 +438,7 @@ export function StagesV2Client() {
         `Du ${format(parseISO(toDateIso(filtered[0]!.date_debut)), "dd/MM/yyyy")} au ${format(parseISO(toDateIso(filtered[filtered.length - 1]!.date_fin)), "dd/MM/yyyy")}`
       : "Aucune période";
 
-    exportStagesLogistiquePDF({ rows, totals, generatedBy, periodeLabel });
+    await exportStagesLogistiquePDF({ rows, totals, generatedBy, periodeLabel });
   }
 
   function toggleId(list: string[], id: string): string[] {
