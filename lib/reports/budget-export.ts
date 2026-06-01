@@ -78,6 +78,7 @@ export function buildBudgetAnnuelReport(dashboard: BudgetDashboard): ReportMeta 
         }
       : undefined,
     observations: DEFAULT_OBSERVATIONS,
+    legacyPrintStyle: true,
   };
 }
 
@@ -121,6 +122,7 @@ export function buildBudgetJoueursReport(dashboard: BudgetDashboard): ReportMeta
       ],
     ],
     observations: DEFAULT_OBSERVATIONS,
+    legacyPrintStyle: true,
   };
 }
 

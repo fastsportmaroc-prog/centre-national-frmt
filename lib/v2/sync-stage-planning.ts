@@ -11,6 +11,8 @@ type PlanningSlot = {
   surface?: string | null;
 };
 
+type TemplateSlot = { heure_debut: string; heure_fin: string };
+
 export type StagePlanningSyncInput = {
   stage_id: string;
   date_debut: string;
@@ -45,6 +47,40 @@ function parseTerrainsBesoins(notes: string | null | undefined): TerrainBesoin[]
   } catch {
     return null;
   }
+}
+
+function parsePlanningTemplateCode(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const match = notes.match(/\[PLANNING_TEMPLATE:([a-z0-9_-]+)\]/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function parsePlanningSlots(notes: string | null | undefined): TemplateSlot[] | null {
+  if (!notes) return null;
+  const match = notes.match(/\[PLANNING_SLOTS:(.+?)\]/);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]) as Array<{ heure_debut?: string; heure_fin?: string }>;
+    const normalized = parsed
+      .map((slot) => ({
+        heure_debut: String(slot.heure_debut ?? "").slice(0, 5),
+        heure_fin: String(slot.heure_fin ?? "").slice(0, 5),
+      }))
+      .filter((slot) => /^\d{2}:\d{2}$/.test(slot.heure_debut) && /^\d{2}:\d{2}$/.test(slot.heure_fin));
+    return normalized.length > 0 ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
+function templateSlotsFromCode(code: string | null): TemplateSlot[] {
+  if (code === "double_daily_stage") {
+    return [
+      { heure_debut: "09:00", heure_fin: "13:00" },
+      { heure_debut: "14:00", heure_fin: "18:00" },
+    ];
+  }
+  return [{ heure_debut: "09:00", heure_fin: "13:00" }];
 }
 
 async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<PlanningSlot[]> {
@@ -99,13 +135,17 @@ async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<Plan
   }
 
   if (slots.length === 0) {
+    const customSlots = parsePlanningSlots(stage.notes);
+    const templateSlots = customSlots ?? templateSlotsFromCode(parsePlanningTemplateCode(stage.notes));
     for (const day of eachDayOfStage(stage.date_debut, stage.date_fin)) {
-      push({
-        date: day,
-        infrastructure_id: null,
-        heure_debut: "09:00",
-        heure_fin: "13:00",
-      });
+      for (const slot of templateSlots) {
+        push({
+          date: day,
+          infrastructure_id: null,
+          heure_debut: slot.heure_debut,
+          heure_fin: slot.heure_fin,
+        });
+      }
     }
   }
 

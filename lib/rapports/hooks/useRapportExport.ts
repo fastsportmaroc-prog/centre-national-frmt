@@ -15,7 +15,7 @@ export function useRapportExport() {
       if (!data) {
         throw new Error("Données du rapport indisponibles");
       }
-      await exportRapportPdf(report, data, "print");
+      await exportRapportPdf(report, data, "download");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Export impossible";
       throw new Error(message);

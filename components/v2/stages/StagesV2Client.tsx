@@ -409,16 +409,6 @@ export function StagesV2Client() {
     }
   }
 
-  function licencesVerifiees(notes: string | null | undefined): boolean {
-    const n = (notes ?? "").toLowerCase();
-    return n.includes("licence ok") || n.includes("licences ok") || n.includes("licences vérifiées");
-  }
-
-  function lettreEnvoyee(notes: string | null | undefined): boolean {
-    const n = (notes ?? "").toLowerCase();
-    return n.includes("lettre envoy") || n.includes("lettre officielle générée");
-  }
-
   function handleExportLogistiquePdf() {
     const rows = filtered.map((s) => ({
       stage: s.stage_action,
@@ -429,12 +419,8 @@ export function StagesV2Client() {
       coachs: String(s.nb_coachs),
       chambres: String(s.chambres ?? 0),
       hebergement: yesNo(Boolean(s.has_hebergement)),
-      restauration: yesNo(Boolean(s.has_restauration)),
       terrains: yesNo(Boolean(s.has_terrains)),
       terrainsSupp: yesNo(hasTerrainsSupp(s.notes)),
-      lettreEnvoyee: yesNo(lettreEnvoyee(s.notes)),
-      licencesVerifiees: yesNo(licencesVerifiees(s.notes)),
-      observations: (s.notes ?? "").trim() || "—",
     }));
 
     const totals = rows.reduce(

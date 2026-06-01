@@ -38,6 +38,8 @@ export type ReportMeta = {
   reference?: string;
   periodeLabel?: string;
   statutFiltre?: string;
+  /** Conserve le style vert historique (budget administratif uniquement) */
+  legacyPrintStyle?: boolean;
 };
 
 function escapeHtml(s: string): string {
@@ -49,7 +51,8 @@ function escapeHtml(s: string): string {
 }
 
 export async function buildReportHtml(meta: ReportMeta): Promise<string> {
-  return buildInstitutionalPrintHtml(enrichReportMeta(meta));
+  const enriched = enrichReportMeta(meta);
+  return buildInstitutionalPrintHtml(enriched, enriched.legacyPrintStyle);
 }
 
 export function exportCsv(filename: string, colonnes: string[], lignes: string[][]) {
@@ -119,5 +122,5 @@ export async function exportPdfReport(
     throw new Error("exportPdfReport : ReportMeta manquant");
   }
   const { exportFrmtPdfFromMeta } = await import("@/lib/pdf/frmt-pdf");
-  await exportFrmtPdfFromMeta(enrichReportMeta(meta), filename);
+  await exportFrmtPdfFromMeta(enrichReportMeta(meta), filename, meta.legacyPrintStyle);
 }

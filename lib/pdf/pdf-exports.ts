@@ -253,6 +253,7 @@ export function exportBudgetAnnuelPDF(
     subtitle: `Exercice ${annee}`,
     filename: `budget-annuel-${annee}.pdf`,
     showSignataires: true,
+    legacyTableStyle: true,
     columns: keys.map((k) => ({ header: k, key: k })),
     data: lignes,
     sections: [
@@ -298,6 +299,7 @@ export function exportBudgetMissionPDF(
     periode: `Du ${formatDateFR(dateDebut)} au ${formatDateFR(dateFin)}`,
     filename: buildPdfFilename("BUDGET", stageName, dateDebut),
     showSignataires: true,
+    legacyTableStyle: true,
     sections: [
       {
         title: "Transport",
@@ -424,6 +426,7 @@ export function exportStagesCneBudgetPdf(
     subtitle: `Synthèse ${annee} — montants en MAD`,
     filename: buildPdfFilename("BUDGET-CNE", String(annee), `${annee}-01-01`),
     showSignataires: true,
+    legacyTableStyle: true,
     sections: [
       {
         title: "Estimation par stage",
@@ -622,11 +625,11 @@ export function exportCalendrierPDF(
       const cellH = Math.min(18, maxGridH / rowCount);
       const headers = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
-      doc.setFillColor(...FRMT.green);
+      doc.setFillColor(...FRMT.tableHeaderBg);
       doc.rect(left, top, gridW, 8, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7.5);
-      doc.setTextColor(...FRMT.white);
+      doc.setTextColor(...FRMT.tableHeaderText);
       headers.forEach((h, i) => {
         doc.text(h, left + i * cellW + cellW / 2, top + 5.5, { align: "center" });
       });
@@ -647,7 +650,7 @@ export function exportCalendrierPDF(
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(inMonth ? 9 : 8);
-        doc.setTextColor(...(inMonth ? FRMT.greenDark : FRMT.midGray));
+        doc.setTextColor(...(inMonth ? FRMT.darkGray : FRMT.midGray));
         doc.text(format(day, "d"), x + 3, y + 5);
 
         if (inMonth) {
@@ -789,7 +792,7 @@ export function exportPlanningPDF(
 
   const optsObj = typeof options === "string" ? { weekLabel: options } : options;
   const generatedBy = optsObj?.generatedBy ?? "Utilisateur FRMT";
-  const periodeWithMeta = `${optsObj?.weekLabel ?? periode ?? "Période non définie"} • Date export: ${formatDateFR(new Date().toISOString())} • Généré par: ${generatedBy}`;
+  const periodeWithMeta = `${optsObj?.weekLabel ?? periode ?? "Période non définie"} • Date export: ${formatDateFR(new Date().toISOString())} • Généré: ${generatedBy}`;
   const summary = optsObj?.summary;
 
   runFrmPdf({
@@ -915,36 +918,28 @@ export function exportStagesLogistiquePDF(params: {
     coachs: string;
     chambres: string;
     hebergement: string;
-    restauration: string;
     terrains: string;
     terrainsSupp: string;
-    lettreEnvoyee: string;
-    licencesVerifiees: string;
-    observations: string;
   }[];
   totals: { joueurs: number; coachs: number; chambres: number };
 }) {
   runFrmPdf({
     title: "Planification Logistique des Stages",
     subtitle: "CENTRE NATIONAL FRMT",
-    periode: `${params.periodeLabel} • Généré le ${formatDateFR(new Date().toISOString())} • Généré par: ${params.generatedBy}`,
+    periode: `${params.periodeLabel} • Généré le ${formatDateFR(new Date().toISOString())} • Généré: ${params.generatedBy}`,
     orientation: "landscape",
     filename: buildPdfFilename("LOGISTIQUE-STAGES", "planification", new Date().toISOString().slice(0, 10)),
     columns: [
-      { header: "Stage", key: "stage", width: 30, align: "left" },
-      { header: "Catégorie", key: "categorie", width: 16, align: "center" },
-      { header: "Dates", key: "dates", width: 30, align: "left" },
-      { header: "Durée", key: "duree", width: 10, align: "center" },
-      { header: "Nb joueurs", key: "joueurs", width: 12, align: "center" },
-      { header: "Nb coachs", key: "coachs", width: 12, align: "center" },
-      { header: "Nb chambres", key: "chambres", width: 14, align: "center" },
-      { header: "Héb.", key: "hebergement", width: 9, align: "center" },
-      { header: "Rest.", key: "restauration", width: 9, align: "center" },
-      { header: "Terr.", key: "terrains", width: 9, align: "center" },
-      { header: "Terr. supp.", key: "terrainsSupp", width: 14, align: "center" },
-      { header: "Lettre", key: "lettreEnvoyee", width: 10, align: "center" },
-      { header: "Licences", key: "licencesVerifiees", width: 12, align: "center" },
-      { header: "Observations", key: "observations", width: 24, align: "left" },
+      { header: "Stage", key: "stage", width: 40, align: "left" },
+      { header: "Cat.", key: "categorie", width: 16, align: "center" },
+      { header: "Dates", key: "dates", width: 38, align: "left" },
+      { header: "Durée", key: "duree", width: 12, align: "center" },
+      { header: "Joueurs", key: "joueurs", width: 15, align: "center" },
+      { header: "Coachs", key: "coachs", width: 15, align: "center" },
+      { header: "Chambres", key: "chambres", width: 16, align: "center" },
+      { header: "Héb.", key: "hebergement", width: 14, align: "center" },
+      { header: "Terr.", key: "terrains", width: 14, align: "center" },
+      { header: "T.supp.", key: "terrainsSupp", width: 14, align: "center" },
     ],
     data: params.rows.length ? params.rows : [{
       stage: "—",
@@ -955,12 +950,8 @@ export function exportStagesLogistiquePDF(params: {
       coachs: "0",
       chambres: "0",
       hebergement: "Non",
-      restauration: "Non",
       terrains: "Non",
       terrainsSupp: "Non",
-      lettreEnvoyee: "Non",
-      licencesVerifiees: "Non",
-      observations: "Aucune donnée",
     }],
     sections: [
       {
@@ -976,7 +967,6 @@ export function exportStagesLogistiquePDF(params: {
         ],
       },
     ],
-    showSignataires: true,
   });
 }
 

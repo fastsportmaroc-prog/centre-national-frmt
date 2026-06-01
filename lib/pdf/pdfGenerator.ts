@@ -19,6 +19,14 @@ export const FRMT = {
   midGray: [45, 55, 72] as [number, number, number],
   darkGray: [45, 55, 72] as [number, number, number],
   borderGray: [229, 231, 235] as [number, number, number],
+  /** Tableaux — style corporate clair */
+  tableHeaderBg: [241, 245, 249] as [number, number, number],
+  tableHeaderText: [30, 41, 59] as [number, number, number],
+  tableHeaderLine: [203, 213, 225] as [number, number, number],
+  tableStripe: [248, 250, 252] as [number, number, number],
+  tableBorder: [226, 232, 240] as [number, number, number],
+  tableTotalBg: [241, 245, 249] as [number, number, number],
+  tableTotalText: [30, 41, 59] as [number, number, number],
   categories: {
     U10: [244, 114, 182] as [number, number, number],
     U12: [56, 189, 248] as [number, number, number],
@@ -63,6 +71,8 @@ export type PDFConfig = {
   customBody?: (doc: jsPDF, pageW: number, pageH: number, startY: number) => number;
   generatedBy?: string;
   appVersion?: string;
+  /** Style vert historique — budget administratif uniquement */
+  legacyTableStyle?: boolean;
 };
 
 /** @deprecated compat */
@@ -149,7 +159,7 @@ function drawInstitutionalHeader(doc: jsPDF, pW: number, logo: string, generated
   doc.setFontSize(7);
   doc.setTextColor(...FRMT.midGray);
   if (generatedBy) {
-    doc.text(`GÉNÉRÉ PAR ${generatedBy}`, pW - 14, HEADER_H - 6, { align: "right" });
+    doc.text(`GÉNÉRÉ: ${generatedBy}`, pW - 14, HEADER_H - 6, { align: "right" });
   }
   doc.text(
     `GÉNÉRÉ LE ${format(new Date(), "dd MMMM yyyy", { locale: fr }).toLocaleUpperCase("fr-FR")}`,
@@ -179,7 +189,7 @@ function drawPageFooter(
 
   drawFrmtBands(doc, pW, y0 - 2.5, 1.2);
 
-  doc.setFillColor(...FRMT.green);
+  doc.setFillColor(...FRMT.darkGray);
   doc.rect(0, y0, pW, footerH, "F");
 
   doc.setTextColor(...FRMT.white);
@@ -207,6 +217,16 @@ function drawPageFooter(
   }
 }
 
+function scaleColumnWidths(columns: PdfColumnDef[], tableWidth: number): number[] {
+  const weights = columns.map((c) => c.width ?? 1);
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  if (total <= 0) {
+    const even = tableWidth / columns.length;
+    return columns.map(() => even);
+  }
+  return weights.map((w) => (w / total) * tableWidth);
+}
+
 function addFrmtTable(
   doc: DocWithTable,
   startY: number,
@@ -217,10 +237,26 @@ function addFrmtTable(
   pH: number,
   logo: string,
   footerNote: string | undefined,
-  categorieColor?: number[]
+  categorieColor?: number[],
+  legacyTableStyle = false
 ) {
+  const tableWidth = pW - margin * 2;
+  const scaledWidths = scaleColumnWidths(columns, tableWidth);
+  const dense = columns.length >= 10;
+  const headFontSize = dense ? 7 : 8;
+  const bodyFontSize = dense ? 7.5 : 8;
+  const headPadding = dense ? { top: 4, bottom: 4, left: 2, right: 2 } : { top: 5, bottom: 5, left: 4, right: 4 };
+  const bodyPadding = dense ? { top: 2.5, bottom: 2.5, left: 2, right: 2 } : { top: 3, bottom: 3, left: 3, right: 3 };
+  const headFill = legacyTableStyle ? FRMT.green : FRMT.tableHeaderBg;
+  const headText = legacyTableStyle ? FRMT.white : FRMT.tableHeaderText;
+  const headLine = legacyTableStyle ? FRMT.greenDark : FRMT.tableHeaderLine;
+  const headLineWidth = legacyTableStyle ? 0 : { bottom: 0.4, top: 0, left: 0, right: 0 };
+  const totalFill = legacyTableStyle ? FRMT.mint : FRMT.tableTotalBg;
+  const totalText = legacyTableStyle ? FRMT.greenDark : FRMT.tableTotalText;
+
   autoTable(doc, {
     startY,
+    tableWidth,
     head: [columns.map((c) => c.header)],
     body: data.map((row) =>
       columns.map((c) => {
@@ -229,33 +265,42 @@ function addFrmtTable(
       })
     ),
     theme: "plain",
+    styles: {
+      overflow: "linebreak",
+      cellWidth: "wrap",
+      valign: "middle",
+    },
     headStyles: {
-      fillColor: FRMT.green,
-      textColor: FRMT.white,
+      fillColor: headFill,
+      textColor: headText,
       fontStyle: "bold",
-      fontSize: 8,
+      fontSize: headFontSize,
       halign: "center",
-      cellPadding: { top: 5, bottom: 5, left: 4, right: 4 },
-      lineWidth: 0,
+      cellPadding: headPadding,
+      lineWidth: headLineWidth,
+      lineColor: headLine,
+      overflow: "linebreak",
     },
     bodyStyles: {
-      fontSize: 8,
-      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      fontSize: bodyFontSize,
+      cellPadding: bodyPadding,
       textColor: FRMT.darkGray,
-      lineColor: FRMT.borderGray,
-      lineWidth: 0.2,
+      fillColor: FRMT.white,
+      lineColor: FRMT.tableBorder,
+      lineWidth: 0.15,
+      overflow: "linebreak",
     },
-    alternateRowStyles: { fillColor: FRMT.lightGray },
+    alternateRowStyles: { fillColor: FRMT.tableStripe },
     columnStyles: columns.reduce(
       (acc, col, i) => {
         const halign = (col.align ?? (i === 0 ? "left" : "center")) as "left" | "center" | "right";
         acc[i] = {
           halign,
-          cellWidth: col.width || "auto",
+          cellWidth: scaledWidths[i] ?? tableWidth / columns.length,
         };
         return acc;
       },
-      {} as Record<number, { halign: "left" | "center" | "right"; cellWidth: number | "auto" }>
+      {} as Record<number, { halign: "left" | "center" | "right"; cellWidth: number }>
     ),
     didParseCell: (hookData) => {
       if (
@@ -264,9 +309,9 @@ function addFrmtTable(
         data[data.length - 1]?._isTotal
       ) {
         hookData.cell.styles.fontStyle = "bold";
-        hookData.cell.styles.fillColor = FRMT.mint;
-        hookData.cell.styles.textColor = FRMT.greenDark;
-        hookData.cell.styles.fontSize = 9;
+        hookData.cell.styles.fillColor = totalFill;
+        hookData.cell.styles.textColor = totalText;
+        hookData.cell.styles.fontSize = bodyFontSize + 0.5;
       }
     },
     didDrawCell: (hookData) => {
@@ -351,6 +396,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     categorieColor,
     generatedBy,
     appVersion,
+    legacyTableStyle = false,
   } = config;
 
   const doc = new jsPDF({ orientation, unit: "mm", format: "a4" }) as DocWithTable;
@@ -369,7 +415,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
   doc.setFillColor(...accentColor);
   doc.rect(margin, cursorY, 3, 16, "F");
 
-  doc.setTextColor(...FRMT.greenDark);
+  doc.setTextColor(...FRMT.darkGray);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text(title.toUpperCase(), margin + 8, cursorY + 10);
@@ -401,7 +447,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
     if (!section.title && !section.content) continue;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.setTextColor(...FRMT.green);
+    doc.setTextColor(...FRMT.darkGray);
     if (section.title) {
       doc.text(section.title.toUpperCase(), margin, cursorY + 4);
       doc.setDrawColor(...FRMT.borderGray);
@@ -420,7 +466,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
   if (config.customBody) {
     cursorY = config.customBody(doc, pW, pH, cursorY) + 8;
   } else if (columns.length && data.length) {
-    addFrmtTable(doc, cursorY, columns, data, margin, pW, pH, logo, config.footerNote, categorieColor);
+    addFrmtTable(doc, cursorY, columns, data, margin, pW, pH, logo, config.footerNote, categorieColor, legacyTableStyle);
     cursorY = (doc.lastAutoTable?.finalY ?? cursorY) + 8;
   }
 
@@ -433,7 +479,7 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
       }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.setTextColor(...FRMT.green);
+      doc.setTextColor(...FRMT.darkGray);
       doc.text(sec.title.toUpperCase(), margin, cursorY + 4);
       doc.setDrawColor(...FRMT.borderGray);
       doc.setLineWidth(0.6);
@@ -451,7 +497,8 @@ export async function generateFRMTPDF(config: PDFConfig): Promise<void> {
         pH,
         logo,
         config.footerNote,
-        categorieColor
+        categorieColor,
+        legacyTableStyle
       );
       cursorY = (doc.lastAutoTable?.finalY ?? cursorY) + 8;
     }

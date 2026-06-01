@@ -64,13 +64,13 @@ export function buildPrintHeaderHtml(
   </header>`;
 }
 
-export function buildPrintTitleBandHtml(titre: string, sousTitre?: string): string {
+export function buildPrintTitleBandHtml(titre: string, sousTitre?: string, legacy = false): string {
   return `
-  <div class="report-title-block">
+  <div class="report-title-block${legacy ? " report-title-block--legacy" : ""}">
     <h1>${esc(titre)}</h1>
     ${sousTitre ? `<p>${esc(sousTitre)}</p>` : ""}
   </div>
-  <div class="gold-line"></div>`;
+  <div class="title-divider"></div>`;
 }
 
 export function buildMetaBoxHtml(rows: { label: string; value: string }[][]): string {
@@ -84,13 +84,13 @@ export function buildMetaBoxHtml(rows: { label: string; value: string }[][]): st
   return `<div class="meta-box"><table><tbody>${body}</tbody></table></div>`;
 }
 
-export function buildKpiGridHtml(kpis: ReportKpi[]): string {
+export function buildKpiGridHtml(kpis: ReportKpi[], legacy = false): string {
   if (!kpis.length) return "";
   const cells = kpis
     .slice(0, 4)
     .map(
       (k) => `
-    <div class="kpi-box">
+    <div class="kpi-box${legacy ? " kpi-box--legacy" : ""}">
       <span class="kpi-label">${esc(k.label)}</span>
       <span class="kpi-value">${esc(k.value)}</span>
       ${k.sub ? `<span class="kpi-sub">${esc(k.sub)}</span>` : ""}
@@ -100,8 +100,9 @@ export function buildKpiGridHtml(kpis: ReportKpi[]): string {
   return `<div class="kpi-row">${cells}</div>`;
 }
 
-export function buildReportTableHtml(section: ReportTableSection): string {
+export function buildReportTableHtml(section: ReportTableSection, legacy = false): string {
   const { title, colonnes, lignes, footer, headerAlign, cellAlign } = section;
+  const tableClass = legacy ? "rt rt-legacy" : "rt";
   const head = colonnes
     .map((h, i) => {
       const align = headerAlign?.[i] ?? (i === 0 ? "left" : "center");
@@ -154,7 +155,7 @@ export function buildReportTableHtml(section: ReportTableSection): string {
     : "";
   return `
   ${title ? `<h2 class="section-title">${esc(title)}</h2>` : ""}
-  <table class="rt">
+  <table class="${tableClass}">
     <thead><tr>${head}</tr></thead>
     <tbody>${body}</tbody>
     ${foot}
@@ -169,16 +170,16 @@ export function buildObservationsHtml(text: string): string {
   </div>`;
 }
 
-export function buildPrintFooterHtml(): string {
+export function buildPrintFooterHtml(legacy = false): string {
   return `
-  <footer class="print-footer">
+  <footer class="print-footer${legacy ? " print-footer--legacy" : ""}">
     <span class="fl">${esc(PRINT_FOOTER_LEFT)}</span>
     <span class="fc">Document officiel — Usage interne</span>
     <span>Page <span class="pnum"></span></span>
   </footer>`;
 }
 
-export function buildInstitutionalPrintHtml(meta: ReportMeta): string {
+export function buildInstitutionalPrintHtml(meta: ReportMeta, legacy = meta.legacyPrintStyle ?? false): string {
   const mainSection: ReportTableSection = {
     title: meta.mainTableTitle ?? "Détail",
     colonnes: meta.colonnes,
@@ -189,9 +190,9 @@ export function buildInstitutionalPrintHtml(meta: ReportMeta): string {
   };
 
   const sectionsHtml = [
-    meta.colonnes.length && meta.lignes.length ? buildReportTableHtml(mainSection) : "",
-    ...(meta.sections ?? []).map((s) => buildReportTableHtml(s)),
-    meta.recap ? buildReportTableHtml(meta.recap) : "",
+    meta.colonnes.length && meta.lignes.length ? buildReportTableHtml(mainSection, legacy) : "",
+    ...(meta.sections ?? []).map((s) => buildReportTableHtml(s, legacy)),
+    meta.recap ? buildReportTableHtml(meta.recap, legacy) : "",
   ].join("");
 
   return `<!DOCTYPE html>
@@ -199,21 +200,25 @@ export function buildInstitutionalPrintHtml(meta: ReportMeta): string {
 <head>
   <meta charset="utf-8"/>
   <title>${esc(meta.titre)}</title>
-  <style>${getPrintReportCss()}</style>
+  <style>${getPrintReportCss({ legacy })}</style>
 </head>
 <body>
   <div class="print-doc">
     ${buildPrintHeaderHtml(meta)}
-    ${buildPrintTitleBandHtml(meta.titre, meta.sousTitre)}
+    ${buildPrintTitleBandHtml(meta.titre, meta.sousTitre, legacy)}
     ${meta.metaRows?.length ? buildMetaBoxHtml(meta.metaRows) : ""}
-    ${meta.kpis?.length ? buildKpiGridHtml(meta.kpis) : ""}
+    ${meta.kpis?.length ? buildKpiGridHtml(meta.kpis, legacy) : ""}
     ${sectionsHtml}
     ${meta.observations ? buildObservationsHtml(meta.observations) : ""}
-    <div class="no-break" style="margin-top:20px">
+    ${
+      legacy
+        ? `<div class="no-break" style="margin-top:20px">
       <p style="font-size:9pt;font-weight:bold;color:#1a5c2a;margin:0">Signature responsable</p>
       <div style="border-top:1px solid #1a5c2a;width:220px;margin-top:28px"></div>
-    </div>
-    ${buildPrintFooterHtml()}
+    </div>`
+        : ""
+    }
+    ${buildPrintFooterHtml(legacy)}
   </div>
   <script>window.onload=function(){window.print()}</script>
 </body>

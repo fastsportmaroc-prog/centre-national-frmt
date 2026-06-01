@@ -205,7 +205,7 @@ function buildBudgetLinesTableHtml(budget: BudgetPrevisionnel, devise: "EUR" | "
     .join("");
 
   return `
-  <table class="rt budget-lines">
+  <table class="rt rt-legacy budget-lines">
     <thead>
       <tr>
         <th class="tl">Désignation</th>
@@ -270,7 +270,7 @@ export function buildBudgetPrevisionnelReportHtml(budget: BudgetPrevisionnel): s
   <meta charset="utf-8"/>
   <title>Budget prévisionnel — ${escapeHtml(budget.tournoi_evenement || budget.objet)}</title>
   <style>
-    ${getPrintReportCss()}
+    ${getPrintReportCss({ legacy: true })}
     body { margin: 0; padding: 0; }
     .budget-doc-title {
       font-size: 12pt;

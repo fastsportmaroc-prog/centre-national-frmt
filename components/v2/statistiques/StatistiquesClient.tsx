@@ -16,7 +16,7 @@ import {
 } from "@/lib/statistiques/statistiques-service";
 import type { StatistiquesBundle, StatistiquesTab } from "@/lib/statistiques/types";
 import { exportCsv } from "@/lib/export/reports";
-import { openPrintReport } from "@/lib/export/reports";
+import { exportPdfReport } from "@/lib/export/reports";
 import { cn } from "@/lib/utils/cn";
 
 const TABS: { id: StatistiquesTab; label: string }[] = [
@@ -96,14 +96,14 @@ function StatistiquesContent() {
 
   async function handleExportPdf() {
     if (!data) return;
-    await openPrintReport({
+    await exportPdfReport(`statistiques-${filters.tab}.pdf`, {
       titre: `Statistiques FRMT — ${filters.tab}`,
       sousTitre: `Saison ${filters.saison} · ${filters.start_date} → ${filters.end_date}`,
       colonnes: ["Indicateur", "Valeur"],
       lignes: data.stages.kpis.map((k) => [k.label, String(k.value)]),
       kpis: data.stages.kpis.map((k) => ({ label: k.label, value: String(k.value), sub: k.sub })),
     });
-    toast("Fenêtre d'impression ouverte", "success");
+    toast("Export PDF lancé", "success");
   }
 
   return (

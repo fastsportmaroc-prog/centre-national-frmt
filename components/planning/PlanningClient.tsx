@@ -39,6 +39,7 @@ export function PlanningClient() {
   >([]);
   const [stageProvisions, setStageProvisions] = useState<StageProvisionSummary[]>([]);
   const [planningRows, setPlanningRows] = useState<PlanningRecord[]>([]);
+  const isDevRuntime = process.env.NODE_ENV !== "production";
 
   const load = useCallback(async () => {
     const [c, r, i, ri, provisions, planning] = await Promise.all([
@@ -66,6 +67,19 @@ export function PlanningClient() {
   }, [load]);
 
   const days = getWeekDays(weekRef);
+  const useDevFallback =
+    isDevRuntime &&
+    courts.length === 0 &&
+    reservations.length === 0 &&
+    reservationsInfra.length === 0 &&
+    planningRows.length === 0;
+  const displayCourts = useDevFallback
+    ? ([
+        { id: "dev-court-1", nom: "Court 1" },
+        { id: "dev-court-2", nom: "Court 2" },
+        { id: "dev-court-3", nom: "Court 3" },
+      ] as Court[])
+    : courts;
 
   function reservationsFor(courtId: string, day: Date) {
     const joueurRes = reservations.filter((r) => {
@@ -209,11 +223,18 @@ export function PlanningClient() {
                 </tr>
               </thead>
               <tbody>
-                {courts.map((court) => (
+                {displayCourts.map((court, courtIndex) => (
                   <tr key={court.id} className="border-b border-border/60 align-top">
                     <td className="px-3 py-3 font-medium">{court.nom}</td>
-                    {days.map((day) => {
+                    {days.map((day, dayIndex) => {
                       const { joueurRes, stageRes } = reservationsFor(court.id, day);
+                      const showMock = useDevFallback && stageRes.length === 0 && joueurRes.length === 0;
+                      const mockLabel =
+                        dayIndex % 2 === 0
+                          ? `Stage U16 (${dayIndex % 3 === 0 ? "matin" : "après-midi"})`
+                          : courtIndex % 2 === 0
+                            ? "Préparation physique"
+                            : "";
                       return (
                         <td key={day.toISOString()} className="px-2 py-2">
                           <div className="space-y-1">
@@ -243,6 +264,12 @@ export function PlanningClient() {
                                 </p>
                               </div>
                             ))}
+                            {showMock && mockLabel && (
+                              <div className="rounded-md border border-frmt-green/30 bg-frmt-green/10 px-2 py-1 text-xs">
+                                <p className="font-medium text-frmt-green">{mockLabel}</p>
+                                <p className="text-muted">Donnée de démonstration (dev)</p>
+                              </div>
+                            )}
                           </div>
                         </td>
                       );
@@ -318,6 +345,11 @@ export function PlanningClient() {
                 </li>
               ))}
             </ul>
+          </Card>
+        )}
+        {useDevFallback && (
+          <Card className="border-frmt-green/20 bg-frmt-green/5 p-4 text-sm text-muted">
+            Aucune séance en base détectée. Un aperçu planning de démonstration est affiché en développement.
           </Card>
         )}
 

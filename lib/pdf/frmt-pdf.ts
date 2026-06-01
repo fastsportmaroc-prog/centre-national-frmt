@@ -51,7 +51,11 @@ export function buildFrmtReportMeta(
   return { titre, colonnes, lignes, ...options };
 }
 
-export async function exportFrmtPdfFromMeta(meta: ReportMeta, filename: string): Promise<void> {
+export async function exportFrmtPdfFromMeta(
+  meta: ReportMeta,
+  filename: string,
+  legacyPrintStyle = meta.legacyPrintStyle ?? false
+): Promise<void> {
   const pdfSections = [
     ...(meta.sections ?? []).map((s) => ({
       heading: s.title ?? "Section",
@@ -100,7 +104,8 @@ export async function exportFrmtPdfFromMeta(meta: ReportMeta, filename: string):
       ),
     })),
     extraSections,
-    showSignataires: true,
+    showSignataires: false,
+    legacyTableStyle: legacyPrintStyle,
     filename: outName,
   });
 }
