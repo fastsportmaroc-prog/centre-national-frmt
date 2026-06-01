@@ -7,6 +7,10 @@ import { getAuthUserFromServer } from "@/lib/auth/server-session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin.server";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import { mutateOmitMissingColumns } from "@/lib/supabase/mutate-omit-missing-columns";
+import {
+  buildStageProgrammePatchPayload,
+  buildStageProgrammeWritePayload,
+} from "@/lib/supabase/stage-programme-payload";
 import type {
   DemandeBilletAvionV2,
   PlanningSeanceV2,
@@ -26,36 +30,30 @@ export async function createStageServer(
   data: StageProgrammeInputV2
 ): Promise<{ stage: StageProgrammeV2 | null; error?: string }> {
   const supabase = await getSupabaseServerDataClient();
-  const payload = {
-    source: data.source ?? "FRMT",
-    categorie: data.categorie,
-    stage_action: data.stage_action,
-    date_debut: data.date_debut,
-    date_fin: data.date_fin,
-    nombre_joueurs: data.nombre_joueurs,
-    nombre_encadrants: data.nombre_encadrants,
-    hebergement: data.hebergement ?? false,
-    chambres: data.chambres ?? 0,
-    lieu: data.lieu,
-    notes: data.notes,
-    statut: data.statut ?? "prevu",
-    terrains: data.terrains ?? false,
-    restauration: data.restauration ?? false,
-    transport_avion: data.transport_avion ?? false,
-    kinesitherapie: data.kinesitherapie ?? false,
+  const payload = buildStageProgrammeWritePayload({
+    ...data,
     infrastructure_ids: [],
     entraineur_ids: [],
     materiel_assignations: [],
     budget_prevu: null,
     budget_reel: null,
-  };
-  const { data: row, error } = await supabase.from(STAGES).insert(payload).select().single();
-  if (error) {
-    const msg = error.message;
-    if (msg.includes("row-level security")) return { stage: null, error: rlsHint(STAGES) };
-    return { stage: null, error: msg };
-  }
-  return { stage: row as StageProgrammeV2 };
+  });
+
+  let inserted: StageProgrammeV2 | null = null;
+  const result = await mutateOmitMissingColumns(payload, async (p) => {
+    const { data: row, error } = await supabase.from(STAGES).insert(p).select().single();
+    if (error) {
+      const msg = error.message;
+      if (msg.includes("row-level security")) return { ok: false, error: rlsHint(STAGES) };
+      return { ok: false, error: msg };
+    }
+    inserted = row as StageProgrammeV2;
+    return { ok: true };
+  });
+
+  if (!result.ok) return { stage: null, error: result.error };
+  if (!inserted) return { stage: null, error: "Stage créé mais réponse vide." };
+  return { stage: inserted };
 }
 
 async function stageWriteClientForUser() {
@@ -82,8 +80,11 @@ export async function updateStageServer(
   const { supabase, error: authError } = await stageWriteClientForUser();
   if (authError || !supabase) return { ok: false, error: authError ?? "Client Supabase indisponible." };
 
-  const payload = { ...data, updated_at: new Date().toISOString() };
-  return mutateOmitMissingColumns(payload as Record<string, unknown>, async (p) => {
+  const payload = {
+    ...buildStageProgrammePatchPayload(data),
+    updated_at: new Date().toISOString(),
+  };
+  return mutateOmitMissingColumns(payload, async (p) => {
     const { error } = await supabase.from(STAGES).update(p).eq("id", id);
     if (error) {
       const msg = error.message;

@@ -5,6 +5,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSafeSupabaseClient } from "@/lib/supabase/client";
 import { mutateOmitMissingColumns } from "@/lib/supabase/mutate-omit-missing-columns";
+import {
+  buildStageProgrammePatchPayload,
+  buildStageProgrammeWritePayload,
+} from "@/lib/supabase/stage-programme-payload";
 import type {
   DemandeBilletAvionV2,
   EntraineurV2,
@@ -252,44 +256,51 @@ export async function getStageById(id: string): Promise<StageProgrammeV2 | null>
 }
 
 export async function createStage(data: StageProgrammeInputV2): Promise<{ stage: StageProgrammeV2 | null; error?: string }> {
-  const payload = {
-    source: data.source ?? "FRMT",
-    categorie: data.categorie,
-    stage_action: data.stage_action,
-    date_debut: data.date_debut,
-    date_fin: data.date_fin,
-    nombre_joueurs: data.nombre_joueurs,
-    nombre_encadrants: data.nombre_encadrants,
-    hebergement: data.hebergement ?? false,
-    chambres: data.chambres ?? 0,
-    lieu: data.lieu,
-    notes: data.notes,
-    statut: data.statut ?? "prevu",
-    terrains: data.terrains ?? false,
-    restauration: data.restauration ?? false,
-    transport_avion: data.transport_avion ?? false,
-    kinesitherapie: data.kinesitherapie ?? false,
+  const c = clientOrNull();
+  if (!c) return { stage: null, error: "Client Supabase indisponible." };
+
+  const payload = buildStageProgrammeWritePayload({
+    ...data,
     infrastructure_ids: [],
     entraineur_ids: [],
     materiel_assignations: [],
     budget_prevu: null,
     budget_reel: null,
-  };
-  const { data: row, error } = await runInsert<StageProgrammeV2>(STAGES, (c) =>
-    c.from(STAGES).insert(payload).select().single()
-  );
-  if (error?.includes("row-level security")) {
-    return {
-      stage: null,
-      error:
-        "Création refusée (RLS). Connectez-vous puis exécutez lib/db/migrations/stages_programme_rls.sql dans Supabase.",
-    };
-  }
-  return { stage: row, error };
+  });
+
+  let inserted: StageProgrammeV2 | null = null;
+  const result = await mutateOmitMissingColumns(payload, async (p) => {
+    const { data: row, error } = await c.from(STAGES).insert(p).select().single();
+    if (error) {
+      if (error.message.includes("row-level security")) {
+        return {
+          ok: false,
+          error:
+            "Création refusée (RLS). Connectez-vous puis exécutez lib/db/migrations/stages_programme_rls.sql dans Supabase.",
+        };
+      }
+      return { ok: false, error: error.message };
+    }
+    inserted = row as StageProgrammeV2;
+    return { ok: true };
+  });
+
+  if (!result.ok) return { stage: null, error: result.error };
+  return { stage: inserted, error: undefined };
 }
 
 export async function updateStage(id: string, data: Partial<StageProgrammeInputV2>): Promise<{ ok: boolean; error?: string }> {
-  return runMutate(STAGES, (c) => c.from(STAGES).update({ ...data, updated_at: new Date().toISOString() }).eq("id", id));
+  const c = clientOrNull();
+  if (!c) return { ok: false, error: "Client Supabase indisponible." };
+  const payload = {
+    ...buildStageProgrammePatchPayload(data),
+    updated_at: new Date().toISOString(),
+  };
+  return mutateOmitMissingColumns(payload, async (p) => {
+    const { error } = await c.from(STAGES).update(p).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  });
 }
 
 export async function deleteStage(id: string): Promise<{ ok: boolean; error?: string }> {

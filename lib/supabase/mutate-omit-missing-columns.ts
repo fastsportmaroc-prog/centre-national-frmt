@@ -2,8 +2,17 @@
 
 export function parseMissingColumn(error?: string): string | null {
   if (!error) return null;
-  const m = error.match(/could not find the '([^']+)' column/i);
-  return m?.[1] ?? null;
+  const patterns = [
+    /could not find the '([^']+)' column/i,
+    /'([^']+)' column of '[^']+' in the schema cache/i,
+    /column "([^"]+)" of relation/i,
+    /column '([^']+)' does not exist/i,
+  ];
+  for (const re of patterns) {
+    const m = error.match(re);
+    if (m?.[1]) return m[1];
+  }
+  return null;
 }
 
 export async function mutateOmitMissingColumns(

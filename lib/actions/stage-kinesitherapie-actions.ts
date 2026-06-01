@@ -6,11 +6,14 @@ import {
   getKinesitherapieSeancesForJoueurs,
   getKinesitherapieStageParticipants,
   joueurIdsFromSeancesOnPeriod,
-  replaceKinesitherapieStageParticipants,
-  upsertKinesitherapieStage,
 } from "@/lib/data/kinesitherapie";
+import {
+  replaceKinesitherapieStageParticipantsServer,
+  upsertKinesitherapieStageServer,
+} from "@/lib/data/kinesitherapie.server";
 import { revalidateStageLinkedPaths } from "@/lib/server/revalidate-stage-paths";
-import { getStageById, updateStage } from "@/lib/supabase/queries";
+import { getStageById } from "@/lib/supabase/queries";
+import { updateStageServer } from "@/lib/supabase/stage-write.server";
 import type { JoueurV2, KinesitherapieStageV2 } from "@/lib/types/v2";
 
 export type StageKinesitherapieBundle = {
@@ -61,7 +64,7 @@ export async function saveStageKinesitherapieAction(input: {
   const { stageId, actif, dateDebut, dateFin, remarques, selectedJoueurIds, suggestedJoueurIds } =
     input;
 
-  const stageUp = await updateStage(stageId, { kinesitherapie: actif });
+  const stageUp = await updateStageServer(stageId, { kinesitherapie: actif });
   if (!stageUp.ok) {
     if (/column|schema cache|kinesitherapie/i.test(stageUp.error ?? "")) {
       return {
@@ -74,7 +77,7 @@ export async function saveStageKinesitherapieAction(input: {
   }
 
   if (!actif) {
-    await upsertKinesitherapieStage({
+    const off = await upsertKinesitherapieStageServer({
       stage_id: stageId,
       actif: false,
       date_debut: dateDebut || null,
@@ -82,13 +85,16 @@ export async function saveStageKinesitherapieAction(input: {
       remarques: remarques || null,
       statut: "annule",
     });
-    await replaceKinesitherapieStageParticipants(stageId, []);
+    if (!off.ok && !/relation|schema cache|does not exist/i.test(off.error ?? "")) {
+      return { ok: false, error: off.error };
+    }
+    await replaceKinesitherapieStageParticipantsServer(stageId, []);
     revalidateStageLinkedPaths(stageId);
     revalidatePath("/v2/kinesitherapie");
     return { ok: true };
   }
 
-  const { error: upErr } = await upsertKinesitherapieStage({
+  const up = await upsertKinesitherapieStageServer({
     stage_id: stageId,
     actif: true,
     date_debut: dateDebut || null,
@@ -96,7 +102,7 @@ export async function saveStageKinesitherapieAction(input: {
     remarques: remarques || null,
     statut: "prevu",
   });
-  if (upErr) return { ok: false, error: upErr };
+  if (!up.ok) return { ok: false, error: up.error };
 
   const suggestedSet = new Set(suggestedJoueurIds);
   const rows = selectedJoueurIds.map((personne_id) => ({
@@ -105,7 +111,7 @@ export async function saveStageKinesitherapieAction(input: {
     auto_from_seance: suggestedSet.has(personne_id),
   }));
 
-  const partRes = await replaceKinesitherapieStageParticipants(stageId, rows);
+  const partRes = await replaceKinesitherapieStageParticipantsServer(stageId, rows);
   if (!partRes.ok) return partRes;
 
   revalidateStageLinkedPaths(stageId);
