@@ -43,12 +43,13 @@ where a.id < b.id
 create index if not exists idx_res_infra_lookup
   on public.reservations_infrastructure (infrastructure_id, date_debut);
 
-create unique index if not exists unique_res_infra_stage_day_creneau
+-- Pas de cast ::date ni coalesce (non IMMUTABLE) — date_debut + creneau identifient le créneau.
+create unique index if not exists unique_res_infra_stage_slot
   on public.reservations_infrastructure (
     stage_id,
     infrastructure_id,
-    (date_debut::date),
-    coalesce(creneau, '')
+    creneau,
+    date_debut
   )
   where stage_id is not null;
 
