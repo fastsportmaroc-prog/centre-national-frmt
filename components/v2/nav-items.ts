@@ -14,7 +14,6 @@ import {
   Wrench,
   Wallet,
   FileText,
-  History,
   Settings,
   Plane,
   ClipboardCheck,
@@ -96,7 +95,6 @@ export const v2NavSections: V2NavSection[] = [
       { href: `${V2_PREFIX}/budget`, label: "Budget administratif", icon: Wallet },
       { href: `${V2_PREFIX}/rapports`, label: "Rapports", icon: FileText, badgeKey: "rapports" },
       { href: `${V2_PREFIX}/statistiques`, label: "Statistiques", icon: BarChart3 },
-      { href: `${V2_PREFIX}/historique`, label: "Historique", icon: History },
     ],
   },
   {

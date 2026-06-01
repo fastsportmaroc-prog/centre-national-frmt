@@ -82,7 +82,7 @@ export function HistoriqueV2Client() {
     <ProtectedRoute allowedRoles={["admin", "direction"]}>
       <V2PageHeader
         title="Historique"
-        description="Journal d'audit permanent — aucune suppression possible"
+        description="Nouveau départ — historique remis à zéro"
         actions={<ExportPdfButton onExport={exportPdf} label="Exporter PDF" />}
       />
       <main className="space-y-4 p-4 sm:p-6">
@@ -109,42 +109,48 @@ export function HistoriqueV2Client() {
           />
         </Card>
 
-        <div className="relative space-y-0 border-l-2 border-frmt-green/40 pl-6">
-          {filtered.map((h) => {
-            const ext = h;
-            const when = format(new Date(h.created_at), "d MMM yyyy HH:mm", { locale: fr });
-            return (
-              <div key={h.id} className="relative pb-6">
-                <span className="absolute -left-[31px] top-1 flex h-4 w-4 rounded-full bg-frmt-green" />
-                <Card className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold">
-                        {actionIcon(h.action)} {h.action.replace(/_/g, " ")}
-                      </p>
-                      <p className="text-sm text-muted">{h.description ?? h.entite_label}</p>
+        {filtered.length === 0 ? (
+          <Card className="p-6 text-sm text-muted">
+            Aucun événement pour l'instant. Les nouvelles actions apparaîtront ici automatiquement.
+          </Card>
+        ) : (
+          <div className="relative space-y-0 border-l-2 border-frmt-green/40 pl-6">
+            {filtered.map((h) => {
+              const ext = h;
+              const when = format(new Date(h.created_at), "d MMM yyyy HH:mm", { locale: fr });
+              return (
+                <div key={h.id} className="relative pb-6">
+                  <span className="absolute -left-[31px] top-1 flex h-4 w-4 rounded-full bg-frmt-green" />
+                  <Card className="p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">
+                          {actionIcon(h.action)} {h.action.replace(/_/g, " ")}
+                        </p>
+                        <p className="text-sm text-muted">{h.description ?? h.entite_label}</p>
+                      </div>
+                      <div className="text-right text-xs text-muted">
+                        <p>{when}</p>
+                        <p>
+                          {ext.user_nom ?? h.utilisateur_nom} · {ext.user_role ?? h.utilisateur_role}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right text-xs text-muted">
-                      <p>{when}</p>
-                      <p>
-                        {ext.user_nom ?? h.utilisateur_nom} · {ext.user_role ?? h.utilisateur_role}
-                      </p>
-                    </div>
-                  </div>
-                  {ext.diff && Object.keys(ext.diff).length > 0 && (
-                    <button
-                      type="button"
-                      className="mt-2 text-xs text-frmt-green hover:underline"
-                      onClick={() => setDiffRow(h)}
-                    >
-                      Voir diff
-                    </button>
-                  )}
-                </Card>
-              </div>
-            );
-          })}
-        </div>
+                    {ext.diff && Object.keys(ext.diff).length > 0 && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs text-frmt-green hover:underline"
+                        onClick={() => setDiffRow(h)}
+                      >
+                        Voir diff
+                      </button>
+                    )}
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
       <Modal open={!!diffRow} onClose={() => setDiffRow(null)} title="Détail des modifications">
