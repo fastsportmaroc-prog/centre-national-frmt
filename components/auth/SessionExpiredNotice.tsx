@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 
 const SESSION_MESSAGES: Record<string, string> = {
   session_expired: "Votre session a expiré. Veuillez vous reconnecter.",
@@ -14,11 +15,9 @@ export function SessionExpiredNotice() {
   if (!message) return null;
 
   return (
-    <div
-      className="mx-6 mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
-      role="status"
-    >
-      {message}
+    <div className="login-alert login-alert-warn mx-7 mt-5 flex items-start gap-2" role="status">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      <span>{message}</span>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ArrowRight, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { initialAuthState } from "@/lib/auth/form-state";
@@ -20,14 +21,8 @@ export function LoginForm({ projectRef, configured }: Props) {
   const redirect = searchParams.get("redirect") ?? "/v2/dashboard";
   const [mode, setMode] = useState<"login" | "signup">("login");
 
-  const [loginState, loginFormAction, loginPending] = useActionState(
-    loginAction,
-    initialAuthState
-  );
-  const [signupState, signupFormAction, signupPending] = useActionState(
-    signupAction,
-    initialAuthState
-  );
+  const [loginState, loginFormAction, loginPending] = useActionState(loginAction, initialAuthState);
+  const [signupState, signupFormAction, signupPending] = useActionState(signupAction, initialAuthState);
 
   const state = mode === "login" ? loginState : signupState;
   const pending = mode === "login" ? loginPending : signupPending;
@@ -35,111 +30,130 @@ export function LoginForm({ projectRef, configured }: Props) {
 
   if (!configured) {
     return (
-      <div className="px-6 py-8 text-center text-sm">
-        <p className="font-medium text-red-400">Connexion indisponible</p>
-        <p className="mt-2 text-muted">
+      <div className="px-8 py-12 text-center">
+        <Lock className="mx-auto mb-3 h-8 w-8 text-red-400/80" />
+        <p className="font-semibold text-foreground">Connexion indisponible</p>
+        <p className="mt-2 text-sm text-muted">
           {isProd
-            ? "Le service d'authentification n'est pas disponible. Contactez l'administrateur FRMT."
-            : "Créez .env.local avec NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY (clé anon eyJ…, pas seulement sb_publishable)."}
+            ? "Contactez l'administrateur du Centre National."
+            : "Configurez Supabase dans .env.local."}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="px-6 pb-6 pt-2">
+    <div className="px-7 pb-7 pt-5">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground">
+          {mode === "login" ? "Connexion" : "Nouveau compte"}
+        </h2>
+        <p className="mt-0.5 text-xs text-muted">
+          {mode === "login"
+            ? "Identifiants professionnels @frmt.ma"
+            : "Demande d'accès au portail"}
+        </p>
+      </div>
+
+      <div className="mb-6 flex rounded-lg bg-black/20 p-1">
+        {(["login", "signup"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setMode(tab)}
+            className={cn(
+              "flex-1 rounded-md py-2 text-sm font-medium transition-all",
+              mode === tab
+                ? "bg-white/10 text-white shadow-sm"
+                : "text-white/45 hover:text-white/70"
+            )}
+          >
+            {tab === "login" ? "Se connecter" : "S'inscrire"}
+          </button>
+        ))}
+      </div>
+
       {!isProd && projectRef && (
-        <p className="mb-4 text-center text-[11px] text-muted">
-          Projet Supabase (dev) : <span className="text-frmt-green">{projectRef}</span>
+        <p className="mb-4 text-center text-[10px] uppercase tracking-wider text-white/30">
+          dev · {projectRef}
         </p>
       )}
-
-      <div className="mb-6 flex rounded-lg border border-border bg-surface-elevated/50 p-1">
-        <button
-          type="button"
-          onClick={() => setMode("login")}
-          className={cn(
-            "flex-1 rounded-md py-2.5 text-sm font-medium transition-colors",
-            mode === "login"
-              ? "bg-frmt-green text-white shadow-sm"
-              : "text-muted hover:text-foreground"
-          )}
-        >
-          Connexion
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("signup")}
-          className={cn(
-            "flex-1 rounded-md py-2.5 text-sm font-medium transition-colors",
-            mode === "signup"
-              ? "bg-frmt-green text-white shadow-sm"
-              : "text-muted hover:text-foreground"
-          )}
-        >
-          Créer un compte
-        </button>
-      </div>
 
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="redirect" value={redirect} />
 
         {mode === "signup" && (
-          <div>
-            <Label htmlFor="fullName">Nom complet</Label>
-            <Input id="fullName" name="fullName" placeholder="Prénom Nom" autoComplete="name" />
+          <div className="login-field">
+            <Label htmlFor="fullName" className="login-label-pro">
+              Nom complet
+            </Label>
+            <div className="login-input-wrap">
+              <User className="login-input-icon h-4 w-4" aria-hidden />
+              <Input id="fullName" name="fullName" placeholder="Prénom Nom" autoComplete="name" className="login-input-pro pl-10" />
+            </div>
           </div>
         )}
 
-        <div>
-          <Label htmlFor="email">Adresse email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="nom@frmt.ma"
-          />
+        <div className="login-field">
+          <Label htmlFor="email" className="login-label-pro">
+            Email
+          </Label>
+          <div className="login-input-wrap">
+            <Mail className="login-input-icon h-4 w-4" aria-hidden />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="nom@frmt.ma"
+              className="login-input-pro pl-10"
+            />
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="password">Mot de passe</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={6}
-            autoComplete={mode === "login" ? "current-password" : "new-password"
-            }
-            placeholder="••••••••"
-          />
+        <div className="login-field">
+          <Label htmlFor="password" className="login-label-pro">
+            Mot de passe
+          </Label>
+          <div className="login-input-wrap">
+            <Lock className="login-input-icon h-4 w-4" aria-hidden />
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={6}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              placeholder="••••••••"
+              className="login-input-pro pl-10"
+            />
+          </div>
         </div>
 
         {state.error && (
-          <p
-            className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-red-300"
-            role="alert"
-          >
+          <div className="login-alert login-alert-error" role="alert">
             {state.error}
-          </p>
+          </div>
         )}
         {state.message && (
-          <p
-            className="rounded-lg border border-frmt-green/40 bg-frmt-green/10 px-3 py-2.5 text-sm text-frmt-green"
-            role="status"
-          >
+          <div className="login-alert login-alert-success" role="status">
             {state.message}
-          </p>
+          </div>
         )}
 
-        <Button type="submit" className="h-11 w-full text-base" disabled={pending}>
-          {pending
-            ? "Connexion en cours…"
-            : mode === "login"
-              ? "Se connecter"
-              : "Créer le compte"}
+        <Button type="submit" className="login-submit-pro group h-12 w-full" disabled={pending}>
+          {pending ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="login-spinner" aria-hidden />
+              Connexion…
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              {mode === "login" ? "Accéder à la plateforme" : "Créer le compte"}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          )}
         </Button>
       </form>
     </div>
