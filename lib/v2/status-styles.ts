@@ -3,7 +3,7 @@ export type StatutVisuel = "prevu" | "confirme" | "en_cours" | "termine" | "annu
 export function statutBadgeClass(statut: StatutVisuel): string {
   const s = (statut ?? "prevu").toLowerCase();
   if (s.includes("confirm")) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
-  if (s.includes("cours")) return "bg-blue-500/20 text-blue-400 border-blue-500/40";
+  if (s.includes("cours")) return "bg-blue-950/50 text-blue-100 border-blue-400/45 font-medium";
   if (s.includes("termin")) return "bg-teal-500/20 text-teal-400 border-teal-500/40";
   if (s.includes("annul") || s.includes("refus")) return "bg-red-500/20 text-red-400 border-red-500/40";
   if (s.includes("rembours")) return "bg-orange-500/20 text-orange-400 border-orange-500/40";

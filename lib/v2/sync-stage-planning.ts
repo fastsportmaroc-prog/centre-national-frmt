@@ -2,8 +2,10 @@ import {
   getReservationsStageTerrains,
   parseTerrainsBesoinsFromNotes,
 } from "@/lib/data/terrains";
-import { createSeance, getPlanningByStage, getStages } from "@/lib/supabase/queries";
+import { createSeance, deleteSeance, getPlanningByStage, getStages } from "@/lib/supabase/queries";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
+
+export const PLANNING_AUTO_TERRAIN_NOTE = "[AUTO_TERRAIN]";
 
 type PlanningSlot = {
   date: string;
@@ -73,27 +75,27 @@ function templateSlotsFromCode(code: string | null): TemplateSlot[] {
   return [{ heure_debut: "09:00", heure_fin: "13:00" }];
 }
 
-async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<PlanningSlot[]> {
+/** Créneaux planning issus des réservations terrain (source pour remplacement idempotent). */
+export async function collectTerrainPlanningSlots(
+  stage: Pick<StagePlanningSyncInput, "stage_id" | "date_debut" | "date_fin" | "notes">
+): Promise<PlanningSlot[]> {
   const slots: PlanningSlot[] = [];
   const seen = new Set<string>();
-
-  const push = (slot: PlanningSlot) => {
-    const key = slotKey(slot);
-    if (seen.has(key)) return;
-    seen.add(key);
-    slots.push(slot);
-  };
 
   const reservations = await getReservationsStageTerrains(stage.stage_id).catch(() => []);
   for (const row of reservations) {
     const { debut, fin } = creneauHours(String(row.creneau ?? "journee"));
-    push({
+    const slot: PlanningSlot = {
       date: String(row.date_debut).slice(0, 10),
       infrastructure_id: (row.terrain_id as string | undefined) ?? null,
       heure_debut: debut,
       heure_fin: fin,
       surface: (row.terrain_surface as string | undefined) ?? null,
-    });
+    };
+    const key = slotKey(slot);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    slots.push(slot);
   }
 
   if (slots.length === 0) {
@@ -111,30 +113,19 @@ async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<Plan
         for (const jour of jours) {
           for (const creneau of besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const)) {
             const { debut, fin } = creneauHours(creneau);
-            push({
+            const slot: PlanningSlot = {
               date: jour,
               infrastructure_id: besoin.terrainId,
               heure_debut: debut,
               heure_fin: fin,
               surface: besoin.terrainSurface ?? null,
-            });
+            };
+            const key = slotKey(slot);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            slots.push(slot);
           }
         }
-      }
-    }
-  }
-
-  if (slots.length === 0) {
-    const customSlots = parsePlanningSlots(stage.notes);
-    const templateSlots = customSlots ?? templateSlotsFromCode(parsePlanningTemplateCode(stage.notes));
-    for (const day of eachDayOfStage(stage.date_debut, stage.date_fin)) {
-      for (const slot of templateSlots) {
-        push({
-          date: day,
-          infrastructure_id: null,
-          heure_debut: slot.heure_debut,
-          heure_fin: slot.heure_fin,
-        });
       }
     }
   }
@@ -142,19 +133,46 @@ async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<Plan
   return slots;
 }
 
-/** Aligne la table `planning` sur les réservations terrain / métadonnées du stage. */
-export async function syncStagePlanning(stage: StagePlanningSyncInput): Promise<number> {
-  const existing = await getPlanningByStage(stage.stage_id);
-  const existingKeys = new Set(
-    existing.map(
-      (p) =>
-        `${p.date}|${p.infrastructure_id ?? ""}|${normalizeTime(p.heure_debut)}|${normalizeTime(p.heure_fin)}`
-    )
-  );
+async function collectTemplatePlanningSlots(stage: StagePlanningSyncInput): Promise<PlanningSlot[]> {
+  const slots: PlanningSlot[] = [];
+  const seen = new Set<string>();
+  const customSlots = parsePlanningSlots(stage.notes);
+  const templateSlots = customSlots ?? templateSlotsFromCode(parsePlanningTemplateCode(stage.notes));
+  for (const day of eachDayOfStage(stage.date_debut, stage.date_fin)) {
+    for (const slot of templateSlots) {
+      const row: PlanningSlot = {
+        date: day,
+        infrastructure_id: null,
+        heure_debut: slot.heure_debut,
+        heure_fin: slot.heure_fin,
+      };
+      const key = slotKey(row);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      slots.push(row);
+    }
+  }
+  return slots;
+}
 
-  const slots = await collectPlanningSlots(stage);
+async function removeTerrainPlanningSlots(stageId: string, terrainSlotKeys: Set<string>): Promise<number> {
+  const existing = await getPlanningByStage(stageId);
+  let removed = 0;
+  for (const row of existing) {
+    const key = `${row.date}|${row.infrastructure_id ?? ""}|${normalizeTime(row.heure_debut)}|${normalizeTime(row.heure_fin)}`;
+    if (!terrainSlotKeys.has(key)) continue;
+    const res = await deleteSeance(row.id);
+    if (res.ok) removed++;
+  }
+  return removed;
+}
+
+async function insertPlanningSlots(
+  stage: StagePlanningSyncInput,
+  slots: PlanningSlot[],
+  existingKeys: Set<string>
+): Promise<number> {
   let created = 0;
-
   for (const slot of slots) {
     if (existingKeys.has(slotKey(slot))) continue;
     const { data, error } = await createSeance({
@@ -173,8 +191,46 @@ export async function syncStagePlanning(stage: StagePlanningSyncInput): Promise<
       existingKeys.add(slotKey(slot));
     }
   }
-
   return created;
+}
+
+/** Remplace les séances planning liées aux réservations terrain (évite les doublons). */
+export async function syncStagePlanningWithTerrainReservations(
+  stage: StagePlanningSyncInput
+): Promise<number> {
+  const terrainSlots = await collectTerrainPlanningSlots(stage);
+  if (terrainSlots.length === 0) return 0;
+
+  const terrainKeys = new Set(terrainSlots.map(slotKey));
+  await removeTerrainPlanningSlots(stage.stage_id, terrainKeys);
+
+  const existing = await getPlanningByStage(stage.stage_id);
+  const existingKeys = new Set(
+    existing.map(
+      (p) =>
+        `${p.date}|${p.infrastructure_id ?? ""}|${normalizeTime(p.heure_debut)}|${normalizeTime(p.heure_fin)}`
+    )
+  );
+
+  return insertPlanningSlots(stage, terrainSlots, existingKeys);
+}
+
+/** Aligne la table `planning` sur les réservations terrain / métadonnées du stage. */
+export async function syncStagePlanning(stage: StagePlanningSyncInput): Promise<number> {
+  const terrainSlots = await collectTerrainPlanningSlots(stage);
+  if (terrainSlots.length > 0) {
+    return syncStagePlanningWithTerrainReservations(stage);
+  }
+
+  const existing = await getPlanningByStage(stage.stage_id);
+  const existingKeys = new Set(
+    existing.map(
+      (p) =>
+        `${p.date}|${p.infrastructure_id ?? ""}|${normalizeTime(p.heure_debut)}|${normalizeTime(p.heure_fin)}`
+    )
+  );
+  const templateSlots = await collectTemplatePlanningSlots(stage);
+  return insertPlanningSlots(stage, templateSlots, existingKeys);
 }
 
 /** Synchronise le planning pour tous les stages (backfill + mise à jour). */

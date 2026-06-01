@@ -604,10 +604,11 @@ function ReservationCard({
       )}
     >
       {conflict && (
-        <p className="mb-2 text-xs font-semibold text-red-500">
-          ⚠️ CONFLIT DÉTECTÉ
-          {conflictLabel ? ` — ${conflictLabel}` : ""}
-        </p>
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-[#7b1a1a] bg-[#2d0d0d] px-3 py-1.5 text-[11px] font-medium text-[#fc8181]">
+          <span aria-hidden>⚠</span>
+          Conflit réel — même terrain, même horaire, stages différents
+          {conflictLabel ? ` (${conflictLabel})` : ""}
+        </div>
       )}
       <p className="text-sm font-medium capitalize">📅 {formatDateHeader(r.date_debut)}</p>
       <hr className="my-2 border-border/60" />

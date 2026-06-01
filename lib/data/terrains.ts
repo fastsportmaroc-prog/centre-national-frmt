@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { infraRowToConflictRow } from "@/lib/terrain/conflict-adapters";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
+import { hasConflict } from "@/services/conflictDetector";
+import { getCreneauRange } from "@/services/terrain-constants";
 
 /** Écritures serveur (session authentifiée) ; lectures client conservent le client navigateur. */
 async function getTerrainsSupabaseClient(): Promise<SupabaseClient> {
@@ -487,26 +490,113 @@ export const getReservationsStageTerrains = async (stageId: string) => {
   return dedupeStageTerrainRows(await buildLegacyCalendrierRows({ stageId }));
 };
 
-/* ─── VÉRIFIER CONFLITS ─── */
+function isCancelledReservationStatut(statut: string | null | undefined): boolean {
+  const s = (statut ?? "").toLowerCase();
+  return s.includes("annul");
+}
+
+async function fetchInfraConflictCandidates(
+  supabase: SupabaseClient,
+  infrastructureId: string,
+  jour: string,
+  excludeStageId?: string
+) {
+  const { data } = await supabase
+    .from("reservations_infrastructure")
+    .select("id, stage_id, infrastructure_id, date_debut, creneau, heure_debut, heure_fin, statut")
+    .eq("infrastructure_id", infrastructureId)
+    .gte("date_debut", `${jour}T00:00:00`)
+    .lte("date_debut", `${jour}T23:59:59`);
+  return (data ?? [])
+    .map((row) => infraRowToConflictRow(row))
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    .filter((row) => !excludeStageId || row.stage_id !== excludeStageId);
+}
+
+async function hasInfraTimeConflict(
+  supabase: SupabaseClient,
+  params: {
+    infrastructure_id: string;
+    stage_id: string;
+    jour: string;
+    creneau: Creneau;
+    heure_debut: string;
+    heure_fin: string;
+  }
+): Promise<boolean> {
+  const others = await fetchInfraConflictCandidates(
+    supabase,
+    params.infrastructure_id,
+    params.jour,
+    params.stage_id
+  );
+  return hasConflict(
+    {
+      stage_id: params.stage_id,
+      terrain_id: params.infrastructure_id,
+      date: params.jour,
+      creneau: params.creneau,
+      heure_debut: params.heure_debut,
+      heure_fin: params.heure_fin,
+    },
+    others
+  );
+}
+
+/* ─── VÉRIFIER CONFLITS (créneaux horaires, hors même stage) ─── */
 export const verifierConflits = async (
   terrainId: string,
   dateDebut: string,
-  dateFin: string,
+  _dateFin: string,
   creneau: Creneau,
   stageIdExclu?: string
 ): Promise<boolean> => {
   const supabase = await getTerrainsSupabaseClient();
-  let q = supabase
+  const jour = dateDebut.slice(0, 10);
+  const range = getCreneauRange(creneau);
+  const infraId = terrainId;
+
+  const infraConflict = await hasInfraTimeConflict(supabase, {
+    infrastructure_id: infraId,
+    stage_id: stageIdExclu ?? "__check__",
+    jour,
+    creneau,
+    heure_debut: range.start,
+    heure_fin: range.end,
+  });
+  if (infraConflict) return true;
+
+  const { data: terrainRows } = await supabase
     .from("terrain_reservations")
-    .select("id")
+    .select("id, stage_id, terrain_id, date_debut, creneau, heure_debut, heure_fin, statut")
     .eq("terrain_id", terrainId)
-    .eq("creneau", creneau)
-    .eq("statut", "confirme")
-    .lte("date_debut", dateFin)
-    .gte("date_fin", dateDebut);
-  if (stageIdExclu) q = q.neq("stage_id", stageIdExclu);
-  const { data } = await q;
-  return (data?.length ?? 0) > 0;
+    .eq("date_debut", jour)
+    .eq("statut", "confirme");
+
+  const mapped = (terrainRows ?? [])
+    .filter((r) => !isCancelledReservationStatut(r.statut))
+    .filter((r) => !stageIdExclu || r.stage_id !== stageIdExclu)
+    .map((r) => ({
+      id: r.id as string,
+      stage_id: (r.stage_id as string | null) ?? null,
+      terrain_id: r.terrain_id as string,
+      date: jour,
+      creneau: String(r.creneau ?? creneau),
+      heure_debut: r.heure_debut ? String(r.heure_debut).slice(0, 5) : range.start,
+      heure_fin: r.heure_fin ? String(r.heure_fin).slice(0, 5) : range.end,
+    }));
+
+  return hasConflict(
+    {
+      stage_id: stageIdExclu ?? "__check__",
+      terrain_id: terrainId,
+      date: jour,
+      creneau,
+      heure_debut: range.start,
+      heure_fin: range.end,
+    },
+    mapped
+  );
 };
 
 /* ─── RÉSERVER TERRAINS DEPUIS UN STAGE ─── */
@@ -725,42 +815,29 @@ export const reserverTerrains = async (stage: any): Promise<{
             `[MODE:${besoin.mode}]` +
             (besoin.mode === "dispatch" ? `[DISPATCH_N:${dispatchCountValue}]` : "");
           const notesPayload = [besoin.notes?.trim(), encodedMeta].filter(Boolean).join(" ").trim();
-          // 1) Vérifier uniquement les conflits avec d'AUTRES stages
-          let overlaps: any[] = [];
-          let overlapErr: any = null;
-          const overlapWithCreneau = await supabase
-            .from("reservations_infrastructure")
-            .select("id, stage_id, notes")
-            .eq("infrastructure_id", terrainIdToUse)
-            .eq("creneau", creneauLegacy(creneau))
-            .in("statut", ["confirmee", "confirme", "confirmé", "confirmee", "confirmer"])
-            .lte("date_debut", dateFin)
-            .gte("date_fin", dateDebut)
-            .neq("stage_id", stage.id ?? "");
-          if (overlapWithCreneau.error) {
-            // Fallback si colonne creneau absente côté DB legacy
-            const overlapNoCreneau = await supabase
-              .from("reservations_infrastructure")
-              .select("id, stage_id, notes")
-              .eq("infrastructure_id", terrainIdToUse)
-              .in("statut", ["confirmee", "confirme", "confirmé", "confirmee", "confirmer"])
-              .lte("date_debut", dateFin)
-              .gte("date_fin", dateDebut)
-              .neq("stage_id", stage.id ?? "");
-            overlaps = overlapNoCreneau.data ?? [];
-            overlapErr = overlapNoCreneau.error;
-          } else {
-            overlaps = overlapWithCreneau.data ?? [];
-          }
-          if (overlapErr) {
-            conflits.push(`${terrainIdToUse}/${jour}/${creneau}/query_error`);
-            continue;
-          }
-
-          if ((overlaps.length ?? 0) > 0) {
+          // 1) Conflit réel = chevauchement horaire avec un AUTRE stage (pas le même)
+          const realConflict = await hasInfraTimeConflict(supabase, {
+            infrastructure_id: terrainIdToUse,
+            stage_id: stage.id,
+            jour,
+            creneau,
+            heure_debut: debut.slice(0, 5),
+            heure_fin: fin.slice(0, 5),
+          });
+          if (realConflict) {
             conflits.push(`${terrainIdToUse}/${jour}/${creneau}`);
             continue;
           }
+
+          // Idempotence : une seule ligne par stage + infra + jour + créneau
+          await supabase
+            .from("reservations_infrastructure")
+            .delete()
+            .eq("stage_id", stage.id)
+            .eq("infrastructure_id", terrainIdToUse)
+            .eq("creneau", creneauLegacy(creneau))
+            .gte("date_debut", `${jour}T00:00:00`)
+            .lte("date_debut", `${jour}T23:59:59`);
 
           // 2) Mise à jour si déjà présente pour ce stage/jour (upgrade matin → journée)
           const existingSameStage = await supabase
@@ -985,6 +1062,23 @@ export const reserverTerrains = async (stage: any): Promise<{
       }
     }
   }
+
+  if (ok.length > 0 && stage.id) {
+    try {
+      const { syncStagePlanningWithTerrainReservations } = await import("@/lib/v2/sync-stage-planning");
+      await syncStagePlanningWithTerrainReservations({
+        stage_id: stage.id,
+        date_debut: stage.dateDebut,
+        date_fin: stage.dateFin,
+        notes: stage.notes ?? null,
+        categorie: stage.categorie ?? null,
+        coach_id: stage.coach_id ?? null,
+      });
+    } catch (err) {
+      console.warn("[terrains] sync planning après réservation", err);
+    }
+  }
+
   return { ok, conflits };
 };
 

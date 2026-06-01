@@ -594,17 +594,15 @@ export function StageDetailV2Client({ id }: { id: string }) {
           className="overflow-visible rounded-lg border border-[var(--border)] bg-[var(--bg-card)]"
           style={{ borderLeftWidth: 3, borderLeftColor: catStyle?.border }}
         >
-          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
+          <div className="v2-stage-detail-tabs">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  tab === t.id
-                    ? "bg-[var(--frmt-navy)] text-white"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-white"
+                  "v2-stage-detail-tab",
+                  tab === t.id && "v2-stage-detail-tab--active"
                 )}
               >
                 {t.label}
@@ -973,13 +971,13 @@ export function StageDetailV2Client({ id }: { id: string }) {
                     <span className="flex flex-wrap gap-3">
                       <Link
                         href={`/v2/calendrier?stage=${stage.id}`}
-                        className="text-xs text-[#3498db] underline-offset-2 hover:underline"
+                        className="v2-stage-detail-link hover:underline"
                       >
                         Voir dans Calendrier →
                       </Link>
                       <Link
                         href={`/v2/planning?stage=${stage.id}`}
-                        className="text-xs text-[#3498db] underline-offset-2 hover:underline"
+                        className="v2-stage-detail-link hover:underline"
                       >
                         Voir dans Planning →
                       </Link>

@@ -12,6 +12,11 @@ import {
   startOfWeek,
 } from "date-fns";
 import { fr } from "date-fns/locale";
+import { reservationToConflictRow } from "@/lib/terrain/conflict-adapters";
+import {
+  conflictIdSet,
+  detectConflicts as detectTerrainConflicts,
+} from "@/services/conflictDetector";
 import type { ReservationEnrichedV2 } from "@/lib/types/v2";
 
 /** Créneaux fixes — aucun créneau personnalisé */
@@ -189,8 +194,13 @@ export function combineDateTime(date: string, time: string): string {
 }
 
 export function creneauxOverlap(a: CreneauType, b: CreneauType): boolean {
-  if (a === "journee" || b === "journee") return true;
-  return a === b;
+  const ra = creneauHorairesFixed(a);
+  const rb = creneauHorairesFixed(b);
+  const s1 = Number(ra.debut.slice(0, 2)) * 60 + Number(ra.debut.slice(3, 5));
+  const e1 = Number(ra.fin.slice(0, 2)) * 60 + Number(ra.fin.slice(3, 5));
+  const s2 = Number(rb.debut.slice(0, 2)) * 60 + Number(rb.debut.slice(3, 5));
+  const e2 = Number(rb.fin.slice(0, 2)) * 60 + Number(rb.fin.slice(3, 5));
+  return s1 < e2 && e1 > s2;
 }
 
 export function normalizeSurface(surface: string | null | undefined): string {
@@ -263,26 +273,9 @@ export function matchPeriode(debutIso: string, periode: PeriodeFilter): boolean 
 }
 
 export function detectConflicts(items: ReservationEnrichedV2[]): Set<string> {
-  const conflictIds = new Set<string>();
   const active = items.filter((r) => normalizeStatut(r.statut) !== "annule");
-
-  for (let i = 0; i < active.length; i++) {
-    for (let j = i + 1; j < active.length; j++) {
-      const a = active[i]!;
-      const b = active[j]!;
-      if (a.infrastructure_id !== b.infrastructure_id) continue;
-      const dayA = format(parseReservationDate(a.date_debut), "yyyy-MM-dd");
-      const dayB = format(parseReservationDate(b.date_debut), "yyyy-MM-dd");
-      if (dayA !== dayB) continue;
-      const ca = resolveCreneauType(a);
-      const cb = resolveCreneauType(b);
-      if (creneauxOverlap(ca, cb)) {
-        conflictIds.add(a.id);
-        conflictIds.add(b.id);
-      }
-    }
-  }
-  return conflictIds;
+  const rows = active.map(reservationToConflictRow);
+  return conflictIdSet(detectTerrainConflicts(rows));
 }
 
 export function conflictStageNames(
@@ -296,6 +289,7 @@ export function conflictStageNames(
   const names = new Set<string>();
   for (const o of all) {
     if (o.id === r.id || !conflictIds.has(o.id)) continue;
+    if (r.stage_id && o.stage_id === r.stage_id) continue;
     if (o.infrastructure_id !== r.infrastructure_id) continue;
     if (format(parseReservationDate(o.date_debut), "yyyy-MM-dd") !== day) continue;
     if (!creneauxOverlap(myCreneau, resolveCreneauType(o))) continue;

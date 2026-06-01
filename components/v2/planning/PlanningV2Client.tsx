@@ -25,6 +25,7 @@ import { normalizeStatut } from "@/lib/v2/reservations-utils";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useSupabaseTableRefresh } from "@/lib/hooks/use-supabase-table-refresh";
 import {
   Activity,
   BadgeCheck,
@@ -167,6 +168,10 @@ export function PlanningV2Client() {
       await load();
     })();
   }, [load]);
+
+  useSupabaseTableRefresh(["planning", "reservations_infrastructure"], () => {
+    void load();
+  });
 
   const weekStart = useMemo(() => {
     const base = startOfWeek(new Date(), { weekStartsOn: 1 });

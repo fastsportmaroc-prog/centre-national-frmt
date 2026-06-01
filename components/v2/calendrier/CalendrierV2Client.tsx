@@ -53,6 +53,7 @@ import {
 } from "@/lib/v2/reservations-utils";
 import { useRole } from "@/lib/hooks/useRole";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { useSupabaseTableRefresh } from "@/lib/hooks/use-supabase-table-refresh";
 import {
   CALENDAR_CATEGORY_LEGEND,
   CALENDAR_TYPE_COLORS,
@@ -151,6 +152,13 @@ export function CalendrierV2Client() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useSupabaseTableRefresh(
+    ["planning", "reservations_infrastructure", "stages_programme"],
+    () => {
+      void load();
+    }
+  );
 
   useEffect(() => {
     setStageFilter(stageFromUrl);

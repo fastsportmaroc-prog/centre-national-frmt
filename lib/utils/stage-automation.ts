@@ -45,12 +45,14 @@ export function hasInfrastructureOverlap(
   infrastructureId: string,
   dateDebut: Date,
   dateFin: Date,
-  excludeId?: string
+  excludeId?: string,
+  excludeStageId?: string
 ): boolean {
   return reservations.some((r) => {
     if (r.statut === "annulee") return false;
     if (r.infrastructure_id !== infrastructureId) return false;
     if (excludeId && r.id === excludeId) return false;
+    if (excludeStageId && r.stage_id === excludeStageId) return false;
     const a0 = dateDebut.getTime();
     const a1 = dateFin.getTime();
     const b0 = new Date(r.date_debut).getTime();
@@ -88,7 +90,7 @@ export function detecterConflitsStage(
       });
       continue;
     }
-    if (hasInfrastructureOverlap(reservations, infraId, debut, fin)) {
+    if (hasInfrastructureOverlap(reservations, infraId, debut, fin, undefined, stage.id)) {
       conflits.push({
         infrastructure_id: infraId,
         infrastructure_nom: infra.nom,
