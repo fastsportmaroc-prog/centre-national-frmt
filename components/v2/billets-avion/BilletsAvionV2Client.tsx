@@ -245,7 +245,7 @@ export function BilletsAvionV2Client() {
                       <p className="font-medium">{nom}</p>
                       <p className="text-muted">{f.prestataire_nom ?? "Prestataire"}</p>
                       <p className="mt-1 font-bold text-frmt-gold">
-                        {formatBilletMontantMad(f.montant, f.devise ?? "MAD")}
+                        {formatBilletMontantMad(f.montant, "MAD")}
                       </p>
                       {f.reference && (
                         <p className="text-xs text-muted">Réf. {f.reference}</p>
