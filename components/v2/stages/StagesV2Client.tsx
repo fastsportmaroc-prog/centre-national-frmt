@@ -17,10 +17,9 @@ import { CategorySelect } from "@/components/v2/ui/CategorySelect";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
-import { createStageComplet } from "@/lib/actions/stage-actions";
+import { createStageComplet, deleteStageQuickAction } from "@/lib/actions/stage-actions";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import {
-  deleteStage,
   getEntraineurs,
   getJoueurs,
   getJoueursByStage,
@@ -356,7 +355,11 @@ export function StagesV2Client() {
 
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
-    await deleteStage(deleteTarget.id);
+    const res = await deleteStageQuickAction(deleteTarget.id);
+    if (!res.ok) {
+      toast(res.error ?? "Suppression impossible", "error");
+      return;
+    }
     toast("Stage supprimé");
     setDeleteTarget(null);
     await load();

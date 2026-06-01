@@ -12,8 +12,10 @@ import {
   createRestaurationServer,
   createSeanceServer,
   createStageServer,
+  deleteStageServer,
   linkCoachStageServer,
   linkJoueurStageServer,
+  updateStageServer,
 } from "@/lib/supabase/stage-write.server";
 import { logAction } from "@/lib/supabase/log-action.server";
 import { generateAndPersistLettre } from "@/lib/letters/save-lettre.server";
@@ -29,7 +31,12 @@ import {
   eachDayOfStage,
   getCreneauHoraires,
 } from "@/lib/v2/stage-calculations";
-import type { CreateStageCompletResult, HebergementStageV2, StageCompletFormData } from "@/lib/types/v2";
+import type {
+  CreateStageCompletResult,
+  HebergementStageV2,
+  StageCompletFormData,
+  StageProgrammeInputV2,
+} from "@/lib/types/v2";
 import { syncStagePlanning } from "@/lib/v2/sync-stage-planning";
 import { revalidateStageLinkedPaths } from "@/lib/server/revalidate-stage-paths";
 import { getAuthUserFromServer } from "@/lib/auth/server-session";
@@ -349,4 +356,23 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
     erreurs,
     message: parts.join(" | "),
   };
+}
+
+export async function updateStageQuickAction(
+  id: string,
+  data: Partial<StageProgrammeInputV2>
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await updateStageServer(id, data);
+  if (res.ok) {
+    revalidateStageLinkedPaths(id);
+  }
+  return res;
+}
+
+export async function deleteStageQuickAction(id: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await deleteStageServer(id);
+  if (res.ok) {
+    revalidateStageLinkedPaths(id);
+  }
+  return res;
 }

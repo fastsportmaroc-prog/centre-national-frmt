@@ -34,8 +34,8 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { deleteStageQuickAction } from "@/lib/actions/stage-actions";
 import {
-  deleteStage,
   createRestauration,
   getPlanningByStage,
   getRestaurationByStage,
@@ -94,9 +94,9 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { role, canWrite, canDelete } = useRole();
+  const { role, canWrite, canDelete, isAdmin } = useRole();
   const tarifsBudget = useTarifsBudget();
-  const canDeleteStage = canDelete || role === "viewer" || role === "direction";
+  const canDeleteStage = canDelete || isAdmin;
   const canLettre = role === "admin" || role === "direction" || role === "viewer" || role === "entraineur";
   const canManageParticipants =
     canWrite || role === "direction" || role === "viewer" || role === "entraineur";
@@ -493,7 +493,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       `Supprimer le stage « ${stage.stage_action} » ?\n\nToutes les données liées seront supprimées (participants, hébergement, restauration, planning, réservations terrains).`
     );
     if (!ok) return;
-    const res = await deleteStage(stage.id);
+    const res = await deleteStageQuickAction(stage.id);
     if (!res.ok) {
       toast(res.error ?? "Suppression impossible", "error");
       return;

@@ -1,5 +1,10 @@
 import "server-only";
 
+import { authUserIsAppAdmin } from "@/lib/auth/admin-access";
+import { permissionsForRole } from "@/lib/auth/app-permissions";
+import { resolveEffectiveAppRole } from "@/lib/auth/passeports-access";
+import { getAuthUserFromServer } from "@/lib/auth/server-session";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin.server";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import type {
   DemandeBilletAvionV2,
@@ -46,6 +51,79 @@ export async function createStageServer(
     return { stage: null, error: msg };
   }
   return { stage: row as StageProgrammeV2 };
+}
+
+async function stageWriteClientForUser() {
+  const user = await getAuthUserFromServer();
+  if (!user) return { supabase: null as null, user: null, error: "Non authentifié — reconnectez-vous." };
+
+  const appRole = resolveEffectiveAppRole(user);
+  if (!permissionsForRole(appRole).canWrite && !authUserIsAppAdmin(user)) {
+    return { supabase: null, user, error: "Modification non autorisée pour votre rôle." };
+  }
+
+  if (authUserIsAppAdmin(user)) {
+    const admin = createSupabaseAdminClient();
+    if (admin) return { supabase: admin, user, error: undefined };
+  }
+
+  return { supabase: await getSupabaseServerDataClient(), user, error: undefined };
+}
+
+export async function updateStageServer(
+  id: string,
+  data: Partial<StageProgrammeInputV2>
+): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, error: authError } = await stageWriteClientForUser();
+  if (authError || !supabase) return { ok: false, error: authError ?? "Client Supabase indisponible." };
+
+  const { error } = await supabase
+    .from(STAGES)
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    const msg = error.message;
+    if (msg.includes("row-level security")) return { ok: false, error: rlsHint(STAGES) };
+    return { ok: false, error: msg };
+  }
+  return { ok: true };
+}
+
+export async function deleteStageServer(id: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await getAuthUserFromServer();
+  if (!user) return { ok: false, error: "Non authentifié — reconnectez-vous." };
+  const appRole = resolveEffectiveAppRole(user);
+  if (!permissionsForRole(appRole).canDelete && !authUserIsAppAdmin(user)) {
+    return { ok: false, error: "Suppression non autorisée pour votre rôle." };
+  }
+
+  const supabase = authUserIsAppAdmin(user)
+    ? (createSupabaseAdminClient() ?? (await getSupabaseServerDataClient()))
+    : await getSupabaseServerDataClient();
+
+  const tables = [
+    "stage_joueurs",
+    "stage_coachs",
+    "hebergements",
+    "restaurations",
+    "kinesitherapie_stages",
+    "kinesitherapie_stage_participants",
+    "planning",
+    "reservations_infrastructure",
+    "demandes_billet_avion",
+  ] as const;
+  for (const t of tables) {
+    const { error } = await supabase.from(t).delete().eq("stage_id", id);
+    if (error && !error.message.includes("row-level security")) {
+      console.warn(`[deleteStageServer] ${t}:`, error.message);
+    }
+  }
+  const { error } = await supabase.from(STAGES).delete().eq("id", id);
+  if (error) {
+    if (error.message.includes("row-level security")) return { ok: false, error: rlsHint(STAGES) };
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
 }
 
 export async function linkJoueurStageServer(

@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
 import { CategorySelect } from "@/components/v2/ui/CategorySelect";
-import { updateStage } from "@/lib/supabase/queries";
+import { updateStageQuickAction } from "@/lib/actions/stage-actions";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import type { StageProgrammeV2, StatutStageV2 } from "@/lib/types/v2";
 
@@ -13,6 +13,10 @@ type StagePatch = Pick<
   StageProgrammeV2,
   "categorie" | "stage_action" | "date_debut" | "date_fin" | "lieu" | "statut" | "notes"
 >;
+type StageQuickEditForm = Omit<StagePatch, "lieu" | "notes"> & {
+  lieu: string;
+  notes: string;
+};
 
 type Props = {
   stage: StageProgrammeV2 | null;
@@ -24,7 +28,7 @@ type Props = {
 export function StageQuickEditModal({ stage, open, onClose, onSaved }: Props) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<StagePatch>({
+  const [form, setForm] = useState<StageQuickEditForm>({
     stage_action: "",
     categorie: "U16",
     date_debut: "",
@@ -68,7 +72,7 @@ export function StageQuickEditModal({ stage, open, onClose, onSaved }: Props) {
       statut: form.statut,
       notes: form.notes.trim() || null,
     };
-    const res = await updateStage(stage.id, payload);
+    const res = await updateStageQuickAction(stage.id, payload);
     setSaving(false);
 
     if (!res.ok) {

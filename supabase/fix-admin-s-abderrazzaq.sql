@@ -45,15 +45,14 @@ FROM auth.users u
 WHERE u.email IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = u.id);
 
--- 3) Compte administrateur principal
+-- 3) Comptes administrateurs principaux (accès total)
 UPDATE public.profiles
-SET
-  role = 'admin',
-  frmt_role = 'admin',
-  actif = true,
-  email = 's.abderrazzaq@frmt.ma'
-WHERE lower(email) = lower('s.abderrazzaq@frmt.ma')
-   OR id IN (SELECT id FROM auth.users WHERE lower(email) = lower('s.abderrazzaq@frmt.ma'));
+SET role = 'admin', frmt_role = 'admin', actif = true
+WHERE lower(email) IN (lower('s.abderrazzaq@frmt.ma'), lower('m.aitbarhouch@frmt.ma'))
+   OR id IN (
+     SELECT id FROM auth.users
+     WHERE lower(email) IN (lower('s.abderrazzaq@frmt.ma'), lower('m.aitbarhouch@frmt.ma'))
+   );
 
 -- 4) Vérification
 SELECT id, email, role, frmt_role, actif

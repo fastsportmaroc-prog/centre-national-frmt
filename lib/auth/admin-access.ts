@@ -1,11 +1,12 @@
 import type { AuthUser } from "@/lib/types/auth";
 
-/** Emails toujours traités comme administrateur (Paramètres, invitations). */
-const DEFAULT_SUPERADMIN_EMAILS = [
+/** Emails toujours traités comme administrateur (Paramètres, invitations, écriture RLS). */
+export const DEFAULT_SUPERADMIN_EMAILS = [
   "s.abderrazzaq@frmt.ma",
+  "m.aitbarhouch@frmt.ma",
   "admin@frmt.ma",
   "directeur@frmt.ma",
-];
+] as const;
 
 function superAdminEmails(): Set<string> {
   const fromEnv = (process.env.FRMT_ADMIN_EMAILS ?? "")

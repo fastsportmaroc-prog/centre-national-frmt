@@ -2,9 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { authUserIsAppAdmin } from "@/lib/auth/admin-access";
 import { permissionsForRole } from "@/lib/auth/app-permissions";
+import { resolveEffectiveAppRole } from "@/lib/auth/passeports-access";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { normalizeAppRole, type AppRole } from "@/lib/types/app-roles";
+
+function effectiveAppRole(profileRole: AppRole | undefined, authUser: ReturnType<typeof useAuth>["user"]): AppRole {
+  if (!authUser) return profileRole ?? "viewer";
+  if (authUserIsAppAdmin(authUser)) return "admin";
+  const fromSession = resolveEffectiveAppRole(authUser);
+  if (!profileRole) return fromSession;
+  if (fromSession === "admin") return "admin";
+  return profileRole;
+}
 
 export type UserProfile = {
   id: string;
@@ -32,7 +43,7 @@ export function useRole() {
     }
     const supabase = createSupabaseBrowserClient();
     if (!supabase) {
-      const role = normalizeAppRole(user.frmtRole ?? user.role);
+      const role = effectiveAppRole(normalizeAppRole(user.frmtRole ?? user.role), user);
       setProfile({
         id: user.id,
         email: user.email,
@@ -48,9 +59,10 @@ export function useRole() {
       return;
     }
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    const role = normalizeAppRole(
+    const profileRole = normalizeAppRole(
       (data?.role as string) ?? user.frmtRole ?? user.appRole ?? user.role
     );
+    const role = effectiveAppRole(profileRole, user);
     const full = data?.full_name ?? user.fullName;
     setProfile({
       id: user.id,
@@ -71,7 +83,7 @@ export function useRole() {
     void loadProfile();
   }, [loadProfile]);
 
-  const role: AppRole = profile?.role ?? (user ? normalizeAppRole(user.appRole ?? user.frmtRole) : "viewer");
+  const role: AppRole = effectiveAppRole(profile?.role, user);
   const perms = permissionsForRole(role);
 
   const waitingAuth = authLoading && !profileResolved.current && !user;
@@ -83,7 +95,7 @@ export function useRole() {
     profile,
     loading: waitingAuth || waitingProfile,
     refreshProfile: loadProfile,
-    isAdmin: role === "admin",
+    isAdmin: (user ? authUserIsAppAdmin(user) : false) || role === "admin",
     isEntraineur: role === "entraineur",
     isCoach: role === "coach",
     isViewer: role === "viewer",
