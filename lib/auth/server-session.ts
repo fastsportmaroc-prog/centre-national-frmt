@@ -14,15 +14,16 @@ function mapFrmtRole(profile: Profile | null): RoleUtilisateur {
   const r = profile?.frmt_role;
   if (
     r === "admin" ||
-    r === "directeur" ||
     r === "entraineur" ||
     r === "logisticien" ||
     r === "joueur"
   ) {
     return r;
   }
+  if (r === "directeur" || profile?.role === "direction") return "logisticien";
   if (profile?.role === "admin") return "admin";
-  return "directeur";
+  if (profile?.role === "entraineur") return "entraineur";
+  return "joueur";
 }
 
 function toAuthUser(user: User, profile: Profile | null): AuthUser {

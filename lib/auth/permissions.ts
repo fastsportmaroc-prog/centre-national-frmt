@@ -4,19 +4,19 @@ import { roleCan } from "@/lib/types/roles";
 
 /** Rôle FRMT effectif (profil Supabase ou défaut). */
 export function resolveFrmtRole(user: AuthUser | null): RoleUtilisateur {
-  if (!user) return "directeur";
+  if (!user) return "joueur";
   const r = user.frmtRole;
   if (
     r === "admin" ||
-    r === "directeur" ||
     r === "entraineur" ||
     r === "logisticien" ||
     r === "joueur"
   ) {
     return r;
   }
-  if (user.role === "admin") return "admin";
-  return "directeur";
+  if (r === "directeur" || user.appRole === "direction") return "logisticien";
+  if (user.role === "admin" || user.appRole === "admin") return "admin";
+  return "joueur";
 }
 
 const HREF_MODULE: Record<string, PermissionModule | null> = {
