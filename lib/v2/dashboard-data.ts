@@ -7,12 +7,17 @@ import {
   getOccupationPourcentage,
   getReservationsEnriched,
   getRestaurations,
+  getStageIdsWithTerrainReservations,
   getStages,
   getStageCoachLinks,
   getStageJoueursLinks,
 } from "@/lib/supabase/queries";
 import type { StageProgrammeV2 } from "@/lib/types/v2";
 import { detectConflicts } from "@/lib/v2/reservations-utils";
+import {
+  hasTerrainsInNotes,
+  stageHasTerrainsConfigured,
+} from "@/lib/v2/stage-terrain-status";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -63,13 +68,17 @@ export type DashboardV2Data = {
   passportVisaStats: AdminDocumentAlertStats;
 };
 
+function stageNeedsTerrains(s: StageProgrammeV2): boolean {
+  return Boolean(s.terrains) || hasTerrainsInNotes(s.notes);
+}
+
 function checklistProgress(s: StageDashboardCard & { hebergement: boolean; transport_avion?: boolean }) {
   const tasks = [
     s.nb_joueurs > 0,
     s.nb_coachs > 0,
     !s.hebergement || s.has_hebergement,
     s.has_restauration,
-    s.has_terrains,
+    !stageNeedsTerrains(s) || s.has_terrains,
     !s.transport_avion || s.has_billets,
     s.statut === "confirme",
     !!s.lieu?.trim(),
@@ -106,7 +115,9 @@ function enrichStage(
   coachsByStage: Map<string, number>,
   hebByStage: Set<string>,
   restByStage: Set<string>,
-  billetsByStage: Set<string>
+  billetsByStage: Set<string>,
+  terrResaCountByStage: Map<string, number>,
+  terrainStageIds: Set<string>
 ): StageDashboardCard {
   const today = new Date().toISOString().slice(0, 10);
   const start = parseISO(s.date_debut.includes("T") ? s.date_debut : `${s.date_debut}T12:00:00`);
@@ -122,7 +133,14 @@ function enrichStage(
     nb_coachs: coachsByStage.get(s.id) ?? s.nombre_encadrants,
     has_hebergement: hebByStage.has(s.id) || s.hebergement,
     has_restauration: restByStage.has(s.id),
-    has_terrains: s.terrains ?? false,
+    has_terrains:
+      terrainStageIds.has(s.id) ||
+      stageHasTerrainsConfigured({
+        id: s.id,
+        terrains: s.terrains,
+        notes: s.notes,
+        terrainReservationCount: terrResaCountByStage.get(s.id) ?? 0,
+      }),
     has_billets: billetsByStage.has(s.id),
     jours_duree,
     jours_avant,
@@ -146,6 +164,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
     occupation,
     reservations,
     passportVisaStats,
+    terrainStageIds,
   ] = await Promise.all([
       getStages(),
       getJoueurs(),
@@ -157,12 +176,22 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
       getOccupationPourcentage(),
       getReservationsEnriched(),
       getAdminDocumentAlertStats(),
+      getStageIdsWithTerrainReservations(),
     ]);
 
   const hebByStage = new Set(hebergements.map((h) => h.stage_id));
   const restByStage = new Set(restaurations.map((r) => r.stage_id));
   const billetsByStage = new Set(billets.map((b) => b.stage_id));
   const { joueursByStage, coachsByStage } = buildLinkCountMaps(linksJ, linksC);
+
+  const terrResaCountByStage = new Map<string, number>();
+  for (const id of terrainStageIds) {
+    terrResaCountByStage.set(id, Math.max(terrResaCountByStage.get(id) ?? 0, 1));
+  }
+  for (const r of reservations) {
+    if (!r.stage_id) continue;
+    terrResaCountByStage.set(r.stage_id, (terrResaCountByStage.get(r.stage_id) ?? 0) + 1);
+  }
 
   const stagesWithEffectiveStatut = stages.map((s) => ({
     ...s,
@@ -171,7 +200,18 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
 
   const stagesAvenir = stagesWithEffectiveStatut
     .filter((s) => s.date_fin >= today && s.statut !== "annule")
-    .map((s) => enrichStage(s, joueursByStage, coachsByStage, hebByStage, restByStage, billetsByStage))
+    .map((s) =>
+      enrichStage(
+        s,
+        joueursByStage,
+        coachsByStage,
+        hebByStage,
+        restByStage,
+        billetsByStage,
+        terrResaCountByStage,
+        terrainStageIds
+      )
+    )
     .sort((a, b) => a.date_debut.localeCompare(b.date_debut));
 
   const alertes: DashboardAlert[] = [];
@@ -184,7 +224,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
         href: "/v2/stages",
       });
     }
-    if (!s.has_terrains && s.statut === "prevu") {
+    if (stageNeedsTerrains(s) && !s.has_terrains && s.statut === "prevu") {
       alertes.push({
         level: "attention",
         message: `Stage « ${s.stage_action} » sans terrain réservé`,
@@ -317,22 +357,45 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
 
 /** Tous les stages enrichis (page Stages, filtres complets). */
 export async function loadAllStageCards(): Promise<StageDashboardCard[]> {
-  const [stages, hebergements, restaurations, billets, linksJ, linksC] = await Promise.all([
-    getStages(),
-    getHebergements(),
-    getRestaurations(),
-    getBilletsAvion(),
-    getStageJoueursLinks(),
-    getStageCoachLinks(),
-  ]);
+  const [stages, hebergements, restaurations, billets, linksJ, linksC, reservations, terrainStageIds] =
+    await Promise.all([
+      getStages(),
+      getHebergements(),
+      getRestaurations(),
+      getBilletsAvion(),
+      getStageJoueursLinks(),
+      getStageCoachLinks(),
+      getReservationsEnriched(),
+      getStageIdsWithTerrainReservations(),
+    ]);
 
   const hebByStage = new Set(hebergements.map((h) => h.stage_id));
   const restByStage = new Set(restaurations.map((r) => r.stage_id));
   const billetsByStage = new Set(billets.map((b) => b.stage_id));
 
+  const terrResaCountByStage = new Map<string, number>();
+  for (const id of terrainStageIds) {
+    terrResaCountByStage.set(id, Math.max(terrResaCountByStage.get(id) ?? 0, 1));
+  }
+  for (const r of reservations) {
+    if (!r.stage_id) continue;
+    terrResaCountByStage.set(r.stage_id, (terrResaCountByStage.get(r.stage_id) ?? 0) + 1);
+  }
+
   const { joueursByStage, coachsByStage } = buildLinkCountMaps(linksJ, linksC);
 
   return stages
-    .map((s) => enrichStage(s, joueursByStage, coachsByStage, hebByStage, restByStage, billetsByStage))
+    .map((s) =>
+      enrichStage(
+        s,
+        joueursByStage,
+        coachsByStage,
+        hebByStage,
+        restByStage,
+        billetsByStage,
+        terrResaCountByStage,
+        terrainStageIds
+      )
+    )
     .sort((a, b) => a.date_debut.localeCompare(b.date_debut));
 }

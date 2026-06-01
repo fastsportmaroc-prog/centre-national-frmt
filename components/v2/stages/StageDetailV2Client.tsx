@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { useToast } from "@/components/v2/ui/ToastProvider";
-import { deleteStageQuickAction } from "@/lib/actions/stage-actions";
+import { deleteStageQuickAction, updateStageQuickAction } from "@/lib/actions/stage-actions";
 import {
   createRestauration,
   getPlanningByStage,
@@ -59,9 +59,16 @@ import {
   getTerrains,
   getReservationsStageTerrains,
   reserverTerrains,
+  resyncStageTerrainsFromNotes,
   supprimerReservationTerrain,
   type Creneau,
 } from "@/services/terrainService";
+import { getCreneauInfoForReservation } from "@/lib/v2/reservations-utils";
+import {
+  appendTerrainBesoinToNotes,
+  stageHasTerrainsConfigured,
+} from "@/lib/v2/stage-terrain-status";
+import { creneauTerrainToIso } from "@/lib/v2/terrain-reservation-map";
 
 type Tab =
   | "infos"
@@ -121,7 +128,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const [terrainReservations, setTerrainReservations] = useState<any[]>([]);
   const [terrainId, setTerrainId] = useState("");
   const [terrainMode, setTerrainMode] = useState<"stage" | "dispatch">("stage");
-  const [terrainCreneaux, setTerrainCreneaux] = useState<Creneau[]>([]);
+  const [terrainCreneaux, setTerrainCreneaux] = useState<Creneau[]>(["journee"]);
   const [terrainJours, setTerrainJours] = useState<string[]>([]);
   const [dispatchJoueurIds, setDispatchJoueurIds] = useState<string[]>([]);
   const [savingTerrain, setSavingTerrain] = useState(false);
@@ -169,6 +176,10 @@ export function StageDetailV2Client({ id }: { id: string }) {
     ]);
     setTerrains(t);
     setTerrainReservations(tr);
+    if (tr.length > 0 && !s.terrains) {
+      const up = await updateStageQuickAction(id, { terrains: true });
+      if (up.ok) setStage((prev) => (prev ? { ...prev, terrains: true } : prev));
+    }
     if (!terrainId && t.length > 0) setTerrainId(t[0].id);
     const remoteLettres = await listLettresByStageAction(id);
     const localLettres = loadLettresLocal().filter((l) => l.stage_id === id);
@@ -239,7 +250,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
     const est = computeStageBudgetEstimateMad({
       dateDebut: stage.date_debut,
       dateFin: stage.date_fin,
-      terrainsActif: Boolean(stage.terrains),
+      terrainsActif: stageHasTerrainsConfigured({
+        id: stage.id,
+        terrains: stage.terrains,
+        notes: stage.notes,
+        terrainReservationCount: terrainReservations.length,
+      }),
       hebergement,
       restauration,
       tarifs: tarifsBudget,
@@ -250,7 +266,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       terrains: est.terrains,
       total: est.total,
     };
-  }, [hebergement, restauration, stage, tarifsBudget]);
+  }, [hebergement, restauration, stage, tarifsBudget, terrainReservations.length]);
 
   const stageDays = useMemo(() => {
     if (!stage) return [] as string[];
@@ -278,6 +294,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
 
   async function handlePdf() {
     if (!stage) return;
+    const terrainsOk = stageHasTerrainsConfigured({
+      id: stage.id,
+      terrains: stage.terrains,
+      notes: stage.notes,
+      terrainReservationCount: terrainReservations.length,
+    });
     exportStagePDF({
       stage_action: stage.stage_action,
       categorie: stage.categorie,
@@ -289,7 +311,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       coachs: coachs.map((x) => `${x.prenom} ${x.nom}`),
       hebergement: stage.hebergement ? "Oui" : "Non",
       restauration: stage.restauration ? "Oui" : "Non",
-      terrains: stage.terrains ? "Oui" : "Non",
+      terrains: terrainsOk ? "Oui" : "Non",
       kinesitherapie: stage.kinesitherapie ? "Oui" : "Non",
     });
     toast("Fiche PDF générée", "info");
@@ -412,10 +434,8 @@ export function StageDetailV2Client({ id }: { id: string }) {
       toast("Sélectionnez un terrain", "warning");
       return;
     }
-    if (terrainCreneaux.length === 0) {
-      toast("Sélectionnez au moins un créneau", "warning");
-      return;
-    }
+    const creneauxEffectifs: Creneau[] =
+      terrainCreneaux.length > 0 ? terrainCreneaux : (["journee"] as Creneau[]);
     if (terrainJours.length === 0) {
       toast("Sélectionnez au moins un jour du stage", "warning");
       return;
@@ -423,26 +443,23 @@ export function StageDetailV2Client({ id }: { id: string }) {
     const selectedTerrain = terrains.find((t) => t.id === terrainId);
     setSavingTerrain(true);
     try {
+      const besoin = {
+        terrainId,
+        terrainNom: selectedTerrain?.nom,
+        terrainType: selectedTerrain?.type,
+        terrainSurface: selectedTerrain?.surface,
+        terrainCapacite: selectedTerrain?.capacite,
+        jours: terrainJours,
+        creneaux: creneauxEffectifs,
+        mode: terrainMode,
+        joueurIds: terrainMode === "dispatch" ? dispatchJoueurIds : [],
+      };
       const { ok, conflits } = await reserverTerrains({
         id: stage.id,
         nom: stage.stage_action,
         dateDebut: stage.date_debut,
         dateFin: stage.date_fin,
-        besoins: {
-          terrains: [
-            {
-              terrainId,
-              terrainNom: selectedTerrain?.nom,
-              terrainType: selectedTerrain?.type,
-              terrainSurface: selectedTerrain?.surface,
-              terrainCapacite: selectedTerrain?.capacite,
-              jours: terrainJours,
-              creneaux: terrainCreneaux,
-              mode: terrainMode,
-              joueurIds: terrainMode === "dispatch" ? dispatchJoueurIds : [],
-            },
-          ],
-        },
+        besoins: { terrains: [besoin] },
       });
       if (conflits.length > 0) {
         toast(
@@ -452,6 +469,27 @@ export function StageDetailV2Client({ id }: { id: string }) {
       } else {
         toast(`${ok.length} créneau(x) réservé(s)`, "success");
       }
+
+      const updatedNotes = appendTerrainBesoinToNotes(stage.notes, besoin);
+      const stageUp = await updateStageQuickAction(stage.id, {
+        terrains: true,
+        notes: updatedNotes,
+      });
+      if (!stageUp.ok) {
+        toast(stageUp.error ?? "Réservation OK mais mise à jour stage incomplète", "warning");
+      } else {
+        setStage((prev) =>
+          prev ? { ...prev, terrains: true, notes: updatedNotes } : prev
+        );
+      }
+
+      await resyncStageTerrainsFromNotes({
+        id: stage.id,
+        stage_action: stage.stage_action,
+        date_debut: stage.date_debut,
+        date_fin: stage.date_fin,
+        notes: updatedNotes,
+      });
       await syncStageLinkedViewsAction(stage.id);
       const [tr, p] = await Promise.all([
         getReservationsStageTerrains(stage.id).catch(() => []),
@@ -459,7 +497,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       ]);
       setTerrainReservations(tr);
       setPlanning(p);
-      setTerrainCreneaux([]);
+      setTerrainCreneaux(["journee"]);
       setTerrainJours(stageDays);
       setDispatchJoueurIds([]);
     } catch (e) {
@@ -903,7 +941,23 @@ export function StageDetailV2Client({ id }: { id: string }) {
                             {r.date_debut}
                             {r.date_fin !== r.date_debut ? ` → ${r.date_fin}` : ""}
                           </td>
-                          <td className="p-2">{r.creneau}</td>
+                          <td className="p-2">
+                            {(() => {
+                              const day = String(r.date_debut).slice(0, 10);
+                              const mapped = creneauTerrainToIso(day, String(r.creneau ?? "journee"));
+                              return getCreneauInfoForReservation({
+                                id: String(r.reservation_id),
+                                infrastructure_id: String(r.terrain_id ?? ""),
+                                stage_id: stage.id,
+                                date_debut: mapped.debut,
+                                date_fin: mapped.fin,
+                                creneau: mapped.creneau,
+                                heure_debut: mapped.heure_debut,
+                                heure_fin: mapped.heure_fin,
+                                statut: String(r.resa_statut ?? "confirmee"),
+                              }).label;
+                            })()}
+                          </td>
                           <td className="p-2">{r.mode}</td>
                           <td className="p-2">{r.nb_joueurs_dispatches ?? 0}</td>
                           <td className="p-2">

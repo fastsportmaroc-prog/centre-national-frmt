@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { FileDown, Pencil, Plus, Trash2 } from "lucide-react";
@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import { exportReservationsPDF } from "@/lib/pdf/pdf-exports";
+import { reconcileStageTerrainReservationsAction } from "@/lib/actions/reservations-sync-actions";
 import {
   createReservationInfrastructure,
   deleteReservationInfrastructure,
@@ -85,8 +86,21 @@ export function ReservationsV2Client() {
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [deleteRow, setDeleteRow] = useState<ReservationEnrichedV2 | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const terrainSyncDone = useRef(false);
 
   const load = useCallback(async () => {
+    if (!terrainSyncDone.current) {
+      terrainSyncDone.current = true;
+      setSyncing(true);
+      try {
+        await reconcileStageTerrainReservationsAction();
+      } catch {
+        /* sync best-effort */
+      } finally {
+        setSyncing(false);
+      }
+    }
     const [r, s, i] = await Promise.all([
       getReservationsEnriched(),
       getStages(),
@@ -234,13 +248,46 @@ export function ReservationsV2Client() {
     await load();
   }
 
+  async function forceSyncAndReload() {
+    setSyncing(true);
+    try {
+      const result = await reconcileStageTerrainReservationsAction();
+      const [r, s, i] = await Promise.all([
+        getReservationsEnriched(),
+        getStages(),
+        getInfrastructures(),
+      ]);
+      setItems(r.filter((x) => normalizeStatut(x.statut) !== "annule"));
+      setStages(s);
+      setInfrastructures(i);
+      toast(
+        result.upgraded > 0
+          ? `${result.upgraded} créneau(x) corrigé(s) en journée complète`
+          : "Réservations synchronisées avec les stages",
+        "success"
+      );
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erreur de synchronisation", "error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <>
       <V2PageHeader
         title="Réservations"
-        description="Planning terrains — créneaux Matin, Après-midi, Journée"
+        description="Planning terrains — créneaux Matin, Après-midi, Journée complète"
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={syncing}
+              onClick={() => void forceSyncAndReload()}
+            >
+              {syncing ? "Sync…" : "Sync stages"}
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setManualOpen(true)}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               Réservation manuelle
@@ -318,8 +365,7 @@ export function ReservationsV2Client() {
           <Card className="border-dashed p-8 text-center text-sm text-muted">
             Aucune réservation pour ces filtres.
             <br />
-            Les réservations sont créées automatiquement à la création d&apos;un stage avec
-            terrains activés.
+            Essayez le filtre <strong>Tout</strong> ou cliquez <strong>Sync stages</strong> en haut à droite.
           </Card>
         )}
 

@@ -37,9 +37,20 @@ export function creneauHorairesFixed(creneau: CreneauType): { debut: string; fin
 
 export function normalizeCreneauType(raw: string | null | undefined): CreneauType {
   const s = (raw ?? "").toLowerCase().replace(/-/g, "_");
-  if (s === "matin" || s.includes("matin")) return "matin";
+  if (s === "journee" || s === "journée" || s.includes("journee") || s.includes("journée")) return "journee";
+  if (s === "matin") return "matin";
+  if (s.includes("matin") && !s.includes("journee") && !s.includes("journée")) return "matin";
   if (s === "apres_midi" || s.includes("apres") || s.includes("après")) return "apres_midi";
   return "journee";
+}
+
+function creneauFromHeureFields(heureDebut?: string | null, heureFin?: string | null): CreneauType | null {
+  const debut = (heureDebut ?? "").slice(0, 5);
+  const fin = (heureFin ?? "").slice(0, 5);
+  if (debut === "09:00" && fin === "18:00") return "journee";
+  if (debut === "09:00" && fin === "13:00") return "matin";
+  if (debut === "14:00" && fin === "18:00") return "apres_midi";
+  return null;
 }
 
 export function inferCreneauFromTimes(debutIso: string, finIso: string): CreneauType {
@@ -54,10 +65,25 @@ export function inferCreneauFromTimes(debutIso: string, finIso: string): Creneau
 }
 
 export function resolveCreneauType(
-  r: Pick<ReservationEnrichedV2, "creneau" | "date_debut" | "date_fin">
+  r: Pick<ReservationEnrichedV2, "creneau" | "date_debut" | "date_fin" | "heure_debut" | "heure_fin" | "stage_id">
 ): CreneauType {
+  const fromHeures = creneauFromHeureFields(r.heure_debut, r.heure_fin);
+  const fromTimes = inferCreneauFromTimes(r.date_debut, r.date_fin);
+
+  if (r.stage_id) {
+    const stored = r.creneau ? normalizeCreneauType(r.creneau) : null;
+    if (stored === "apres_midi") return "apres_midi";
+    if (stored === "matin" || fromHeures === "matin" || fromTimes === "matin" || !stored) {
+      return "journee";
+    }
+  }
+
+  if (fromHeures) return fromHeures;
+  if (fromTimes === "journee" && r.creneau && normalizeCreneauType(r.creneau) === "matin") {
+    return "journee";
+  }
   if (r.creneau) return normalizeCreneauType(r.creneau);
-  return inferCreneauFromTimes(r.date_debut, r.date_fin);
+  return fromTimes;
 }
 
 export type CreneauInfo = {
@@ -93,16 +119,41 @@ const CRENEAU_META: Record<CreneauType, Omit<CreneauInfo, "heureDebut" | "heureF
 export function getCreneauInfo(
   debutIso: string,
   finIso: string,
-  creneauStored?: string | null
+  creneauStored?: string | null,
+  heureDebut?: string | null,
+  heureFin?: string | null
 ): CreneauInfo {
-  const type = creneauStored ? normalizeCreneauType(creneauStored) : inferCreneauFromTimes(debutIso, finIso);
+  const fromHeures = creneauFromHeureFields(heureDebut, heureFin);
+  const type =
+    fromHeures ??
+    (creneauStored ?
+      resolveCreneauType({
+        creneau: creneauStored,
+        date_debut: debutIso,
+        date_fin: finIso,
+        heure_debut: heureDebut,
+        heure_fin: heureFin,
+      })
+    : inferCreneauFromTimes(debutIso, finIso));
   const { debut, fin } = creneauHorairesFixed(type);
   const meta = CRENEAU_META[type];
   return { ...meta, heureDebut: debut, heureFin: fin };
 }
 
+export function formatCreneauLabel(raw: string | null | undefined): string {
+  const type = normalizeCreneauType(raw);
+  return CRENEAU_OPTIONS.find((o) => o.value === type)?.label ?? "Journée complète";
+}
+
 export function getCreneauInfoForReservation(r: ReservationEnrichedV2): CreneauInfo {
-  return getCreneauInfo(r.date_debut, r.date_fin, r.creneau);
+  let type = resolveCreneauType(r);
+  // Règle métier : réservation liée à un stage = journée complète (sauf aprem seul)
+  if (r.stage_id && type === "matin") {
+    type = "journee";
+  }
+  const { debut, fin } = creneauHorairesFixed(type);
+  const meta = CRENEAU_META[type];
+  return { ...meta, heureDebut: debut, heureFin: fin };
 }
 
 export function buildReservationDateTimes(

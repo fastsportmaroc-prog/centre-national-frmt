@@ -7,7 +7,9 @@ export {
   getReservationsStageTerrains,
   verifierConflits,
   reserverTerrains,
+  resyncStageTerrainsFromNotes,
   supprimerReservationsStage,
+  upgradeStageTerrainsMatinToJourneeInDb,
   supprimerReservationTerrain,
 } from "@/lib/data/terrains";
 

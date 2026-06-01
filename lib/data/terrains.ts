@@ -1,4 +1,5 @@
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
+import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 
 /* ─── TYPES ─── */
 export type Creneau = "matin" | "apres-midi" | "journee";
@@ -31,9 +32,10 @@ function asError(err: unknown, fallback = "Erreur terrain"): Error {
 }
 
 function mapLegacyCreneau(creneau: string | null | undefined): "matin" | "apres-midi" | "journee" {
-  const c = (creneau ?? "").toLowerCase();
+  const c = (creneau ?? "").toLowerCase().replace(/-/g, "_");
+  if (c.includes("journee") || c.includes("journée")) return "journee";
   if (c.includes("apres")) return "apres-midi";
-  if (c.includes("matin")) return "matin";
+  if (c === "matin" || c.includes("matin")) return "matin";
   return "journee";
 }
 
@@ -606,12 +608,36 @@ export const reserverTerrains = async (stage: any): Promise<{
       conflits.push(`${besoin.terrainId}/introuvable`);
       continue;
     }
-    for (const creneau of besoin.creneaux) {
+    const creneauxEffectifs: Creneau[] =
+      besoin.creneaux?.length ? besoin.creneaux : (["journee"] as Creneau[]);
+    const clearPartialCreneaux = async (jour: string, creneau: Creneau) => {
+      if (creneau !== "journee") return;
+      await supabase
+        .from("terrain_reservations")
+        .delete()
+        .eq("stage_id", stage.id)
+        .eq("terrain_id", terrainIdToUse)
+        .eq("date_debut", jour)
+        .in("creneau", ["matin", "apres-midi"]);
+      const infraId = await ensureLegacyInfrastructureId(besoin);
+      if (infraId) {
+        await supabase
+          .from("reservations_infrastructure")
+          .delete()
+          .eq("stage_id", stage.id)
+          .eq("infrastructure_id", infraId)
+          .gte("date_debut", `${jour}T00:00:00`)
+          .lte("date_debut", `${jour}T23:59:59`)
+          .in("creneau", ["matin", "apres_midi"]);
+      }
+    };
+    for (const creneau of creneauxEffectifs) {
       const joursCibles: string[] =
         besoin.jours?.length && Array.isArray(besoin.jours)
           ? [...new Set(besoin.jours.map((d) => String(d).slice(0, 10)).filter((d) => d.length > 0))]
           : eachDay(stage.dateDebut, stage.dateFin);
       for (const jour of joursCibles) {
+        await clearPartialCreneaux(jour, creneau);
         if (useLegacyReservations) {
           const { debut, fin } = legacyHours(creneau);
           const dateDebut = `${jour}T${debut}`;
@@ -658,7 +684,43 @@ export const reserverTerrains = async (stage: any): Promise<{
             continue;
           }
 
-          // 2) Insert normal (avec creneau)
+          // 2) Mise à jour si déjà présente pour ce stage/jour (upgrade matin → journée)
+          const existingSameStage = await supabase
+            .from("reservations_infrastructure")
+            .select("id, notes, creneau")
+            .eq("infrastructure_id", terrainIdToUse)
+            .eq("stage_id", stage.id)
+            .gte("date_debut", `${jour}T00:00:00`)
+            .lte("date_debut", `${jour}T23:59:59`)
+            .limit(1);
+          const existingRow = existingSameStage.data?.[0] as
+            | { id: string; notes?: string | null; creneau?: string | null }
+            | undefined;
+          if (existingRow?.id) {
+            const mergedNotes = [String(existingRow.notes ?? "").trim(), notesPayload]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            await supabase
+              .from("reservations_infrastructure")
+              .update({
+                creneau: creneauLegacy(creneau),
+                date_debut: dateDebut,
+                date_fin: dateFin,
+                heure_debut: debut.slice(0, 5),
+                heure_fin: fin.slice(0, 5),
+                statut: "confirmee",
+                notes: mergedNotes || null,
+              })
+              .eq("id", existingRow.id);
+            if (besoin.mode === "dispatch") {
+              await saveLegacyDispatch(existingRow.id, besoin, terrainIdToUse, jour, creneau);
+            }
+            ok.push(`${terrainIdToUse}/${jour}/${creneau}`);
+            continue;
+          }
+
+          // 3) Insert normal (avec creneau)
           let legacyInsertErr: any = null;
           const insertWithCreneau = await supabase
             .from("reservations_infrastructure")
@@ -677,7 +739,7 @@ export const reserverTerrains = async (stage: any): Promise<{
             .single();
           legacyInsertErr = insertWithCreneau.error;
 
-          // 3) Fallback insert compatible schéma legacy sans creneau/heure_*
+          // 4) Fallback insert compatible schéma legacy sans creneau/heure_*
           if (legacyInsertErr) {
             const insertLegacyMinimal = await supabase
               .from("reservations_infrastructure")
@@ -694,28 +756,34 @@ export const reserverTerrains = async (stage: any): Promise<{
             legacyInsertErr = insertLegacyMinimal.error;
           }
 
-          // 4) Idempotence: si déjà présente pour ce stage/jour, compter OK
+          // 5) Idempotence après échec insert
           if (legacyInsertErr) {
-            const existingSameStage = await supabase
+            const existingRetry = await supabase
               .from("reservations_infrastructure")
-              .select("id, notes")
+              .select("id, notes, creneau")
               .eq("infrastructure_id", terrainIdToUse)
               .eq("stage_id", stage.id)
               .gte("date_debut", `${jour}T00:00:00`)
               .lte("date_debut", `${jour}T23:59:59`)
               .limit(1);
-            if ((existingSameStage.data?.length ?? 0) > 0) {
-              // Si la resa existe déjà, propager aussi la meta dispatch pour la rendre visible dans l'onglet Dispatch.
-              const existing = existingSameStage.data?.[0] as any;
-              if (existing?.id && besoin.mode === "dispatch") {
-                const mergedNotes = [String(existing.notes ?? "").trim(), encodedMeta]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim();
-                await supabase
-                  .from("reservations_infrastructure")
-                  .update({ notes: mergedNotes || null })
-                  .eq("id", existing.id);
+            if ((existingRetry.data?.length ?? 0) > 0) {
+              const existing = existingRetry.data?.[0] as { id: string; notes?: string | null };
+              const mergedNotes = [String(existing.notes ?? "").trim(), notesPayload]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+              await supabase
+                .from("reservations_infrastructure")
+                .update({
+                  creneau: creneauLegacy(creneau),
+                  date_debut: dateDebut,
+                  date_fin: dateFin,
+                  heure_debut: debut.slice(0, 5),
+                  heure_fin: fin.slice(0, 5),
+                  notes: mergedNotes || null,
+                })
+                .eq("id", existing.id);
+              if (besoin.mode === "dispatch") {
                 await saveLegacyDispatch(existing.id, besoin, terrainIdToUse, jour, creneau);
               }
               ok.push(`${terrainIdToUse}/${jour}/${creneau}`);
@@ -776,6 +844,47 @@ export const reserverTerrains = async (stage: any): Promise<{
           .single();
         if (error || !resa) continue;
 
+        // Miroir reservations_infrastructure → visible dans Réservations V2
+        const infraMirrorId = await ensureLegacyInfrastructureId(besoin);
+        if (infraMirrorId) {
+          const { debut, fin } = legacyHours(creneau);
+          const dateDebut = `${jour}T${debut}`;
+          const dateFin = `${jour}T${fin}`;
+          const existingMirror = await supabase
+            .from("reservations_infrastructure")
+            .select("id, creneau")
+            .eq("infrastructure_id", infraMirrorId)
+            .eq("stage_id", stage.id)
+            .gte("date_debut", `${jour}T00:00:00`)
+            .lte("date_debut", `${jour}T23:59:59`)
+            .maybeSingle();
+          if (existingMirror.data?.id) {
+            await supabase
+              .from("reservations_infrastructure")
+              .update({
+                date_debut: dateDebut,
+                date_fin: dateFin,
+                creneau: creneauLegacy(creneau),
+                heure_debut: debut.slice(0, 5),
+                heure_fin: fin.slice(0, 5),
+                statut: "confirmee",
+              })
+              .eq("id", existingMirror.data.id);
+          } else {
+            await supabase.from("reservations_infrastructure").insert({
+              infrastructure_id: infraMirrorId,
+              stage_id: stage.id,
+              date_debut: dateDebut,
+              date_fin: dateFin,
+              creneau: creneauLegacy(creneau),
+              heure_debut: debut.slice(0, 5),
+              heure_fin: fin.slice(0, 5),
+              statut: "confirmee",
+              notes: besoin.notes?.trim() || null,
+            });
+          }
+        }
+
         // Dispatch joueurs si mode dispatch
         if (besoin.mode === "dispatch" && besoin.joueurIds?.length) {
           const rows = besoin.joueurIds.map((jid: string) => ({
@@ -796,6 +905,225 @@ export const reserverTerrains = async (stage: any): Promise<{
     }
   }
   return { ok, conflits };
+};
+
+/** Extrait le JSON array après `[TERRAINS_BESOINS:` (crochets internes inclus). */
+function sliceTerrainsBesoinsJson(notes: string): string | null {
+  const marker = "[TERRAINS_BESOINS:";
+  const idx = notes.indexOf(marker);
+  if (idx === -1) return null;
+  const jsonStart = idx + marker.length;
+  if (notes[jsonStart] !== "[") return null;
+  let depth = 0;
+  for (let i = jsonStart; i < notes.length; i++) {
+    const ch = notes[i];
+    if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) return notes.slice(jsonStart, i + 1);
+    }
+  }
+  return null;
+}
+
+export function parseTerrainsBesoinsFromNotes(notes: string | null | undefined): TerrainBesoin[] | null {
+  if (!notes) return null;
+  const jsonStr = sliceTerrainsBesoinsJson(notes);
+  if (!jsonStr) return null;
+  try {
+    const parsed = JSON.parse(jsonStr) as TerrainBesoin[];
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function stripTerrainsBesoinsFromNotes(notes: string | null | undefined): string {
+  if (!notes) return "";
+  const marker = "[TERRAINS_BESOINS:";
+  let result = notes;
+  while (true) {
+    const idx = result.indexOf(marker);
+    if (idx === -1) break;
+    const jsonStart = idx + marker.length;
+    if (result[jsonStart] !== "[") {
+      const close = result.indexOf("]", jsonStart);
+      if (close === -1) break;
+      result = (result.slice(0, idx) + result.slice(close + 1)).trim();
+      continue;
+    }
+    let depth = 0;
+    let removeEnd = -1;
+    for (let i = jsonStart; i < result.length; i++) {
+      if (result[i] === "[") depth++;
+      else if (result[i] === "]") {
+        depth--;
+        if (depth === 0) {
+          removeEnd = i + 1;
+          if (result[removeEnd] === "]") removeEnd++;
+          break;
+        }
+      }
+    }
+    if (removeEnd === -1) break;
+    result = (result.slice(0, idx) + result.slice(removeEnd)).replace(/\s{2,}/g, " ").trim();
+  }
+  return result.trim();
+}
+
+/** Passe matin → journée en base pour les stages avec terrains actifs. */
+export async function upgradeStageTerrainsMatinToJourneeInDb(stageId: string): Promise<number> {
+  const supabase = await getSupabaseDataClient();
+  let n = 0;
+  const { data: infraRows } = await supabase
+    .from("reservations_infrastructure")
+    .select("id, date_debut")
+    .eq("stage_id", stageId)
+    .in("creneau", ["matin", "apres_midi"]);
+  for (const row of infraRows ?? []) {
+    const jour = String(row.date_debut).slice(0, 10);
+    await supabase
+      .from("reservations_infrastructure")
+      .update({
+        creneau: "journee",
+        date_debut: `${jour}T09:00:00`,
+        date_fin: `${jour}T18:00:00`,
+        heure_debut: "09:00",
+        heure_fin: "18:00",
+      })
+      .eq("id", row.id);
+    n++;
+  }
+  const { data: terrainRows } = await supabase
+    .from("terrain_reservations")
+    .select("terrain_id, date_debut")
+    .eq("stage_id", stageId)
+    .in("creneau", ["matin", "apres-midi"]);
+  for (const row of terrainRows ?? []) {
+    const jour = String(row.date_debut).slice(0, 10);
+    await supabase
+      .from("terrain_reservations")
+      .update({ creneau: "journee", date_debut: jour, date_fin: jour })
+      .eq("stage_id", stageId)
+      .eq("terrain_id", row.terrain_id)
+      .eq("date_debut", jour)
+      .in("creneau", ["matin", "apres-midi"]);
+    n++;
+  }
+  return n;
+}
+
+/** Supprime matin/aprem quand une réservation journée existe déjà (doublons legacy). */
+export async function cleanupDuplicateMatinWhenJourneeExists(): Promise<number> {
+  const supabase = await getSupabaseDataClient();
+  const { data: journeeRows } = await supabase
+    .from("terrain_reservations")
+    .select("stage_id, terrain_id, date_debut")
+    .eq("creneau", "journee");
+  let cleaned = 0;
+  for (const row of journeeRows ?? []) {
+    const jour = String(row.date_debut).slice(0, 10);
+    await supabase
+      .from("terrain_reservations")
+      .delete()
+      .eq("stage_id", row.stage_id)
+      .eq("terrain_id", row.terrain_id)
+      .eq("date_debut", jour)
+      .in("creneau", ["matin", "apres-midi"]);
+    await supabase
+      .from("reservations_infrastructure")
+      .delete()
+      .eq("stage_id", row.stage_id)
+      .eq("infrastructure_id", row.terrain_id)
+      .gte("date_debut", `${jour}T00:00:00`)
+      .lte("date_debut", `${jour}T23:59:59`)
+      .in("creneau", ["matin", "apres_midi"]);
+    cleaned++;
+  }
+  return cleaned;
+}
+
+/** Recrée les réservations terrain depuis les métadonnées `[TERRAINS_BESOINS:…]` du stage. */
+export async function resyncStageTerrainsFromNotes(stage: {
+  id: string;
+  nom?: string;
+  stage_action?: string;
+  date_debut: string;
+  date_fin: string;
+  notes?: string | null;
+}): Promise<{ ok: string[]; conflits: string[] }> {
+  const besoins = parseTerrainsBesoinsFromNotes(stage.notes);
+  if (!besoins?.length) return { ok: [], conflits: [] };
+  const normalized = besoins.map((b) => ({
+    ...b,
+    creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
+    mode: b.mode ?? "stage",
+  }));
+  if (normalized.some((b) => !b.creneaux?.length || b.creneaux.includes("journee"))) {
+    await upgradeStageTerrainsMatinToJourneeInDb(stage.id);
+  }
+  const supabase = await getSupabaseDataClient();
+  for (const besoin of normalized) {
+    const wantsJournee = !besoin.creneaux?.length || besoin.creneaux.includes("journee");
+    if (!wantsJournee) continue;
+    const infraId = besoin.terrainId;
+    const days =
+      besoin.jours?.length ?
+        besoin.jours.map((d) => d.slice(0, 10))
+      : eachDayOfStage(stage.date_debut, stage.date_fin);
+    for (const jour of days) {
+      await supabase
+        .from("reservations_infrastructure")
+        .update({
+          creneau: "journee",
+          date_debut: `${jour}T09:00:00`,
+          date_fin: `${jour}T18:00:00`,
+          heure_debut: "09:00",
+          heure_fin: "18:00",
+          statut: "confirmee",
+        })
+        .eq("stage_id", stage.id)
+        .eq("infrastructure_id", infraId)
+        .gte("date_debut", `${jour}T00:00:00`)
+        .lte("date_debut", `${jour}T23:59:59`)
+        .in("creneau", ["matin", "apres_midi"]);
+    }
+  }
+  return reserverTerrains({
+    id: stage.id,
+    nom: stage.nom ?? stage.stage_action ?? "Stage",
+    dateDebut: stage.date_debut,
+    dateFin: stage.date_fin,
+    besoins: { terrains: normalized },
+  });
+}
+
+/** Alignement automatique Stages → Réservations pour tous les stages avec besoins terrain. */
+export async function resyncAllStageTerrainsFromNotes(): Promise<number> {
+  const supabase = await getSupabaseDataClient();
+  const { data: stages } = await supabase
+    .from("stages_programme")
+    .select("id, stage_action, date_debut, date_fin, notes, statut, terrains")
+    .neq("statut", "annule");
+  let synced = 0;
+  await cleanupDuplicateMatinWhenJourneeExists();
+  for (const s of stages ?? []) {
+    const hasBesoins = Boolean(s.notes?.includes("[TERRAINS_BESOINS:"));
+    if (s.terrains && !hasBesoins) {
+      await upgradeStageTerrainsMatinToJourneeInDb(s.id);
+    }
+    if (!hasBesoins && !s.terrains) continue;
+    if (!hasBesoins) continue;
+    const { ok } = await resyncStageTerrainsFromNotes({
+      id: s.id,
+      stage_action: s.stage_action,
+      date_debut: s.date_debut,
+      date_fin: s.date_fin,
+      notes: s.notes,
+    });
+    if (ok.length > 0) synced++;
+  }
+  return synced;
 };
 
 /* ─── SUPPRIMER RÉSERVATIONS D'UN STAGE ─── */

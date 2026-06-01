@@ -181,8 +181,13 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
     });
     if (courts.length === 0) courts = infrastructures.slice(0, form.terrains.nb_courts);
     courts = courts.slice(0, form.terrains.nb_courts);
-    const creneau = form.terrains.creneau;
-    const { debut, fin } = getCreneauHoraires(form.terrains);
+    const creneau: "matin" | "apres_midi" | "journee" =
+      form.terrains.creneau === "matin"
+        ? "matin"
+        : form.terrains.creneau === "apres_midi"
+          ? "apres_midi"
+          : "journee";
+    const { debut, fin } = getCreneauHoraires({ ...form.terrains, creneau });
     const days = eachDayOfStage(form.date_debut, form.date_fin);
     const coachId = form.entraineur_ids[0] ?? null;
 

@@ -18,7 +18,7 @@ import { CategorySelect } from "@/components/v2/ui/CategorySelect";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
-import { createStageComplet, deleteStageQuickAction } from "@/lib/actions/stage-actions";
+import { createStageComplet, deleteStageQuickAction, updateStageQuickAction } from "@/lib/actions/stage-actions";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import {
   getEntraineurs,
@@ -29,6 +29,7 @@ import {
 import { exportStagePDF, exportStagesLogistiquePDF } from "@/lib/pdf/pdf-exports";
 import { emptyStageForm } from "@/lib/v2/form-defaults";
 import { loadAllStageCards, type StageDashboardCard } from "@/lib/v2/dashboard-data";
+import { hasTerrainsSupplementairesInNotes } from "@/lib/v2/stage-terrain-status";
 import { getCategoryStyle } from "@/lib/v2/category-colors";
 import { useDebounced } from "@/lib/hooks/useDebounced";
 import { matchesParticipantSearch } from "@/lib/v2/global-search";
@@ -124,6 +125,17 @@ export function StagesV2Client() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refresh();
+    });
+    return () => {
+      window.removeEventListener("focus", refresh);
+    };
+  }, [load]);
+
   const today = new Date().toISOString().slice(0, 10);
 
   const filtered = useMemo(() => {
@@ -213,7 +225,9 @@ export function StagesV2Client() {
               ? "apres_midi"
               : firstCreneau === "journee"
                 ? "journee"
-                : "matin",
+                : firstCreneau === "matin"
+                  ? "matin"
+                  : "journee",
           surface: "indifferent",
           fitness: hasFitness,
           natation: hasNatation,
@@ -247,6 +261,10 @@ export function StagesV2Client() {
     toast(result.message ?? "Stage créé");
 
     if (result.stage_id && terrainsBesoins.length > 0) {
+      await updateStageQuickAction(result.stage_id, {
+        terrains: true,
+        notes: payload.notes || null,
+      });
       const { ok, conflits } = await reserverTerrains({
         id: result.stage_id,
         nom: form.stage_action,
@@ -263,8 +281,10 @@ export function StagesV2Client() {
         toast(`${ok.length} terrain(s) réservé(s) avec succès !`, "success");
       }
       await syncStageLinkedViewsAction(result.stage_id);
+      await load();
     } else if (result.stage_id) {
       await syncStageLinkedViewsAction(result.stage_id);
+      await load();
     }
 
     setOpen(false);
@@ -310,7 +330,7 @@ export function StagesV2Client() {
               terrainType: selectedTerrain?.type,
               terrainSurface: selectedTerrain?.surface,
               terrainCapacite: selectedTerrain?.capacite,
-              creneaux: [],
+              creneaux: ["journee"],
               mode: "stage",
               joueurIds: [],
             },
@@ -368,7 +388,7 @@ export function StagesV2Client() {
     await load();
   }
 
-  async function handleExportPdf(stage: StageProgrammeV2) {
+  async function handleExportPdf(stage: StageDashboardCard) {
     const [j, e] = await Promise.all([
       getJoueursByStage(stage.id),
       getEntraineursByStage(stage.id),
@@ -384,7 +404,7 @@ export function StagesV2Client() {
       coachs: e.map((x) => `${x.prenom} ${x.nom}`),
       hebergement: stage.hebergement ? "Oui" : "Non",
       restauration: stage.restauration ? "Oui" : "Non",
-      terrains: stage.terrains ? "Oui" : "Non",
+      terrains: stage.has_terrains ? "Oui" : "Non",
     });
   }
 
@@ -397,16 +417,7 @@ export function StagesV2Client() {
   }
 
   function hasTerrainsSupp(notes: string | null | undefined): boolean {
-    if (!notes) return false;
-    const m = notes.match(/\[TERRAINS_BESOINS:(.+?)\]/);
-    if (!m?.[1]) return false;
-    try {
-      const parsed = JSON.parse(m[1]) as Array<{ terrainId?: string }>;
-      const uniq = new Set(parsed.map((x) => x.terrainId).filter(Boolean));
-      return uniq.size > 1;
-    } catch {
-      return false;
-    }
+    return hasTerrainsSupplementairesInNotes(notes);
   }
 
   async function handleExportLogistiquePdf() {

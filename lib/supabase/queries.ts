@@ -27,6 +27,13 @@ import type {
   StageProgrammeInputV2,
   StageProgrammeV2,
 } from "@/lib/types/v2";
+import { getCalendrierPeriode } from "@/lib/data/terrains";
+import {
+  finalizeReservationsFromStageBesoins,
+  mapCalendrierTerrainRow,
+  mergeReservationSources,
+  normalizeStageLinkedCourtReservations,
+} from "@/lib/v2/terrain-reservation-map";
 
 const STAGES = "stages_programme";
 
@@ -258,6 +265,10 @@ export async function createStage(data: StageProgrammeInputV2): Promise<{ stage:
     lieu: data.lieu,
     notes: data.notes,
     statut: data.statut ?? "prevu",
+    terrains: data.terrains ?? false,
+    restauration: data.restauration ?? false,
+    transport_avion: data.transport_avion ?? false,
+    kinesitherapie: data.kinesitherapie ?? false,
     infrastructure_ids: [],
     entraineur_ids: [],
     materiel_assignations: [],
@@ -716,6 +727,26 @@ export async function getReservationsInfrastructure(): Promise<ReservationInfraV
   );
 }
 
+/** Stage ids ayant au moins une réservation terrain (calendrier ou infra). */
+export async function getStageIdsWithTerrainReservations(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const [terrainRows, infraRows] = await Promise.all([
+    runSelect<{ stage_id: string | null }[]>("terrain_reservations", (c) =>
+      c.from("terrain_reservations").select("stage_id").not("stage_id", "is", null)
+    ),
+    runSelect<{ stage_id: string | null }[]>("reservations_infrastructure", (c) =>
+      c.from("reservations_infrastructure").select("stage_id").not("stage_id", "is", null)
+    ),
+  ]);
+  for (const row of terrainRows) {
+    if (row.stage_id) ids.add(row.stage_id);
+  }
+  for (const row of infraRows) {
+    if (row.stage_id) ids.add(row.stage_id);
+  }
+  return ids;
+}
+
 export async function getReservationsEnriched(): Promise<ReservationEnrichedV2[]> {
   const [reservations, stages, infrastructures, entraineurs, stageCoachLinks] = await Promise.all([
     getReservationsInfrastructure(),
@@ -733,7 +764,7 @@ export async function getReservationsEnriched(): Promise<ReservationEnrichedV2[]
     if (!stageFirstCoach.has(link.stage_id)) stageFirstCoach.set(link.stage_id, link.coach_id);
   }
 
-  return reservations.map((r) => {
+  const infraEnriched: ReservationEnrichedV2[] = reservations.map((r) => {
     const stage = r.stage_id ? stageMap.get(r.stage_id) : null;
     const infra = infraMap.get(r.infrastructure_id);
     const coachId = r.entraineur_id ?? (r.stage_id ? stageFirstCoach.get(r.stage_id) : null);
@@ -750,6 +781,36 @@ export async function getReservationsEnriched(): Promise<ReservationEnrichedV2[]
       groupe: stage?.categorie ?? null,
     };
   });
+
+  const year = new Date().getFullYear();
+  const terrainRows = await getCalendrierPeriode(`${year - 1}-01-01`, `${year + 2}-12-31`).catch(
+    () => [] as Record<string, unknown>[]
+  );
+  const terrainEnriched = terrainRows
+    .map((row) => mapCalendrierTerrainRow(row as Record<string, unknown>))
+    .filter((r): r is ReservationEnrichedV2 => r !== null)
+    .map((r) => {
+      const infra = infraMap.get(r.infrastructure_id);
+      const coachId = r.stage_id ? stageFirstCoach.get(r.stage_id) : null;
+      const coach = coachId ? coachMap.get(coachId) : null;
+      return {
+        ...r,
+        court_nom: r.court_nom ?? infra?.nom ?? null,
+        court_surface: r.court_surface ?? infra?.surface ?? null,
+        infrastructure_type: infra?.type ?? null,
+        coach_nom: coach?.nom ?? null,
+        coach_prenom: coach?.prenom ?? null,
+      };
+    });
+
+  return normalizeStageLinkedCourtReservations(
+    finalizeReservationsFromStageBesoins(
+      mergeReservationSources(infraEnriched, terrainEnriched),
+      stages
+    ),
+    infrastructures,
+    stages
+  );
 }
 
 export async function updateReservationInfrastructure(

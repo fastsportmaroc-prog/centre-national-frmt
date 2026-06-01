@@ -119,7 +119,7 @@ async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<Plan
             besoin.jours.map((d) => d.slice(0, 10))
           : days;
         for (const jour of jours) {
-          for (const creneau of besoin.creneaux) {
+          for (const creneau of besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const)) {
             const { debut, fin } = creneauHours(creneau);
             push({
               date: jour,
