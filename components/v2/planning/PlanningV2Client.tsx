@@ -11,9 +11,15 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
-import { getStages } from "@/lib/supabase/queries";
+import { getPlanning, getStages } from "@/lib/supabase/queries";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
 import type { StageProgrammeV2 } from "@/lib/types/v2";
+import {
+  buildPlanningSessionsForWeek,
+  formatPlanningSlotLabel,
+  type PlanningCreneauSlot,
+  type PlanningSessionRow,
+} from "@/lib/v2/planning-creneaux";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -26,28 +32,8 @@ import {
   UserSquare2,
 } from "lucide-react";
 
-type Creneau = "matin" | "apres_midi";
 type StageStatusFilter = "prevus_confirmes" | "en_cours" | "tous";
-type PlanningSession = {
-  id: string;
-  stageId: string;
-  stageName: string;
-  categorie: string;
-  date: string;
-  creneau: Creneau;
-  heure_debut: string;
-  heure_fin: string;
-  nombre_joueurs: number;
-  nombre_coachs: number;
-  statut: string;
-  hebergement: boolean;
-  restauration: boolean;
-  terrains: boolean;
-  terrains_supplementaires: boolean;
-  lettre_envoyee: boolean;
-  licences_verifiees: boolean;
-  observations: string;
-};
+type PlanningSession = PlanningSessionRow;
 
 function normalizeStageStatus(raw: unknown): string {
   return String(raw ?? "")
@@ -102,93 +88,12 @@ function pickStageDate(stage: StageProgrammeV2, kind: "start" | "end"): Date | n
   return null;
 }
 
-function slotLabel(slot: Creneau): string {
-  return slot === "matin" ? "Matin (09:00-11:00)" : "Après-midi (15:00-17:00)";
-}
-
-function stageBooleanFlag(stage: StageProgrammeV2, key: string): boolean {
-  return Boolean((stage as unknown as Record<string, unknown>)[key]);
-}
-
-function notesContains(note: string | null | undefined, ...tokens: string[]): boolean {
-  const n = (note ?? "").toLowerCase();
-  return tokens.some((t) => n.includes(t));
-}
-
-function shouldIncludeStageStatus(status: string): boolean {
-  return status === "prevu" || status === "confirme" || status === "en_cours";
-}
-
 export function generatePlanningSessionsFromStages(
   stages: StageProgrammeV2[],
+  planningRows: Awaited<ReturnType<typeof getPlanning>>,
   selectedWeekStart: Date
 ): PlanningSession[] {
-  const weekStart = startOfWeek(selectedWeekStart, { weekStartsOn: 1 });
-  const weekEnd = addDays(weekStart, 6);
-  const out: PlanningSession[] = [];
-
-  for (const stage of stages) {
-    const statut = normalizeStageStatus(stage.statut);
-    if (!shouldIncludeStageStatus(statut)) continue;
-
-    const start = pickStageDate(stage, "start");
-    const end = pickStageDate(stage, "end");
-    if (!start || !end) continue;
-
-    const current = new Date(start);
-    while (current <= end) {
-      if (current >= weekStart && current <= weekEnd) {
-        const day = format(current, "yyyy-MM-dd");
-        out.push({
-          id: `${stage.id}-${day}-matin`,
-          stageId: stage.id,
-          stageName: stage.stage_action ?? "Stage",
-          categorie: normalizeStageCategory(stage.categorie),
-          date: day,
-          creneau: "matin",
-          heure_debut: "09:00",
-          heure_fin: "11:00",
-          nombre_joueurs: Number(stage.nombre_joueurs ?? 0),
-          nombre_coachs: Number(stage.nombre_encadrants ?? 0),
-          statut,
-          hebergement: stageBooleanFlag(stage, "hebergement"),
-          restauration: stageBooleanFlag(stage, "restauration"),
-          terrains: stageBooleanFlag(stage, "terrains"),
-          terrains_supplementaires: notesContains(stage.notes, "[terrains_besoins:", "terrain supp"),
-          lettre_envoyee: notesContains(stage.notes, "lettre envoy", "lettre officielle générée"),
-          licences_verifiees: notesContains(stage.notes, "licences vérifiées", "licence ok"),
-          observations: (stage.notes ?? "").trim() || "—",
-        });
-        out.push({
-          id: `${stage.id}-${day}-apres_midi`,
-          stageId: stage.id,
-          stageName: stage.stage_action ?? "Stage",
-          categorie: normalizeStageCategory(stage.categorie),
-          date: day,
-          creneau: "apres_midi",
-          heure_debut: "15:00",
-          heure_fin: "17:00",
-          nombre_joueurs: Number(stage.nombre_joueurs ?? 0),
-          nombre_coachs: Number(stage.nombre_encadrants ?? 0),
-          statut,
-          hebergement: stageBooleanFlag(stage, "hebergement"),
-          restauration: stageBooleanFlag(stage, "restauration"),
-          terrains: stageBooleanFlag(stage, "terrains"),
-          terrains_supplementaires: notesContains(stage.notes, "[terrains_besoins:", "terrain supp"),
-          lettre_envoyee: notesContains(stage.notes, "lettre envoy", "lettre officielle générée"),
-          licences_verifiees: notesContains(stage.notes, "licences vérifiées", "licence ok"),
-          observations: (stage.notes ?? "").trim() || "—",
-        });
-      }
-      current.setDate(current.getDate() + 1);
-    }
-  }
-
-  return out.sort((a, b) => {
-    const k1 = `${a.date}|${a.creneau}|${a.stageName}`;
-    const k2 = `${b.date}|${b.creneau}|${b.stageName}`;
-    return k1.localeCompare(k2);
-  });
+  return buildPlanningSessionsForWeek(stages, planningRows, selectedWeekStart);
 }
 
 export function PlanningV2Client() {
@@ -197,6 +102,7 @@ export function PlanningV2Client() {
   const searchParams = useSearchParams();
   const stageFromUrl = searchParams.get("stage") ?? "";
   const [stages, setStages] = useState<StageProgrammeV2[]>([]);
+  const [planningRows, setPlanningRows] = useState<Awaited<ReturnType<typeof getPlanning>>>([]);
   const [stageFilter, setStageFilter] = useState(stageFromUrl);
   const [statusFilter, setStatusFilter] = useState<StageStatusFilter>("tous");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -206,8 +112,9 @@ export function PlanningV2Client() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const s = await getStages();
+    const [s, p] = await Promise.all([getStages(), getPlanning()]);
     setStages(s);
+    setPlanningRows(p);
     if (isDev) {
       console.info("[PlanningV2] stages loaded:", s.length);
     }
@@ -233,7 +140,10 @@ export function PlanningV2Client() {
   const weekLabel = formatWeekRange(weekStart);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  const generatedSessions = useMemo(() => generatePlanningSessionsFromStages(stages, weekStart), [stages, weekStart]);
+  const generatedSessions = useMemo(
+    () => generatePlanningSessionsFromStages(stages, planningRows, weekStart),
+    [stages, planningRows, weekStart]
+  );
 
   const stageById = useMemo(
     () => Object.fromEntries(stages.map((s) => [s.id, s])),
@@ -299,7 +209,11 @@ export function PlanningV2Client() {
     <>
       <V2PageHeader
         title="Planning des séances"
-        description={loading ? "Chargement des stages…" : "Planning automatique généré depuis les stages"}
+        description={
+          loading ?
+            "Chargement des stages…"
+          : "Créneaux alignés sur les terrains stage : matin 09-13, après-midi 14-18, journée 09-18"
+        }
         actions={
           <V2PageActions
             onExportPdf={() =>
@@ -309,7 +223,7 @@ export function PlanningV2Client() {
                   heure_debut: r.heure_debut,
                   heure_fin: r.heure_fin,
                   jour: format(parseISO(`${r.date}T12:00:00`), "EEEE", { locale: fr }),
-                  creneau: slotLabel(r.creneau),
+                  creneau: formatPlanningSlotLabel(r.creneau),
                   horaire: `${r.heure_debut} - ${r.heure_fin}`,
                   stage: r.stageName,
                   categorie: normalizeStageCategory(r.categorie),
@@ -402,12 +316,12 @@ export function PlanningV2Client() {
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
             <div className="mb-1 flex items-center gap-2 text-emerald-300"><Sun className="h-4 w-4" /> Créneaux matin</div>
             <p className="text-2xl font-bold">{weekSummary.matin}</p>
-            <p className="text-xs text-muted">Créneaux 09:00-11:00</p>
+            <p className="text-xs text-muted">Créneaux 09:00-13:00</p>
           </Card>
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
             <div className="mb-1 flex items-center gap-2 text-emerald-300"><Clock3 className="h-4 w-4" /> Créneaux après-midi</div>
             <p className="text-2xl font-bold">{weekSummary.apm}</p>
-            <p className="text-xs text-muted">Créneaux 15:00-17:00</p>
+            <p className="text-xs text-muted">Créneaux 14:00-18:00</p>
           </Card>
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
             <div className="mb-1 flex items-center gap-2 text-emerald-300"><Users className="h-4 w-4" /> Total joueurs concernés</div>
@@ -425,7 +339,7 @@ export function PlanningV2Client() {
           <EmptyState
             icon={CalendarDays}
             title="Aucune séance générée pour cette semaine"
-            description="Les séances sont créées automatiquement à partir des stages prévus, confirmés ou en cours."
+            description="Configurez les terrains sur la fiche stage (onglet Terrains), puis synchronisez le planning depuis la fiche stage."
             actionLabel="Voir les stages"
             onAction={() => router.push("/v2/stages")}
           />
@@ -440,14 +354,18 @@ export function PlanningV2Client() {
                     <p className="mb-2 text-xs font-semibold uppercase text-muted">
                       {format(day, "EEEE dd/MM", { locale: fr })}
                     </p>
-                    {(["matin", "apres_midi"] as Creneau[]).map((slot) => {
+                    {(["matin", "apres_midi", "journee"] as PlanningCreneauSlot[]).map((slot) => {
                       const key = `${dayIso}|${slot}`;
                       const slotSessions = sessionsByDaySlot.get(key) ?? [];
                       return (
                         <div key={key} className="mb-2 space-y-2 rounded border border-border/40 p-2">
                           <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
-                            {slot === "matin" ? <Sun className="h-3 w-3" /> : <Clock3 className="h-3 w-3" />}
-                            {slotLabel(slot)}
+                            {slot === "matin" ?
+                              <Sun className="h-3 w-3" />
+                            : slot === "apres_midi" ?
+                              <Clock3 className="h-3 w-3" />
+                            : <CalendarDays className="h-3 w-3" />}
+                            {formatPlanningSlotLabel(slot)}
                           </p>
                           {slotSessions.length === 0 ? (
                             <p className="text-[11px] text-muted">Aucune séance</p>

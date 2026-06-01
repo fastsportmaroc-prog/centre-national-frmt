@@ -1,5 +1,7 @@
-import { getReservationsStageTerrains } from "@/lib/data/terrains";
-import type { TerrainBesoin } from "@/lib/data/terrains";
+import {
+  getReservationsStageTerrains,
+  parseTerrainsBesoinsFromNotes,
+} from "@/lib/data/terrains";
 import { createSeance, getPlanningByStage, getStages } from "@/lib/supabase/queries";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 
@@ -35,18 +37,6 @@ function creneauHours(creneau: string): { debut: string; fin: string } {
 
 function slotKey(slot: PlanningSlot): string {
   return `${slot.date}|${slot.infrastructure_id ?? ""}|${normalizeTime(slot.heure_debut)}|${normalizeTime(slot.heure_fin)}`;
-}
-
-function parseTerrainsBesoins(notes: string | null | undefined): TerrainBesoin[] | null {
-  if (!notes) return null;
-  const match = notes.match(/\[TERRAINS_BESOINS:(.+?)\]/);
-  if (!match?.[1]) return null;
-  try {
-    const parsed = JSON.parse(match[1]) as TerrainBesoin[];
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
 }
 
 function parsePlanningTemplateCode(notes: string | null | undefined): string | null {
@@ -107,7 +97,7 @@ async function collectPlanningSlots(stage: StagePlanningSyncInput): Promise<Plan
   }
 
   if (slots.length === 0) {
-    const besoins = parseTerrainsBesoins(stage.notes);
+    const besoins = parseTerrainsBesoinsFromNotes(stage.notes);
     if (besoins?.length) {
       const days =
         besoins.some((b) => b.jours?.length) ?
