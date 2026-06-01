@@ -109,8 +109,13 @@ export function mergeReservationSources(
 
 function besoinPrimaryCreneau(besoin: TerrainBesoin): CreneauType {
   const creneaux = besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const);
-  if (creneaux.some((c) => c === "journee")) return "journee";
-  if (creneaux.some((c) => c === "apres-midi")) return "apres_midi";
+  const normalized = creneaux.map((c) => (c === "apres-midi" ? "apres_midi" : c));
+  if (normalized.length === 1) {
+    const only = normalized[0];
+    if (only === "matin" || only === "apres_midi" || only === "journee") return only;
+  }
+  if (normalized.includes("journee")) return "journee";
+  if (normalized.includes("apres_midi")) return "apres_midi";
   return "matin";
 }
 
@@ -183,11 +188,11 @@ export function finalizeReservationsFromStageBesoins(
     }
     const target = besoinPrimaryCreneau(besoin);
     const current = resolveCreneauType(r);
-    if (target === "journee" && current !== "journee") {
-      adjusted.push(applyCreneauToRow(r, "journee"));
+    if (current !== target) {
+      adjusted.push(applyCreneauToRow(r, target));
       continue;
     }
-    adjusted.push(current === target ? r : applyCreneauToRow(r, target));
+    adjusted.push(r);
   }
 
   for (const stage of stages) {
@@ -234,7 +239,7 @@ export function finalizeReservationsFromStageBesoins(
   return adjusted.sort((a, b) => a.date_debut.localeCompare(b.date_debut));
 }
 
-/** Stages avec terrains actifs → affichage journée par défaut (sauf besoin matin explicite). */
+/** Aligne l'affichage sur les besoins terrain des notes (sans forcer la journée). */
 export function applyJourneeDefaultForStageTerrains(
   rows: ReservationEnrichedV2[],
   stages: Array<{ id: string; terrains?: boolean; notes?: string | null }>
@@ -243,21 +248,14 @@ export function applyJourneeDefaultForStageTerrains(
   return rows.map((r) => {
     if (!r.stage_id) return r;
     const stage = stageMap.get(r.stage_id);
-    if (!stage?.terrains && !parseTerrainsBesoinsFromNotes(stage?.notes)?.length) return r;
-
     const besoins = parseTerrainsBesoinsFromNotes(stage?.notes);
-    if (besoins?.length) {
-      const day = dateOnlyString(r.date_debut);
-      const besoin = besoins.find((b) => reservationMatchesBesoin(r, b, day));
-      if (besoin?.creneaux?.length && !besoin.creneaux.includes("journee")) {
-        return r;
-      }
-    }
-
-    if (resolveCreneauType(r) === "matin") {
-      return applyCreneauToRow(r, "journee");
-    }
-    return r;
+    if (!besoins?.length) return r;
+    const day = dateOnlyString(r.date_debut);
+    const besoin = besoins.find((b) => reservationMatchesBesoin(r, b, day));
+    if (!besoin) return r;
+    const target = besoinPrimaryCreneau(besoin);
+    const current = resolveCreneauType(r);
+    return current === target ? r : applyCreneauToRow(r, target);
   });
 }
 

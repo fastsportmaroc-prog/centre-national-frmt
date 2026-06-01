@@ -39,7 +39,10 @@ export function appendTerrainBesoinToNotes(
   const idx = existing.findIndex((b) => b.terrainId === besoin.terrainId);
   const normalized: TerrainBesoin = {
     ...besoin,
-    creneaux: besoin.creneaux?.length ? besoin.creneaux : (["journee"] as TerrainBesoin["creneaux"]),
+    creneaux:
+      besoin.creneaux?.length ?
+        [...besoin.creneaux]
+      : (["journee"] as TerrainBesoin["creneaux"]),
     mode: besoin.mode ?? "stage",
   };
   if (idx >= 0) existing[idx] = { ...existing[idx], ...normalized };

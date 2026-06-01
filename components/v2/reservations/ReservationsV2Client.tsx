@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { FileDown, Pencil, Plus, Trash2 } from "lucide-react";
@@ -87,20 +87,7 @@ export function ReservationsV2Client() {
   const [deleteRow, setDeleteRow] = useState<ReservationEnrichedV2 | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const terrainSyncDone = useRef(false);
-
   const load = useCallback(async () => {
-    if (!terrainSyncDone.current) {
-      terrainSyncDone.current = true;
-      setSyncing(true);
-      try {
-        await reconcileStageTerrainReservationsAction();
-      } catch {
-        /* sync best-effort */
-      } finally {
-        setSyncing(false);
-      }
-    }
     const [r, s, i] = await Promise.all([
       getReservationsEnriched(),
       getStages(),
@@ -261,9 +248,9 @@ export function ReservationsV2Client() {
       setStages(s);
       setInfrastructures(i);
       toast(
-        result.upgraded > 0
-          ? `${result.upgraded} créneau(x) corrigé(s) en journée complète`
-          : "Réservations synchronisées avec les stages",
+        result.cleaned > 0
+          ? `${result.cleaned} doublon(s) matin/journée supprimé(s)`
+          : "Réservations à jour (créneaux conservés)",
         "success"
       );
     } catch (e) {

@@ -31,11 +31,53 @@ function asError(err: unknown, fallback = "Erreur terrain"): Error {
   }
 }
 
-function mapLegacyCreneau(creneau: string | null | undefined): "matin" | "apres-midi" | "journee" {
-  const c = (creneau ?? "").toLowerCase().replace(/-/g, "_");
+function inferCreneauFromLegacyRow(row: {
+  creneau?: string | null;
+  date_debut?: string | null;
+  date_fin?: string | null;
+  heure_debut?: string | null;
+  heure_fin?: string | null;
+}): "matin" | "apres-midi" | "journee" {
+  const c = (row.creneau ?? "").toLowerCase().replace(/-/g, "_");
   if (c.includes("journee") || c.includes("journée")) return "journee";
   if (c.includes("apres")) return "apres-midi";
   if (c === "matin" || c.includes("matin")) return "matin";
+
+  const hD = String(row.heure_debut ?? "").slice(0, 5);
+  const hF = String(row.heure_fin ?? "").slice(0, 5);
+  if (hD === "09:00" && hF === "13:00") return "matin";
+  if (hD === "14:00" && hF === "18:00") return "apres-midi";
+  if (hD === "09:00" && hF === "18:00") return "journee";
+
+  const start = String(row.date_debut ?? "");
+  const end = String(row.date_fin ?? "");
+  const hasTime = start.includes("T") && end.includes("T");
+  if (hasTime) {
+    const hStart = Number(start.slice(11, 13)) + Number(start.slice(14, 16)) / 60;
+    const hEnd = Number(end.slice(11, 13)) + Number(end.slice(14, 16)) / 60;
+    if (hStart >= 13) return "apres-midi";
+    if (hEnd <= 13.5) return "matin";
+    if (hStart < 12 && hEnd > 15) return "journee";
+  }
+  return "journee";
+}
+
+function mapLegacyCreneau(
+  creneau: string | null | undefined,
+  row?: {
+    date_debut?: string | null;
+    date_fin?: string | null;
+    heure_debut?: string | null;
+    heure_fin?: string | null;
+  }
+): "matin" | "apres-midi" | "journee" {
+  if (creneau?.trim()) {
+    const c = creneau.toLowerCase().replace(/-/g, "_");
+    if (c.includes("journee") || c.includes("journée")) return "journee";
+    if (c.includes("apres")) return "apres-midi";
+    if (c === "matin" || c.includes("matin")) return "matin";
+  }
+  if (row) return inferCreneauFromLegacyRow({ creneau, ...row });
   return "journee";
 }
 
@@ -82,7 +124,7 @@ async function buildLegacyCalendrierRows(filters?: {
     if (filters?.dateDebut) q2 = q2.gte("date_fin", filters.dateDebut);
     if (filters?.dateFin) q2 = q2.lte("date_debut", filters.dateFin);
     const r2 = await q2.order("date_debut", { ascending: true });
-    resa = (r2.data ?? []).map((r: any) => ({ ...r, creneau: "journee" }));
+    resa = r2.data ?? [];
     resaErr = r2.error;
   }
   if (resaErr) throw asError(resaErr, "Erreur lecture reservations_infrastructure");
@@ -159,7 +201,7 @@ async function buildLegacyCalendrierRows(filters?: {
       stage_statut: st?.statut ?? "—",
       date_debut: String(r.date_debut).slice(0, 10),
       date_fin: String(r.date_fin).slice(0, 10),
-      creneau: mapLegacyCreneau(r.creneau),
+      creneau: mapLegacyCreneau(r.creneau, r),
       mode: extra.mode,
       resa_statut: r.statut ?? "confirmee",
       nb_joueurs_dispatches: nbDispatch,
@@ -304,7 +346,10 @@ export const getOccupation = async () => {
       .from("reservations_infrastructure")
       .select("id, infrastructure_id, stage_id, date_debut, statut")
       .in("statut", ["confirmee", "confirme", "confirmé", "confirmer"]);
-    resa = (r2.data ?? []).map((r: any) => ({ ...r, creneau: "journee" }));
+    resa = (r2.data ?? []).map((r: any) => ({
+      ...r,
+      creneau: inferCreneauFromLegacyRow(r),
+    }));
     resaErr = r2.error;
   }
   if (resaErr) throw asError(resaErr, "Erreur lecture reservations_infrastructure");
@@ -997,7 +1042,10 @@ export function stripTerrainsBesoinsFromNotes(notes: string | null | undefined):
   return result.trim();
 }
 
-/** Passe matin → journée en base pour les stages avec terrains actifs. */
+/**
+ * Passe matin → journée en base (migration manuelle uniquement).
+ * Ne pas appeler automatiquement : respecter le créneau choisi par l'utilisateur.
+ */
 export async function upgradeStageTerrainsMatinToJourneeInDb(stageId: string): Promise<number> {
   const supabase = await getSupabaseDataClient();
   let n = 0;
@@ -1088,12 +1136,9 @@ export async function resyncStageTerrainsFromNotes(
     creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
     mode: b.mode ?? "stage",
   }));
-  if (normalized.some((b) => !b.creneaux?.length || b.creneaux.includes("journee"))) {
-    await upgradeStageTerrainsMatinToJourneeInDb(stage.id);
-  }
   const supabase = await getSupabaseDataClient();
   for (const besoin of normalized) {
-    const wantsJournee = !besoin.creneaux?.length || besoin.creneaux.includes("journee");
+    const wantsJournee = besoin.creneaux?.includes("journee");
     if (!wantsJournee) continue;
     const infraId = besoin.terrainId;
     const days =
