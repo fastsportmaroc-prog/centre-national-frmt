@@ -41,19 +41,21 @@ export function LoginForm({ projectRef, configured }: Props) {
   }
 
   return (
-    <div className="px-8 pb-8 pt-6">
-      <div className="login-tabs mb-8 flex gap-6 border-b border-white/[0.08]">
+    <div className="login-form-body px-7 pb-8 pt-7 sm:px-9">
+      <div className="login-tabs mb-7 flex gap-1 rounded-sm border border-white/[0.06] bg-black/20 p-1">
         {(["login", "signup"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setMode(tab)}
             className={cn(
-              "login-tab pb-3 text-sm transition-colors",
-              mode === tab ? "login-tab--active" : "text-white/35 hover:text-white/55"
+              "login-tab flex-1 rounded-sm py-2.5 text-[13px] transition-all duration-200",
+              mode === tab
+                ? "login-tab--active bg-white/[0.07] text-white shadow-sm"
+                : "text-white/40 hover:text-white/60"
             )}
           >
-            {tab === "login" ? "Se connecter" : "Créer un compte"}
+            {tab === "login" ? "Connexion" : "Inscription"}
           </button>
         ))}
       </div>
