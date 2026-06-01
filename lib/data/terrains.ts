@@ -124,7 +124,10 @@ async function buildLegacyCalendrierRows(filters?: {
     if (filters?.dateDebut) q2 = q2.gte("date_fin", filters.dateDebut);
     if (filters?.dateFin) q2 = q2.lte("date_debut", filters.dateFin);
     const r2 = await q2.order("date_debut", { ascending: true });
-    resa = r2.data ?? [];
+    resa = (r2.data ?? []).map((r: any) => ({
+      ...r,
+      creneau: inferCreneauFromLegacyRow(r),
+    }));
     resaErr = r2.error;
   }
   if (resaErr) throw asError(resaErr, "Erreur lecture reservations_infrastructure");
