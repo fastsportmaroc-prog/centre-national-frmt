@@ -18,7 +18,7 @@ import {
   updateDemandeBillet,
 } from "@/lib/supabase/queries";
 import { exportBilletsPdf } from "@/lib/pdf/pdf-exports";
-import { getTarifsTransport } from "@/lib/v2/settings-store";
+import { billetPrixEnMad, formatBilletMontantMad } from "@/lib/v2/billets-currency";
 import type { CompetitionBilletFacture, CompetitionBilletHubRow } from "@/lib/types/competition";
 import type { DemandeBilletAvionV2 } from "@/lib/types/v2";
 import { ExternalLink, Plane, Trash2, Trophy } from "lucide-react";
@@ -34,10 +34,6 @@ const statutClass: Record<string, string> = {
 };
 
 type SourceFilter = "all" | "stages" | "competitions";
-
-function formatMad(n: number) {
-  return `${n.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} MAD`;
-}
 
 export function BilletsAvionV2Client() {
   const searchParams = useSearchParams();
@@ -94,9 +90,14 @@ export function BilletsAvionV2Client() {
     });
   }, [compBillets, filterCompetition, filterStatut]);
 
-  const tarifs = getTarifsTransport();
-  const stageCostEur = filteredStages.reduce((s, b) => s + Number(b.prix_unitaire), 0);
-  const compCostMad = filteredComp.reduce((s, b) => s + Number(b.montant ?? 0), 0);
+  const stageCostMad = filteredStages.reduce(
+    (s, b) => s + billetPrixEnMad(Number(b.prix_unitaire), b.devise),
+    0
+  );
+  const compCostMad = filteredComp.reduce(
+    (s, b) => s + billetPrixEnMad(Number(b.montant ?? 0), b.devise),
+    0
+  );
   const factureMad = compFactures
     .filter((f) => !filterCompetition || f.competition_id === filterCompetition)
     .reduce((s, f) => s + Number(f.montant), 0);
@@ -121,7 +122,7 @@ export function BilletsAvionV2Client() {
         b.personne_type,
         `${b.date_depart} ${b.aeroport_depart}`,
         `${b.date_retour} ${b.aeroport_retour}`,
-        b.prix_unitaire,
+        formatBilletMontantMad(Number(b.prix_unitaire), b.devise),
       ]),
       ...filteredComp.map((b) => [
         b.competition_nom,
@@ -129,10 +130,10 @@ export function BilletsAvionV2Client() {
         b.participant_type,
         `${b.type} ${b.date_vol}`,
         b.aeroport_depart ?? "",
-        b.montant ?? 0,
+        b.montant != null ? formatBilletMontantMad(Number(b.montant), b.devise) : "—",
       ]),
     ];
-    exportBilletsPdf(rows, stageCostEur + compCostMad / (tarifs.taux_eur_mad || 11));
+    exportBilletsPdf(rows, stageCostMad + compCostMad);
   }
 
   return (
@@ -179,13 +180,13 @@ export function BilletsAvionV2Client() {
             <p className="text-xl font-bold">{filteredComp.length}</p>
           </Card>
           <Card className="p-3 text-sm">
-            <p className="text-muted">Coût stages EUR</p>
-            <p className="text-xl font-bold">{stageCostEur.toFixed(0)} €</p>
+            <p className="text-muted">Coût stages</p>
+            <p className="text-xl font-bold">{formatBilletMontantMad(stageCostMad, "MAD")}</p>
           </Card>
           <Card className="p-3 text-sm">
             <p className="text-muted">Coût compétitions / factures</p>
             <p className="text-xl font-bold">
-              {formatMad(Math.max(compCostMad, factureMad))}
+              {formatBilletMontantMad(Math.max(compCostMad, factureMad), "MAD")}
             </p>
           </Card>
         </div>
@@ -243,7 +244,9 @@ export function BilletsAvionV2Client() {
                     >
                       <p className="font-medium">{nom}</p>
                       <p className="text-muted">{f.prestataire_nom ?? "Prestataire"}</p>
-                      <p className="mt-1 font-bold text-frmt-gold">{formatMad(f.montant)}</p>
+                      <p className="mt-1 font-bold text-frmt-gold">
+                        {formatBilletMontantMad(f.montant, f.devise ?? "MAD")}
+                      </p>
                       {f.reference && (
                         <p className="text-xs text-muted">Réf. {f.reference}</p>
                       )}
@@ -373,7 +376,7 @@ export function BilletsAvionV2Client() {
                       </td>
                       <td className="p-2 text-right font-medium">
                         {b.montant != null
-                          ? `${Number(b.montant).toLocaleString("fr-FR")} ${b.devise ?? "MAD"}`
+                          ? formatBilletMontantMad(Number(b.montant), b.devise)
                           : "—"}
                       </td>
                       <td className="p-2">

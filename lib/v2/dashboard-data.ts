@@ -13,6 +13,7 @@ import {
   getStageJoueursLinks,
 } from "@/lib/supabase/queries";
 import type { StageProgrammeV2 } from "@/lib/types/v2";
+import { billetPrixEnMad } from "@/lib/v2/billets-currency";
 import { detectConflicts } from "@/lib/v2/reservations-utils";
 import {
   hasTerrainsInNotes,
@@ -293,10 +294,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
   const billetsEnAttente = billets.filter((b) => b.statut === "demande").length;
   const madAPayer = billets
     .filter((b) => b.statut === "demande")
-    .reduce((sum, b) => {
-      if (b.devise === "MAD") return sum + b.prix_unitaire;
-      return sum + b.prix_unitaire * 10.8;
-    }, 0);
+    .reduce((sum, b) => sum + billetPrixEnMad(b.prix_unitaire, b.devise), 0);
 
   const weekTimeline: WeekTimelineDay[] = [];
   const now = new Date();

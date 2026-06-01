@@ -262,7 +262,7 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
         heure_retour: form.transport_avion.heure_retour || null,
         prix_unitaire: form.transport_avion.prix_unitaire,
         statut: "demande",
-        devise: "EUR",
+        devise: "MAD",
         notes: null,
       });
       if (error) erreurs.push(`billet ${p.nom}: ${error}`);

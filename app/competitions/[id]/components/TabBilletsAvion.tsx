@@ -18,6 +18,7 @@ import type {
   CompetitionBilletLegInput,
   CompetitionParticipantEnriched,
 } from "@/lib/types/competition";
+import { billetPrixEnMad, formatBilletMontantMad } from "@/lib/v2/billets-currency";
 
 type LegForm = {
   enabled: boolean;
@@ -43,9 +44,9 @@ const emptyLeg = (): LegForm => ({
   aeroport_retour_iata: null,
 });
 
-function formatMontant(n: number | null | undefined, devise = "MAD") {
+function formatMontant(n: number | null | undefined, devise?: string | null) {
   if (n == null || Number.isNaN(n)) return "—";
-  return `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${devise}`;
+  return formatBilletMontantMad(n, devise);
 }
 
 export function TabBilletsAvion({
@@ -109,7 +110,7 @@ export function TabBilletsAvion({
     setFactureMontant(f?.montant != null ? String(f.montant) : "");
     setFactureUrl(f?.facture_url ?? "");
     setFactureRef(f?.reference ?? "");
-    if (bJson.billets?.[0]?.devise) setDevise(bJson.billets[0].devise);
+    setDevise("MAD");
     if (fJson.tarif?.tarif_mode === "individuel" && bJson.billets?.[0]?.montant != null) {
       setMontantUnitaire(String(bJson.billets[0].montant));
     }
@@ -135,7 +136,7 @@ export function TabBilletsAvion({
 
   const totalBilletsMontant = useMemo(() => {
     if (tarifMode === "groupe" && montantGroupe) return Number(montantGroupe);
-    return billets.reduce((s, b) => s + Number(b.montant ?? 0), 0);
+    return billets.reduce((s, b) => s + billetPrixEnMad(Number(b.montant ?? 0), b.devise), 0);
   }, [billets, tarifMode, montantGroupe]);
 
   function participantName(id: string) {
@@ -182,7 +183,7 @@ export function TabBilletsAvion({
         tarif_mode: tarifMode,
         montant_unitaire: tarifMode === "individuel" ? Number(montantUnitaire) || null : null,
         montant_groupe: tarifMode === "groupe" ? Number(montantGroupe) || null : null,
-        devise,
+        devise: "MAD",
       }),
     });
     const json = await res.json();
@@ -472,10 +473,9 @@ export function TabBilletsAvion({
             </div>
             <div>
               <Label>Devise</Label>
-              <Select value={devise} onChange={(e) => setDevise(e.target.value)}>
-                <option value="MAD">MAD</option>
-                <option value="EUR">EUR</option>
-              </Select>
+              <p className="mt-1 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm font-medium">
+                MAD (dirham marocain)
+              </p>
             </div>
           </div>
           {tarifMode === "individuel" ? (
@@ -522,7 +522,7 @@ export function TabBilletsAvion({
       <Card className="p-4 text-sm">
         <p className="text-muted">Total billets compétition</p>
         <p className="text-xl font-bold text-frmt-gold">
-          {formatMontant(totalBilletsMontant, devise)}
+          {formatMontant(totalBilletsMontant, "MAD")}
           {tarifMode === "groupe" ? " (groupe)" : " (individuel)"}
         </p>
       </Card>

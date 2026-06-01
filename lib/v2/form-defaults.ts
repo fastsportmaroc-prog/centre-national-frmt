@@ -2,7 +2,10 @@ import { getTarifsTransport } from "@/lib/v2/settings-store";
 import type { StageCompletFormData } from "@/lib/types/v2";
 
 export function emptyStageForm(dates?: { debut?: string; fin?: string }): StageCompletFormData {
-  const tarifs = typeof window !== "undefined" ? getTarifsTransport() : { prix_billet_eur: 350 };
+  const tarifs =
+    typeof window !== "undefined" ?
+      getTarifsTransport()
+    : { prix_billet_mad: 3850, prix_billet_eur: 350 };
   const debut = dates?.debut ?? "2026-06-02";
   const fin = dates?.fin ?? "2026-06-08";
   return {
@@ -54,7 +57,7 @@ export function emptyStageForm(dates?: { debut?: string; fin?: string }): StageC
       aeroport_retour: "CMN - Casablanca",
       date_retour: fin,
       heure_retour: "18:00",
-      prix_unitaire: tarifs.prix_billet_eur,
+      prix_unitaire: tarifs.prix_billet_mad,
       tous_joueurs: true,
       tous_entraineurs: true,
       joueur_ids: [],

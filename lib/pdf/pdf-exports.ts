@@ -242,20 +242,19 @@ export function exportReservationsPDF(
 
 export function exportBilletsPdf(
   rows: (string | number)[][],
-  totalEur: number,
-  _devise = "EUR",
+  totalMad: number,
+  _devise = "MAD",
   stageName?: string
 ) {
-  const headers = ["Nom", "Prénom", "Type", "Départ", "Retour", "Prix"];
+  const headers = ["Nom", "Prénom", "Type", "Départ", "Retour", "Prix (MAD)"];
   const data = rows.map((r) =>
     Object.fromEntries(headers.map((h, j) => [h, String(r[j] ?? "—")]))
   );
-  exportBilletsPDF(data, totalEur, totalEur * 10.8, stageName);
+  exportBilletsPDF(data, totalMad, stageName);
 }
 
 export function exportBilletsPDF(
   rows: Record<string, string>[],
-  totalEur: number,
   totalMad: number,
   stageName?: string
 ) {
@@ -266,7 +265,7 @@ export function exportBilletsPDF(
     filename: "billets-avion.pdf",
     columns: keys.map((k) => ({ header: k, key: k })),
     data: rows,
-    footerNote: `TOTAL — ${rows.length} billets — ${formatMoneyEUR(totalEur)} / ${formatMoneyMAD(totalMad)}`,
+    footerNote: `TOTAL — ${rows.length} billet(s) — ${formatMoneyMAD(totalMad)}`,
   });
 }
 
