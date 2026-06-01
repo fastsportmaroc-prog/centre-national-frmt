@@ -10,7 +10,6 @@ import { V2PageActions } from "@/components/v2/V2PageActions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
-import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { getPlanning, getStages } from "@/lib/supabase/queries";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
 import type { StageProgrammeV2 } from "@/lib/types/v2";
@@ -21,6 +20,7 @@ import {
   type PlanningSessionRow,
 } from "@/lib/v2/planning-creneaux";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
+import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Activity,
@@ -34,6 +34,12 @@ import {
 
 type StageStatusFilter = "prevus_confirmes" | "en_cours" | "tous";
 type PlanningSession = PlanningSessionRow;
+
+const CRENEAU_ORDER: PlanningCreneauSlot[] = ["matin", "apres_midi", "journee"];
+
+function creneauxReservesDuJour(daySessions: PlanningSession[]): PlanningCreneauSlot[] {
+  return CRENEAU_ORDER.filter((slot) => daySessions.some((s) => s.creneau === slot));
+}
 
 function normalizeStageStatus(raw: unknown): string {
   return String(raw ?? "")
@@ -179,16 +185,24 @@ export function PlanningV2Client() {
     });
   }, [generatedSessions, stageFilter, categoryFilter, statusFilter]);
 
-  const sessionsByDaySlot = useMemo(() => {
+  const sessionsByDay = useMemo(() => {
     const map = new Map<string, PlanningSession[]>();
     for (const s of filteredSessions) {
-      const key = `${s.date}|${s.creneau}`;
-      const list = map.get(key) ?? [];
+      const list = map.get(s.date) ?? [];
       list.push(s);
-      map.set(key, list);
+      map.set(s.date, list);
     }
     return map;
   }, [filteredSessions]);
+
+  const joursDisponiblesCount = useMemo(() => {
+    let n = 0;
+    for (const day of weekDays) {
+      const iso = format(day, "yyyy-MM-dd");
+      if ((sessionsByDay.get(iso)?.length ?? 0) === 0) n++;
+    }
+    return n;
+  }, [weekDays, sessionsByDay]);
 
   const weekSummary = useMemo(() => {
     const uniqueStages = new Set(filteredSessions.map((s) => s.stageId)).size;
@@ -336,84 +350,129 @@ export function PlanningV2Client() {
         </div>
 
         {filteredSessions.length === 0 ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="Aucune séance générée pour cette semaine"
-            description="Configurez les terrains sur la fiche stage (onglet Terrains), puis synchronisez le planning depuis la fiche stage."
-            actionLabel="Voir les stages"
-            onAction={() => router.push("/v2/stages")}
-          />
-        ) : (
-          <Card className="overflow-x-auto p-4">
-            <h3 className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Vue semaine</h3>
-            <div className="grid min-w-[1100px] grid-cols-7 gap-3">
-              {weekDays.map((day) => {
-                const dayIso = format(day, "yyyy-MM-dd");
-                return (
-                  <div key={dayIso} className="rounded border border-border/60 bg-[var(--bg-main)] p-2">
-                    <p className="mb-2 text-xs font-semibold uppercase text-muted">
-                      {format(day, "EEEE dd/MM", { locale: fr })}
-                    </p>
-                    {(["matin", "apres_midi", "journee"] as PlanningCreneauSlot[]).map((slot) => {
-                      const key = `${dayIso}|${slot}`;
-                      const slotSessions = sessionsByDaySlot.get(key) ?? [];
-                      return (
-                        <div key={key} className="mb-2 space-y-2 rounded border border-border/40 p-2">
-                          <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
-                            {slot === "matin" ?
-                              <Sun className="h-3 w-3" />
-                            : slot === "apres_midi" ?
-                              <Clock3 className="h-3 w-3" />
-                            : <CalendarDays className="h-3 w-3" />}
-                            {formatPlanningSlotLabel(slot)}
-                          </p>
-                          {slotSessions.length === 0 ? (
-                            <p className="text-[11px] text-muted">Aucune séance</p>
-                          ) : (
-                            slotSessions.map((s) => (
-                              <div
-                                key={s.id}
-                                className="rounded border border-emerald-500/30 bg-[linear-gradient(145deg,rgba(16,185,129,0.12),rgba(12,18,25,0.85))] p-2"
-                              >
-                                <div className="mb-1 flex items-start justify-between gap-1">
-                                  <p className="text-xs font-semibold">{s.stageName}</p>
-                                  <StatusBadge statut={s.statut} className="text-[10px]" />
-                                </div>
-                                <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px]">
-                                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5">{normalizeStageCategory(s.categorie)}</span>
-                                  <span>{s.heure_debut}-{s.heure_fin}</span>
-                                </div>
-                                <p className="text-[10px] text-muted">
-                                  {s.nombre_joueurs} joueurs · {s.nombre_coachs} coachs
-                                </p>
-                                <div className="mt-1 flex gap-2 text-[10px]">
-                                  <Link href={`/v2/stages/${s.stageId}`} className="text-[#3498db] hover:underline">
-                                    Fiche stage
-                                  </Link>
-                                  <Link href={`/v2/calendrier?stage=${s.stageId}`} className="text-frmt-green hover:underline">
-                                    Calendrier
-                                  </Link>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+          <Card className="border border-amber-500/25 bg-amber-500/5 p-3 text-sm text-muted">
+            Aucun créneau réservé sur cette semaine avec les filtres actuels. Les jours en gris sont
+            disponibles — configurez les terrains sur la fiche stage (onglet Terrains).
+          </Card>
+        ) : null}
+
+        <Card className="overflow-x-auto p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Vue semaine</h3>
+            <div className="flex flex-wrap gap-3 text-[11px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-6 rounded border border-dashed border-slate-400/50 bg-slate-500/10" />
+                Jour disponible ({joursDisponiblesCount})
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-6 rounded border border-emerald-500/40 bg-emerald-500/10" />
+                Créneau(x) réservé(s)
+              </span>
             </div>
+          </div>
+          <div className="grid min-w-[1100px] grid-cols-7 gap-3">
+            {weekDays.map((day) => {
+              const dayIso = format(day, "yyyy-MM-dd");
+              const daySessions = sessionsByDay.get(dayIso) ?? [];
+              const hasReservations = daySessions.length > 0;
+              const creneauxReserves = creneauxReservesDuJour(daySessions);
+
+              return (
+                <div
+                  key={dayIso}
+                  className={cn(
+                    "flex min-h-[140px] flex-col rounded-lg border p-2 transition-colors",
+                    hasReservations ?
+                      "border-emerald-500/35 bg-[var(--bg-main)]"
+                    : "border-dashed border-slate-400/45 bg-slate-500/[0.07]"
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "mb-2 text-xs font-semibold uppercase",
+                      hasReservations ? "text-emerald-200" : "text-slate-400"
+                    )}
+                  >
+                    {format(day, "EEEE dd/MM", { locale: fr })}
+                    {!hasReservations ? (
+                      <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-500">
+                        Journée disponible
+                      </span>
+                    ) : null}
+                  </p>
+
+                  {creneauxReserves.map((slot) => {
+                    const slotSessions = daySessions.filter((s) => s.creneau === slot);
+                    return (
+                      <div
+                        key={`${dayIso}-${slot}`}
+                        className="mb-2 space-y-2 rounded border border-emerald-500/25 bg-emerald-500/[0.06] p-2 last:mb-0"
+                      >
+                        <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
+                          {slot === "matin" ?
+                            <Sun className="h-3 w-3 shrink-0" />
+                          : slot === "apres_midi" ?
+                            <Clock3 className="h-3 w-3 shrink-0" />
+                          : <CalendarDays className="h-3 w-3 shrink-0" />}
+                          {formatPlanningSlotLabel(slot)}
+                        </p>
+                        {slotSessions.map((s) => (
+                          <div
+                            key={s.id}
+                            className="rounded border border-emerald-500/30 bg-[linear-gradient(145deg,rgba(16,185,129,0.14),rgba(12,18,25,0.88))] p-2"
+                          >
+                            <div className="mb-1 flex items-start justify-between gap-1">
+                              <p className="text-xs font-semibold">{s.stageName}</p>
+                              <StatusBadge statut={s.statut} className="text-[10px]" />
+                            </div>
+                            <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px]">
+                              <span className="rounded bg-emerald-500/20 px-1.5 py-0.5">
+                                {normalizeStageCategory(s.categorie)}
+                              </span>
+                              <span>
+                                {s.heure_debut}–{s.heure_fin}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted">
+                              {s.nombre_joueurs} joueurs · {s.nombre_coachs} coachs
+                            </p>
+                            <div className="mt-1 flex gap-2 text-[10px]">
+                              <Link
+                                href={`/v2/stages/${s.stageId}`}
+                                className="text-[#3498db] hover:underline"
+                              >
+                                Fiche stage
+                              </Link>
+                              <Link
+                                href={`/v2/calendrier?stage=${s.stageId}`}
+                                className="text-frmt-green hover:underline"
+                              >
+                                Calendrier
+                              </Link>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          {filteredSessions.length > 0 ? (
             <div className="mt-4 rounded border border-border/40 bg-[var(--bg-main)] p-3 text-xs text-muted">
               <p className="mb-1 flex items-center gap-1 font-semibold text-emerald-300">
                 <BadgeCheck className="h-3 w-3" /> Indicateurs conformité
               </p>
               <p>
-                Hébergement: {filteredSessions.filter((s) => s.hebergement).length} · Restauration: {filteredSessions.filter((s) => s.restauration).length} · Terrains: {filteredSessions.filter((s) => s.terrains).length} · Licences vérifiées: {filteredSessions.filter((s) => s.licences_verifiees).length}
+                Hébergement: {filteredSessions.filter((s) => s.hebergement).length} · Restauration:{" "}
+                {filteredSessions.filter((s) => s.restauration).length} · Terrains:{" "}
+                {filteredSessions.filter((s) => s.terrains).length} · Licences vérifiées:{" "}
+                {filteredSessions.filter((s) => s.licences_verifiees).length}
               </p>
             </div>
-          </Card>
-        )}
+          ) : null}
+        </Card>
       </main>
     </>
   );
