@@ -40,8 +40,8 @@ export function LoginScreen({ configured, projectRef }: Props) {
           <LoginHeroBackdrop />
 
           <div className="login-v3-hero-content relative z-[1]">
-            <div className="login-v3-logo-wrap mb-8 lg:mb-12">
-              <LogoPlaceholder size="xl" className="login-v3-logo" />
+            <div className="login-v3-logo-plaque login-v3-logo-plaque--hero mb-8 lg:mb-12">
+              <LogoPlaceholder size="2xl" />
             </div>
 
             <p className="login-v3-badge">{APP_NAME_SHORT}</p>
@@ -67,7 +67,7 @@ export function LoginScreen({ configured, projectRef }: Props) {
         <section className="login-v3-panel flex items-center justify-center px-6 py-10 sm:px-10 lg:px-12 xl:px-16">
           <div className="login-v3-panel-inner w-full max-w-[440px]">
             <header className="login-v3-mobile-brand mb-8 text-center lg:hidden">
-              <div className="login-v3-logo-wrap login-v3-logo-wrap--sm mx-auto mb-5 inline-flex">
+              <div className="login-v3-logo-plaque login-v3-logo-plaque--light mx-auto mb-5 inline-flex">
                 <LogoPlaceholder size="lg" />
               </div>
               <p className="login-v3-federation-sm">{FEDERATION_NAME}</p>

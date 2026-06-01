@@ -2,7 +2,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
 };
 
@@ -11,6 +11,7 @@ const sizes = {
   md: 56,
   lg: 80,
   xl: 120,
+  "2xl": 148,
 };
 
 /** Logo officiel FRMT (public/logo-frmt.png). */
@@ -23,7 +24,7 @@ export function LogoPlaceholder({ size = "md", className }: Props) {
       width={px}
       height={px}
       className={cn("shrink-0 object-contain", className)}
-      priority={size === "lg"}
+      priority={size === "lg" || size === "xl" || size === "2xl"}
     />
   );
 }
