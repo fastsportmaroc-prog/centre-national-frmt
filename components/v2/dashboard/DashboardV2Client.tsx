@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   BedDouble,
   CalendarDays,
-  LayoutDashboard,
   Plane,
   Trophy,
   Users,
@@ -31,40 +30,36 @@ const VIEWS: {
   id: DashboardView;
   label: string;
   description: string;
-  activeClass: string;
 }[] = [
   {
     id: "logistique",
     label: "Vue logistique",
     description: "Stages, hébergement, repas, occupation du centre",
-    activeClass: "border-frmt-green bg-frmt-green/10 text-frmt-green shadow-sm shadow-frmt-green/10",
   },
   {
     id: "competition",
     label: "Vue compétition",
     description: "Compétitions, visas à prévoir, passeports et billets",
-    activeClass: "border-frmt-gold bg-frmt-gold/10 text-frmt-gold shadow-sm shadow-frmt-gold/15",
   },
   {
     id: "technique",
     label: "Vue technique",
     description: "Planning stages et préparation terrain",
-    activeClass: "border-sky-500 bg-sky-500/10 text-sky-200 shadow-sm shadow-sky-500/15",
   },
 ];
 
 function DashboardSkeleton() {
   return (
-    <div className="animate-pulse space-y-6 p-4 sm:p-6">
-      <div className="h-20 rounded-xl bg-[#161b22]" />
+    <div className="dashboard-page animate-pulse space-y-6 p-4 sm:p-6">
+      <div className="h-20 rounded-lg bg-[var(--bg-card)]" />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-48 rounded-lg bg-[#161b22]" />
+          <div key={i} className="h-48 rounded-lg bg-[var(--bg-card)]" />
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 rounded-lg bg-[#161b22]" />
+          <div key={i} className="h-24 rounded-lg bg-[var(--bg-card)]" />
         ))}
       </div>
     </div>
@@ -99,23 +94,18 @@ export function DashboardV2Client() {
   if (!data || !competitionData) return <DashboardSkeleton />;
 
   return (
-    <>
-      <header className="border-b border-[#30363d] bg-gradient-to-br from-[#0d1117] via-[#161b22] to-[#0d1117] px-4 py-6 sm:px-6">
+    <div className="dashboard-page">
+      <header className="border-b border-[var(--border-main)] px-4 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-frmt-gold">
-              Centre National · FRMT
-            </p>
-            <div className="mt-1 flex items-center gap-2">
-              <LayoutDashboard className="h-7 w-7 text-frmt-green" />
-              <h1 className="text-2xl font-bold text-[#e6edf3] sm:text-3xl">Tableau de bord</h1>
-            </div>
-            <p className="mt-2 text-sm text-[#c9d1d9]">{activeViewMeta.description}</p>
+            <p className="dashboard-breadcrumb">Centre National · FRMT</p>
+            <h1 className="dashboard-title mt-1">Tableau de bord</h1>
+            <p className="dashboard-subtitle mt-1.5">{activeViewMeta.description}</p>
           </div>
           {view === "competition" && (
             <Link
               href="/competitions"
-              className="rounded-lg border border-frmt-green/40 bg-frmt-green/10 px-4 py-2 text-sm font-medium text-frmt-green hover:bg-frmt-green/20"
+              className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-inset)] px-4 py-2 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             >
               Gérer les compétitions
             </Link>
@@ -127,33 +117,36 @@ export function DashboardV2Client() {
           role="tablist"
           aria-label="Vues du tableau de bord"
         >
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="tab"
-              aria-selected={view === v.id}
-              onClick={() => setView(v.id)}
-              className={cn(
-                "rounded-lg border px-4 py-2 text-sm font-medium transition",
-                view === v.id
-                  ? v.activeClass
-                  : "border-[#30363d] bg-[#0d1117]/60 text-[#8b949e] hover:border-[#484f58] hover:text-white"
-              )}
-            >
-              {v.label}
-              {v.id === "competition" && competitionData.kpis.visas_a_prevoir > 0 && (
-                <span className="ml-2 inline-flex min-w-[1.25rem] justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-                  {competitionData.kpis.visas_a_prevoir}
-                </span>
-              )}
-              {v.id === "logistique" && data.alertesByLevel.urgent.length > 0 && (
-                <span className="ml-2 inline-flex min-w-[1.25rem] justify-center rounded-full bg-red-500/90 px-1.5 text-[11px] font-bold text-white">
-                  {data.alertesByLevel.urgent.length}
-                </span>
-              )}
-            </button>
-          ))}
+          {VIEWS.map((v) => {
+            const competitionBadge =
+              v.id === "competition" && competitionData.kpis.visas_a_prevoir > 0
+                ? competitionData.kpis.visas_a_prevoir
+                : 0;
+            const logistiqueBadge =
+              v.id === "logistique" && data.alertesByLevel.urgent.length > 0
+                ? data.alertesByLevel.urgent.length
+                : 0;
+            const badge = competitionBadge || logistiqueBadge;
+
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={view === v.id}
+                onClick={() => setView(v.id)}
+                className={cn(
+                  "dashboard-view-tab",
+                  view === v.id && "dashboard-view-tab--active"
+                )}
+              >
+                {v.label}
+                {badge > 0 && (
+                  <span className="dashboard-view-tab-badge">{badge}</span>
+                )}
+              </button>
+            );
+          })}
         </nav>
       </header>
 
@@ -242,14 +235,14 @@ export function DashboardV2Client() {
 
             {(view === "logistique" || view === "technique") && (
               <section>
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#484f58]">
-                  Stages à venir
-                </h2>
+                <h2 className="dashboard-section-label mb-3">Stages à venir</h2>
                 {stagesToShow.length === 0 ? (
                   <div className="v2-kpi-card p-8 text-center">
                     <p className="text-3xl">🎾</p>
-                    <p className="mt-2 font-medium text-[#e6edf3]">Aucun stage planifié</p>
-                    <p className="mt-1 text-sm text-[#8b949e]">
+                    <p className="mt-2 text-[13px] font-medium text-[var(--text-primary)]">
+                      Aucun stage planifié
+                    </p>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                       Créez votre premier stage pour commencer
                     </p>
                   </div>
@@ -283,9 +276,7 @@ export function DashboardV2Client() {
             )}
 
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#484f58]">
-                Alertes priorisées
-              </h2>
+              <h2 className="dashboard-section-label mb-3">Alertes priorisées</h2>
               <div className="v2-kpi-card p-4">
                 <DashboardAlertsPanel byLevel={data.alertesByLevel} />
               </div>
@@ -293,25 +284,23 @@ export function DashboardV2Client() {
 
             {view === "logistique" && (
               <section>
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#484f58]">
-                  Occupation centre
-                </h2>
+                <h2 className="dashboard-section-label mb-3">Occupation centre</h2>
                 <div className="v2-kpi-card space-y-3 p-4">
                   {data.occupation.map((o) => (
                     <div key={o.infrastructure_id}>
-                      <div className="mb-1 flex justify-between text-sm text-[#e6edf3]">
+                      <div className="mb-1 flex justify-between text-[12px] text-[var(--text-primary)]">
                         <span>{o.nom}</span>
-                        <span className="text-[#8b949e]">{o.pct}%</span>
+                        <span className="text-[var(--text-muted)]">{o.pct}%</span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-[#0d1117]">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--bg-inset)]">
                         <div
                           className={cn(
                             "h-full rounded-full transition-all",
                             o.pct <= 50
-                              ? "bg-emerald-500"
+                              ? "bg-[var(--color-green)]"
                               : o.pct <= 80
-                                ? "bg-amber-500"
-                                : "bg-red-500"
+                                ? "bg-[var(--color-amber)]"
+                                : "bg-[var(--color-red)]"
                           )}
                           style={{ width: `${o.pct}%` }}
                         />
@@ -319,7 +308,7 @@ export function DashboardV2Client() {
                     </div>
                   ))}
                   {data.occupation.length === 0 && (
-                    <p className="text-sm text-[#8b949e]">Aucune infrastructure chargée.</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Aucune infrastructure chargée.</p>
                   )}
                 </div>
               </section>
@@ -327,6 +316,6 @@ export function DashboardV2Client() {
           </>
         )}
       </main>
-    </>
+    </div>
   );
 }

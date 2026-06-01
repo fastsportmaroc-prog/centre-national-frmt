@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { AppBrand } from "@/components/brand/AppBrand";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { NAV_BADGE_KEYS, v2NavSections } from "./nav-items";
 import { loadNavBadges } from "@/lib/v2/nav-badges";
@@ -25,19 +24,13 @@ export function V2Sidebar() {
   }, []);
 
   return (
-    <aside className="v2-sidebar hidden h-screen w-64 shrink-0 flex-col border-r md:flex">
+    <aside className="v2-sidebar hidden h-screen w-[200px] shrink-0 flex-col border-r md:flex">
       <div className="frmt-tricolor shrink-0" />
-      <div className="shrink-0 border-b border-white/5 px-4 py-4">
-        <AppBrand size="sm" showFederation={false} />
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8899aa]">
-          Centre National — V2
-        </p>
-      </div>
-      <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto p-3">
+      <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto p-2 pt-3">
         {v2NavSections.map((section) => (
           <div
             key={section.id}
-            className={section.separatorBefore ? "mt-4 border-t border-white/5 pt-4" : ""}
+            className={cn(section.separatorBefore && "mt-1 border-t border-[var(--border-light)] pt-1")}
           >
             {section.label && (
               <p className="v2-sidebar-section-label">{section.label}</p>
@@ -52,21 +45,14 @@ export function V2Sidebar() {
                     <Link
                       href={item.href}
                       className={cn(
-                        "v2-sidebar-nav-link flex items-center gap-2 rounded-r-lg px-2 py-2 text-sm transition-colors",
-                        active && "v2-sidebar-nav-link--active font-medium"
+                        "v2-sidebar-nav-link flex items-center gap-2 transition-colors",
+                        active && "v2-sidebar-nav-link--active"
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <Icon className="shrink-0" strokeWidth={1.75} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {badge > 0 && (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                            item.badgeKey === "hebergement" && "bg-red-500/20 text-red-400",
-                            item.badgeKey === "billets" && "bg-orange-500/20 text-orange-300",
-                            item.badgeKey === "rapports" && "bg-amber-500/20 text-amber-300"
-                          )}
-                        >
+                        <span className="rounded-full bg-[var(--accent-red-bg)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-red-text)]">
                           {badge}
                         </span>
                       )}
@@ -78,7 +64,7 @@ export function V2Sidebar() {
           </div>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-white/5">
+      <div className="shrink-0 border-t border-[var(--border-light)]">
         <UserMenu />
       </div>
     </aside>

@@ -28,10 +28,10 @@ export function V2Shell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <V2MobileContext.Provider value={() => setMobileOpen(true)}>
-        <div className="flex min-h-screen bg-[var(--bg-main)]">
+        <div className="flex min-h-screen bg-[var(--bg-base)]">
           <V2Sidebar />
           <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} sectionsOverride={mobileSections} />
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col bg-[var(--bg-base)]">
             <V2TopBar />
             {children}
           </div>

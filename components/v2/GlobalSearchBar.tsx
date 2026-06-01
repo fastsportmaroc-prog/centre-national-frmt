@@ -80,7 +80,7 @@ export function GlobalSearchBar({ className }: { className?: string }) {
   return (
     <div ref={wrapRef} className={cn("relative w-full min-w-[220px]", className)}>
       <form onSubmit={(e) => void onSubmit(e)} className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b949e]" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           type="search"
           value={q}
@@ -90,7 +90,7 @@ export function GlobalSearchBar({ className }: { className?: string }) {
           }}
           onFocus={() => setOpen(true)}
           placeholder="Rechercher joueur, coach, stage, compétition…"
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2.5 pl-10 pr-10 text-sm text-[#e6edf3] outline-none transition placeholder:text-[#6e7681] focus:border-frmt-gold focus:ring-1 focus:ring-frmt-gold/30"
+          className="w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-inset)] py-0 pl-9 pr-9 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent-red)] h-8"
           autoComplete="off"
           aria-label="Recherche globale"
           aria-expanded={open}

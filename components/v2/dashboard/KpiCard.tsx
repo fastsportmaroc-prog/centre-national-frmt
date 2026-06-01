@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { KPI_ACCENT, type KpiAccent } from "@/lib/v2/dashboard-colors";
+import type { KpiAccent } from "@/lib/v2/dashboard-colors";
 
 type Props = {
   label: string;
@@ -12,8 +12,17 @@ type Props = {
   href: string;
   icon: LucideIcon;
   accent?: KpiAccent;
-  /** Met en avant la valeur si &gt; 0 (danger / warning). */
   pulse?: boolean;
+};
+
+const ACCENT_VARIANT: Record<KpiAccent, string> = {
+  navy: "kpi-card--blue",
+  green: "kpi-card--green",
+  gold: "kpi-card--amber",
+  warning: "kpi-card--amber",
+  danger: "kpi-card--red",
+  info: "kpi-card--purple",
+  neutral: "kpi-card--teal",
 };
 
 export function KpiCard({
@@ -25,7 +34,7 @@ export function KpiCard({
   accent = "navy",
   pulse = false,
 }: Props) {
-  const style = KPI_ACCENT[accent];
+  const variant = ACCENT_VARIANT[accent];
   const num = typeof value === "number" ? value : parseInt(String(value), 10);
   const showPulse = pulse && !Number.isNaN(num) && num > 0;
 
@@ -33,22 +42,24 @@ export function KpiCard({
     <Link href={href} className="block">
       <div
         className={cn(
-          "v2-kpi-card border-t-[3px] p-4 transition",
-          style.border,
-          style.bg,
-          "hover:border-frmt-gold/30",
-          showPulse && accent === "danger" && "shadow-[0_0_20px_rgba(239,68,68,0.12)]",
-          showPulse && accent === "warning" && "shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+          "v2-kpi-card transition-colors hover:bg-[var(--bg-hover)]",
+          variant,
+          showPulse && accent === "danger" && "kpi-card--pulse-red",
+          showPulse && accent === "warning" && "kpi-card--pulse-amber"
         )}
       >
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs text-[#8b949e]">{label}</span>
-          <Icon className={cn("h-4 w-4", style.icon)} />
+        <div className="kpi-card-inner">
+          <div className="kpi-card-top">
+            <div>
+              <p className="kpi-card-label">{label}</p>
+              <p className="kpi-card-value mt-2">{value}</p>
+            </div>
+            <div className="kpi-card-icon">
+              <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+            </div>
+          </div>
+          {sublabel && <p className="kpi-card-sublabel">{sublabel}</p>}
         </div>
-        <p className={cn("text-[32px] font-bold leading-none tabular-nums", style.value)}>
-          {value}
-        </p>
-        {sublabel && <p className="mt-1 text-xs text-[#6e7681]">{sublabel}</p>}
       </div>
     </Link>
   );

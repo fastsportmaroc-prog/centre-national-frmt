@@ -107,7 +107,7 @@ function AlertItem({
   );
 }
 
-export function NotificationBell() {
+export function NotificationBell({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [alerts, setAlerts] = useState<AppAlert[]>([]);
 
@@ -149,21 +149,26 @@ export function NotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "relative flex items-center gap-2 rounded-lg border px-2.5 py-2 transition",
-          open
-            ? "border-frmt-gold/50 bg-frmt-gold/10 text-frmt-gold"
-            : "border-[#30363d] bg-[#161b22] text-[#e6edf3] hover:border-frmt-gold/40 hover:bg-[#21262d]"
+          compact
+            ? "v2-topbar-icon-btn relative"
+            : "relative flex items-center gap-2 rounded-lg border px-2.5 py-2 transition",
+          !compact &&
+            (open
+              ? "border-frmt-gold/50 bg-frmt-gold/10 text-frmt-gold"
+              : "border-[#30363d] bg-[#161b22] text-[#e6edf3] hover:border-frmt-gold/40 hover:bg-[#21262d]")
         )}
         aria-label={`Notifications${unread.length ? `, ${unread.length} non lues` : ""}`}
         aria-expanded={open}
       >
-        <Bell className="h-4 w-4 shrink-0" />
-        <span className="hidden text-xs font-medium sm:inline">Alertes</span>
+        <Bell className={cn("shrink-0", compact ? "h-4 w-4" : "h-4 w-4")} />
+        {!compact && <span className="hidden text-xs font-medium sm:inline">Alertes</span>}
         {unread.length > 0 && (
           <span
             className={cn(
-              "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white",
-              urgentUnread > 0 ? "bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)]" : "bg-amber-500 text-[#0d1117]"
+              compact
+                ? "v2-topbar-badge"
+                : "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white",
+              !compact && (urgentUnread > 0 ? "bg-red-600" : "bg-amber-500 text-[#0d1117]")
             )}
           >
             {unread.length > 9 ? "9+" : unread.length}

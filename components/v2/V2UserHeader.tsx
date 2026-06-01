@@ -14,7 +14,7 @@ export function V2UserHeader() {
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  if (loading) return <span className="text-xs text-muted">…</span>;
+  if (loading) return <span className="text-xs text-[var(--text-muted)]">…</span>;
 
   const displayName =
     profile?.prenom || profile?.nom
@@ -32,16 +32,14 @@ export function V2UserHeader() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-sm hover:bg-surface-elevated"
+        className="v2-user-pill"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a3c5e] text-xs font-semibold text-white">
-          {initials || "?"}
-        </span>
+        <span className="v2-user-avatar">{initials || "?"}</span>
         <span className="hidden text-left sm:block">
-          <span className="block font-medium leading-tight">{displayName}</span>
-          <span className="block text-[10px] text-muted">{roleLabel(role)}</span>
+          <span className="v2-user-name block">{displayName}</span>
+          <span className="v2-user-role block">{roleLabel(role)}</span>
         </span>
-        <ChevronDown className="h-4 w-4 text-muted" />
+        <ChevronDown className="hidden h-3.5 w-3.5 text-[var(--text-muted)] sm:block" />
       </button>
       {open && (
         <>
@@ -53,15 +51,15 @@ export function V2UserHeader() {
           />
           <div
             className={cn(
-              "absolute right-0 z-50 mt-1 min-w-[200px] rounded-lg border border-border bg-surface py-1 shadow-lg"
+              "absolute right-0 z-50 mt-1 min-w-[200px] rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] py-1"
             )}
           >
-            <p className="border-b border-border px-3 py-2 text-xs text-muted">
+            <p className="border-b border-[var(--border-light)] px-3 py-2 text-xs text-[var(--text-muted)]">
               Bonjour {profile?.prenom ?? displayName.split(" ")[0]}
             </p>
             <Link
               href="/v2/parametres"
-              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-elevated"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               onClick={() => setOpen(false)}
             >
               <User className="h-4 w-4" />
@@ -69,7 +67,7 @@ export function V2UserHeader() {
             </Link>
             <Link
               href="/auth/login?reset=1"
-              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-elevated"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               onClick={() => setOpen(false)}
             >
               <KeyRound className="h-4 w-4" />
@@ -78,7 +76,7 @@ export function V2UserHeader() {
             <button
               type="button"
               disabled={loggingOut}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-surface-elevated disabled:opacity-60"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--color-red-text)] hover:bg-[var(--bg-hover)] disabled:opacity-60"
               onClick={() => {
                 setOpen(false);
                 setLoggingOut(true);
