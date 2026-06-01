@@ -16,6 +16,7 @@ import {
   generateFRMTPDF,
   getCategoryPdfColor,
   type PDFConfig,
+  type PdfColumnDef,
   type PdfSectionDef,
 } from "@/lib/pdf/pdfGenerator";
 import {
@@ -141,19 +142,46 @@ export function exportStagePDF(stage: {
   });
 }
 
+function mapJoueurRowToPdf(row: Record<string, string>, index: number): Record<string, string> {
+  return {
+    num: safePdfCell(row["#"] ?? row.num ?? String(index + 1)),
+    nom: safePdfCell(row.Nom ?? row.nom),
+    prenom: safePdfCell(row["Prénom"] ?? row.Prenom ?? row.prenom),
+    sexe: safePdfCell(row.Sexe ?? row.sexe),
+    categorie: safePdfCell(row["Catégorie"] ?? row.Categorie ?? row.categorie),
+    naissance: safePdfCell(row["Né le"] ?? row.naissance),
+    age: safePdfCell(row["Âge"] ?? row.Age ?? row.age),
+    club: safePdfCell(row.Club ?? row.club),
+    statut: safePdfCell(formatStatutPdf(row.Statut ?? row.statut ?? "actif")),
+  };
+}
+
+const JOUEURS_PDF_COLUMNS: PdfColumnDef[] = [
+  { header: "#", key: "num", width: 10, align: "center" },
+  { header: "Nom", key: "nom", width: 34, align: "left" },
+  { header: "Prénom", key: "prenom", width: 34, align: "left" },
+  { header: "Sexe", key: "sexe", width: 14, align: "center" },
+  { header: "Catégorie", key: "categorie", width: 24, align: "center" },
+  { header: "Né le", key: "naissance", width: 26, align: "center" },
+  { header: "Âge", key: "age", width: 12, align: "center" },
+  { header: "Club", key: "club", width: 48, align: "left" },
+  { header: "Statut", key: "statut", width: 22, align: "center" },
+];
+
 export function exportJoueursPDF(joueurs: Record<string, string>[], filtres?: string) {
-  const keys = Object.keys(joueurs[0] ?? { nom: "" });
+  const source = joueurs.length ? joueurs : [{}];
+  const data = source.map((row, i) => mapJoueurRowToPdf(row, i));
+
   return runFrmPdf({
-    title: "Liste des Joueurs",
-    subtitle: filtres ? `Filtres : ${filtres}` : undefined,
-    filename: buildPdfFilename("JOUEURS", filtres ?? "liste"),
-    columns: keys.map((k, i) => ({
-      header: k,
-      key: k,
-      width: i === 0 ? 28 : undefined,
-      align: i === 0 ? "left" : "center",
-    })),
-    data: joueurs.map((row, i) => ({ num: String(i + 1), ...row })),
+    title: "Liste des joueurs",
+    subtitle: filtres ? `Filtres : ${filtres}` : "Effectif national — Centre National FRMT",
+    orientation: "landscape",
+    filename: buildPdfFilename("JOUEURS", "liste", new Date().toISOString().slice(0, 10)),
+    columns: JOUEURS_PDF_COLUMNS,
+    data,
+    footerNote: "Document généré par FRMT Centre National V2",
+    generatedBy: "Utilisateur FRMT",
+    appVersion: "FRMT V2",
   });
 }
 
