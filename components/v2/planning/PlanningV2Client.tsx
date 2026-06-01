@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { addDays, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
@@ -40,8 +40,17 @@ type PlanningSession = PlanningSessionRow;
 
 const CRENEAU_ORDER: PlanningCreneauSlot[] = ["matin", "apres_midi", "journee"];
 
-function creneauxReservesDuJour(daySessions: PlanningSession[]): PlanningCreneauSlot[] {
-  return CRENEAU_ORDER.filter((slot) => daySessions.some((s) => s.creneau === slot));
+function creneauxReservesDuJour(
+  daySessions: PlanningSession[],
+  visible: (slot: PlanningCreneauSlot) => boolean
+): PlanningCreneauSlot[] {
+  return CRENEAU_ORDER.filter(
+    (slot) => visible(slot) && daySessions.some((s) => s.creneau === slot)
+  );
+}
+
+function isStageCalendarPlaceholder(session: PlanningSession): boolean {
+  return session.id.startsWith("stage-cal-");
 }
 
 function normalizeStageStatus(raw: unknown): string {
@@ -118,6 +127,9 @@ export function PlanningV2Client() {
   const [statusFilter, setStatusFilter] = useState<StageStatusFilter>("tous");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [showCreneauMatin, setShowCreneauMatin] = useState(true);
+  const [showCreneauApresMidi, setShowCreneauApresMidi] = useState(true);
+  const [showCreneauJournee, setShowCreneauJournee] = useState(true);
   const [loading, setLoading] = useState(true);
   const isDev = process.env.NODE_ENV !== "production";
 
@@ -191,8 +203,18 @@ export function PlanningV2Client() {
     setWeekOffset(Math.round((target.getTime() - base.getTime()) / msPerWeek));
   }, [stageById, stageFromUrl]);
 
+  const creneauVisible = useCallback(
+    (slot: PlanningCreneauSlot) => {
+      if (slot === "matin") return showCreneauMatin;
+      if (slot === "apres_midi") return showCreneauApresMidi;
+      return showCreneauJournee;
+    },
+    [showCreneauMatin, showCreneauApresMidi, showCreneauJournee]
+  );
+
   const filteredSessions = useMemo(() => {
     return generatedSessions.filter((session) => {
+      if (!creneauVisible(session.creneau)) return false;
       if (stageFilter && session.stageId !== stageFilter) return false;
       if (categoryFilter !== "all" && session.categorie !== categoryFilter) return false;
       if (statusFilter === "en_cours") return normalizeStageStatus(session.statut) === "en_cours";
@@ -202,7 +224,7 @@ export function PlanningV2Client() {
       }
       return true;
     });
-  }, [generatedSessions, stageFilter, categoryFilter, statusFilter]);
+  }, [generatedSessions, stageFilter, categoryFilter, statusFilter, creneauVisible]);
 
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, PlanningSession[]>();
@@ -225,8 +247,7 @@ export function PlanningV2Client() {
 
   const weekSummary = useMemo(() => {
     const uniqueStages = new Set(filteredSessions.map((s) => s.stageId)).size;
-    const matin = filteredSessions.filter((s) => s.creneau === "matin").length;
-    const apm = filteredSessions.filter((s) => s.creneau === "apres_midi").length;
+    const joursOccupes = new Set(filteredSessions.map((s) => s.date)).size;
     const playersByStage = new Map<string, number>();
     const coachsByStage = new Map<string, number>();
     for (const s of filteredSessions) {
@@ -235,7 +256,7 @@ export function PlanningV2Client() {
     }
     const totalPlayers = [...playersByStage.values()].reduce((a, b) => a + b, 0);
     const totalCoachs = [...coachsByStage.values()].reduce((a, b) => a + b, 0);
-    return { total: filteredSessions.length, uniqueStages, matin, apm, totalPlayers, totalCoachs };
+    return { total: filteredSessions.length, uniqueStages, joursOccupes, totalPlayers, totalCoachs };
   }, [filteredSessions]);
 
   return (
@@ -279,8 +300,8 @@ export function PlanningV2Client() {
                     stagesActifs: weekSummary.uniqueStages,
                     totalJoueurs: weekSummary.totalPlayers,
                     totalCoachs: weekSummary.totalCoachs,
-                    creneauxMatin: weekSummary.matin,
-                    creneauxApresMidi: weekSummary.apm,
+                    creneauxMatin: filteredSessions.filter((s) => s.creneau === "matin").length,
+                    creneauxApresMidi: filteredSessions.filter((s) => s.creneau === "apres_midi").length,
                   },
                 }
               )
@@ -333,38 +354,58 @@ export function PlanningV2Client() {
               </Button>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-4 border-t border-emerald-500/20 pt-3">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Créneaux affichés</span>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showCreneauMatin}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setShowCreneauMatin(e.target.checked)}
+                className="rounded border-border"
+              />
+              Matin (09-13)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showCreneauApresMidi}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setShowCreneauApresMidi(e.target.checked)}
+                className="rounded border-border"
+              />
+              Après-midi (14-18)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showCreneauJournee}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setShowCreneauJournee(e.target.checked)}
+                className="rounded border-border"
+              />
+              Journée complète (09-18)
+            </label>
+          </div>
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
-            <div className="mb-1 flex items-center gap-2 text-emerald-300"><CalendarDays className="h-4 w-4" /> Séances semaine</div>
+            <div className="mb-1 flex items-center gap-2 text-emerald-300"><CalendarDays className="h-4 w-4" /> Séances / créneaux</div>
             <p className="text-2xl font-bold">{weekSummary.total}</p>
-            <p className="text-xs text-muted">Séances générées automatiquement</p>
+            <p className="text-xs text-muted">Réservations + jours de stage prévus</p>
           </Card>
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
             <div className="mb-1 flex items-center gap-2 text-emerald-300"><Activity className="h-4 w-4" /> Stages actifs</div>
             <p className="text-2xl font-bold">{weekSummary.uniqueStages}</p>
-            <p className="text-xs text-muted">Stages prévus/confirmés/en cours</p>
+            <p className="text-xs text-muted">Sur la semaine affichée</p>
           </Card>
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
-            <div className="mb-1 flex items-center gap-2 text-emerald-300"><Sun className="h-4 w-4" /> Créneaux matin</div>
-            <p className="text-2xl font-bold">{weekSummary.matin}</p>
-            <p className="text-xs text-muted">Créneaux 09:00-13:00</p>
-          </Card>
-          <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
-            <div className="mb-1 flex items-center gap-2 text-emerald-300"><Clock3 className="h-4 w-4" /> Créneaux après-midi</div>
-            <p className="text-2xl font-bold">{weekSummary.apm}</p>
-            <p className="text-xs text-muted">Créneaux 14:00-18:00</p>
-          </Card>
-          <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
-            <div className="mb-1 flex items-center gap-2 text-emerald-300"><Users className="h-4 w-4" /> Total joueurs concernés</div>
+            <div className="mb-1 flex items-center gap-2 text-emerald-300"><Users className="h-4 w-4" /> Joueurs</div>
             <p className="text-2xl font-bold">{weekSummary.totalPlayers}</p>
-            <p className="text-xs text-muted">Cumul des stages visibles</p>
+            <p className="text-xs text-muted">{weekSummary.joursOccupes} jour(s) occupé(s)</p>
           </Card>
           <Card className="border border-border/60 p-4 transition hover:border-emerald-500/50">
-            <div className="mb-1 flex items-center gap-2 text-emerald-300"><UserSquare2 className="h-4 w-4" /> Total coachs concernés</div>
+            <div className="mb-1 flex items-center gap-2 text-emerald-300"><UserSquare2 className="h-4 w-4" /> Coachs</div>
             <p className="text-2xl font-bold">{weekSummary.totalCoachs}</p>
-            <p className="text-xs text-muted">Encadrement technique planifié</p>
+            <p className="text-xs text-muted">Encadrement planifié</p>
           </Card>
         </div>
 
@@ -395,7 +436,7 @@ export function PlanningV2Client() {
               const dayIso = format(day, "yyyy-MM-dd");
               const daySessions = sessionsByDay.get(dayIso) ?? [];
               const hasReservations = daySessions.length > 0;
-              const creneauxReserves = creneauxReservesDuJour(daySessions);
+              const creneauxReserves = creneauxReservesDuJour(daySessions, creneauVisible);
 
               return (
                 <div
@@ -443,7 +484,14 @@ export function PlanningV2Client() {
                           >
                             <div className="mb-1 flex items-start justify-between gap-1">
                               <p className="text-xs font-semibold">{s.stageName}</p>
-                              <StatusBadge statut={s.statut} className="text-[10px]" />
+                              <div className="flex flex-col items-end gap-0.5">
+                                {isStageCalendarPlaceholder(s) ? (
+                                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] text-sky-200">
+                                    Stage prévu
+                                  </span>
+                                ) : null}
+                                <StatusBadge statut={s.statut} className="text-[10px]" />
+                              </div>
                             </div>
                             <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px]">
                               <span className="rounded bg-emerald-500/20 px-1.5 py-0.5">

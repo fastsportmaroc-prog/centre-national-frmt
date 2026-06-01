@@ -1,9 +1,9 @@
 import { parseTerrainsBesoinsFromNotes } from "@/lib/data/terrains";
 import type { PlanningSeanceV2, ReservationEnrichedV2, StageProgrammeV2 } from "@/lib/types/v2";
-import { dateOnlyString } from "@/lib/v2/calendar-dates";
+import { dateOnlyString, safeEachDayInRange } from "@/lib/v2/calendar-dates";
 import { creneauHorairesFixed, resolveCreneauType, type CreneauType } from "@/lib/v2/reservations-utils";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
-import { addDays, endOfWeek, format, startOfWeek } from "date-fns";
+import { addDays, format, startOfWeek } from "date-fns";
 
 export type PlanningCreneauSlot = "matin" | "apres_midi" | "journee";
 
@@ -101,6 +101,8 @@ function normalizeStageStatus(raw: unknown): string {
 }
 
 function shouldIncludeStageStatus(status: string): boolean {
+  if (!status) return true;
+  if (status === "annule" || status === "annulé" || status === "annulee") return false;
   return status === "prevu" || status === "confirme" || status === "en_cours";
 }
 
@@ -109,6 +111,37 @@ function normalizeStageCategory(raw: unknown): string {
   const lower = value.toLowerCase();
   if (lower === "senior" || lower === "seniors") return "Élite Pro";
   return value || "—";
+}
+
+/** Bornes semaine en ISO (lun→dim), sans piège minuit / dimanche exclu. */
+export function planningWeekBounds(weekStart: Date): { startIso: string; endIso: string } {
+  const start = startOfWeek(weekStart, { weekStartsOn: 1 });
+  return {
+    startIso: format(start, "yyyy-MM-dd"),
+    endIso: format(addDays(start, 6), "yyyy-MM-dd"),
+  };
+}
+
+export function isDayInPlanningWeek(dayIso: string, weekStart: Date): boolean {
+  const day = dayIso.slice(0, 10);
+  const { startIso, endIso } = planningWeekBounds(weekStart);
+  return day >= startIso && day <= endIso;
+}
+
+function reservationDaysInWeek(
+  dateDebut: string,
+  dateFin: string | null | undefined,
+  weekStart: Date
+): string[] {
+  const start = dateOnlyString(dateDebut);
+  if (!start) return [];
+  const end = dateOnlyString(dateFin) || start;
+  const out: string[] = [];
+  for (const d of safeEachDayInRange(start, end)) {
+    const iso = format(d, "yyyy-MM-dd");
+    if (isDayInPlanningWeek(iso, weekStart)) out.push(iso);
+  }
+  return out;
 }
 
 function reservationIsActive(statut: string | null | undefined): boolean {
@@ -126,8 +159,6 @@ export function buildPlanningSessionsForWeek(
   selectedWeekStart: Date,
   reservations: PlanningReservationInput[] = []
 ): PlanningSessionRow[] {
-  const weekStart = startOfWeek(selectedWeekStart, { weekStartsOn: 1 });
-  const weekEnd = addDays(weekStart, 6);
   const stageById = new Map(stages.map((s) => [s.id, s]));
   const seen = new Set<string>();
   const out: PlanningSessionRow[] = [];
@@ -145,8 +176,7 @@ export function buildPlanningSessionsForWeek(
     const statut = normalizeStageStatus(stage.statut);
     if (!shouldIncludeStageStatus(statut)) continue;
     const day = String(p.date).slice(0, 10);
-    const dayDate = new Date(`${day}T12:00:00`);
-    if (dayDate < weekStart || dayDate > weekEnd) continue;
+    if (!isDayInPlanningWeek(day, selectedWeekStart)) continue;
 
     const creneau = slotFromHoraires(p.heure_debut, p.heure_fin);
     const horaires = horairesForPlanningSlot(creneau);
@@ -170,26 +200,24 @@ export function buildPlanningSessionsForWeek(
     const statut = normalizeStageStatus(stage.statut);
     if (!shouldIncludeStageStatus(statut)) continue;
 
-    const day = dateOnlyString(r.date_debut);
-    if (!day) continue;
-    const dayDate = new Date(`${day}T12:00:00`);
-    if (dayDate < weekStart || dayDate > weekEnd) continue;
-
     const creneauType = resolveCreneauType(r);
     const creneau: PlanningCreneauSlot =
       creneauType === "apres_midi" ? "apres_midi" : creneauType === "matin" ? "matin" : "journee";
     const horaires = horairesForPlanningSlot(creneau);
-    push({
-      id: `resa-${r.stage_id}-${day}-${creneau}`,
-      stageId: stage.id,
-      stageName: stage.stage_action ?? "Stage",
-      categorie: normalizeStageCategory(stage.categorie),
-      date: day,
-      creneau,
-      heure_debut: r.heure_debut?.slice(0, 5) || horaires.heure_debut,
-      heure_fin: r.heure_fin?.slice(0, 5) || horaires.heure_fin,
-      ...stageMeta(stage, statut),
-    });
+
+    for (const day of reservationDaysInWeek(r.date_debut, r.date_fin, selectedWeekStart)) {
+      push({
+        id: `resa-${r.stage_id}-${day}-${creneau}`,
+        stageId: stage.id,
+        stageName: stage.stage_action ?? "Stage",
+        categorie: normalizeStageCategory(stage.categorie),
+        date: day,
+        creneau,
+        heure_debut: r.heure_debut?.slice(0, 5) || horaires.heure_debut,
+        heure_fin: r.heure_fin?.slice(0, 5) || horaires.heure_fin,
+        ...stageMeta(stage, statut),
+      });
+    }
   }
 
   for (const stage of stages) {
@@ -201,8 +229,7 @@ export function buildPlanningSessionsForWeek(
 
     const stageDays = eachDayOfStage(stage.date_debut, stage.date_fin);
     for (const day of stageDays) {
-      const dayDate = new Date(`${day}T12:00:00`);
-      if (dayDate < weekStart || dayDate > weekEnd) continue;
+      if (!isDayInPlanningWeek(day, selectedWeekStart)) continue;
 
       for (const besoin of besoins) {
         const jours =
@@ -214,9 +241,6 @@ export function buildPlanningSessionsForWeek(
         const creneaux = besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const);
         for (const raw of creneaux) {
           const creneau = terrainCreneauRawToSlot(raw);
-          const k = sessionKey(stage.id, day, creneau, besoin.terrainId);
-          if (seen.has(k)) continue;
-          seen.add(k);
           const horaires = horairesForPlanningSlot(creneau);
           push({
             id: `${stage.id}-${day}-${creneau}-${besoin.terrainId}`,
@@ -231,6 +255,29 @@ export function buildPlanningSessionsForWeek(
           });
         }
       }
+    }
+  }
+
+  /** Jours du stage (période prévue) sans réservation explicite ce jour-là. */
+  for (const stage of stages) {
+    const statut = normalizeStageStatus(stage.statut);
+    if (!shouldIncludeStageStatus(statut)) continue;
+    for (const day of eachDayOfStage(stage.date_debut, stage.date_fin)) {
+      if (!isDayInPlanningWeek(day, selectedWeekStart)) continue;
+      const hasDay = out.some((s) => s.stageId === stage.id && s.date === day);
+      if (hasDay) continue;
+      const horaires = horairesForPlanningSlot("journee");
+      push({
+        id: `stage-cal-${stage.id}-${day}`,
+        stageId: stage.id,
+        stageName: stage.stage_action ?? "Stage",
+        categorie: normalizeStageCategory(stage.categorie),
+        date: day,
+        creneau: "journee",
+        heure_debut: horaires.heure_debut,
+        heure_fin: horaires.heure_fin,
+        ...stageMeta(stage, statut),
+      });
     }
   }
 
