@@ -2,10 +2,23 @@ import type { StageProgrammeInputV2 } from "@/lib/types/v2";
 
 const OPTIONAL_FLAGS = ["terrains", "restauration", "transport_avion", "kinesitherapie"] as const;
 
+/** Champs optionnels en base (pas sur le type stage affiché). */
+export type StageProgrammeDbExtras = {
+  infrastructure_ids?: string[];
+  entraineur_ids?: string[];
+  materiel_assignations?: unknown[];
+  budget_prevu?: number | null;
+  budget_reel?: number | null;
+};
+
+export type StageProgrammeWriteInput = StageProgrammeInputV2 & StageProgrammeDbExtras;
+
+type WriteFieldKey = keyof StageProgrammeWriteInput;
+
 function assignDefined(
   payload: Record<string, unknown>,
-  data: Partial<StageProgrammeInputV2>,
-  keys: (keyof StageProgrammeInputV2)[]
+  data: Partial<StageProgrammeWriteInput>,
+  keys: WriteFieldKey[]
 ) {
   for (const key of keys) {
     if (data[key] !== undefined) payload[key] = data[key] as unknown;
@@ -13,7 +26,7 @@ function assignDefined(
 }
 
 /** Payload INSERT stages_programme — flags optionnels seulement si fournis (évite colonnes absentes en prod). */
-export function buildStageProgrammeWritePayload(data: StageProgrammeInputV2): Record<string, unknown> {
+export function buildStageProgrammeWritePayload(data: StageProgrammeWriteInput): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     source: data.source ?? "FRMT",
     categorie: data.categorie,
@@ -40,7 +53,9 @@ export function buildStageProgrammeWritePayload(data: StageProgrammeInputV2): Re
 }
 
 /** Payload PATCH — uniquement les champs présents dans `data`. */
-export function buildStageProgrammePatchPayload(data: Partial<StageProgrammeInputV2>): Record<string, unknown> {
+export function buildStageProgrammePatchPayload(
+  data: Partial<StageProgrammeWriteInput>
+): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   assignDefined(payload, data, [
     "source",

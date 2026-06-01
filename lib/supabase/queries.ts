@@ -259,14 +259,7 @@ export async function createStage(data: StageProgrammeInputV2): Promise<{ stage:
   const c = clientOrNull();
   if (!c) return { stage: null, error: "Client Supabase indisponible." };
 
-  const payload = buildStageProgrammeWritePayload({
-    ...data,
-    infrastructure_ids: [],
-    entraineur_ids: [],
-    materiel_assignations: [],
-    budget_prevu: null,
-    budget_reel: null,
-  });
+  const payload = buildStageProgrammeWritePayload(data);
 
   let inserted: StageProgrammeV2 | null = null;
   const result = await mutateOmitMissingColumns(payload, async (p) => {
