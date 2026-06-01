@@ -37,6 +37,7 @@ import type {
   StageCompletFormData,
   StageProgrammeInputV2,
 } from "@/lib/types/v2";
+import { parseTerrainsBesoinsFromNotes, resyncStageTerrainsFromNotes } from "@/lib/data/terrains";
 import { syncStagePlanning } from "@/lib/v2/sync-stage-planning";
 import { revalidateStageLinkedPaths } from "@/lib/server/revalidate-stage-paths";
 import { getAuthUserFromServer } from "@/lib/auth/server-session";
@@ -167,7 +168,19 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
     else restauration_creee = !!data;
   }
 
-  if (form.terrains.actif) {
+  const besoinsFromNotes = parseTerrainsBesoinsFromNotes(form.notes);
+  if (besoinsFromNotes?.length) {
+    const { ok, conflits } = await resyncStageTerrainsFromNotes({
+      id: stage_id,
+      stage_action: form.stage_action,
+      date_debut: form.date_debut,
+      date_fin: form.date_fin,
+      notes: form.notes,
+    });
+    reservations_creees += ok.length;
+    for (const c of conflits) erreurs.push(`terrain: ${c}`);
+    await updateStageServer(stage_id, { terrains: true });
+  } else if (form.terrains.actif) {
     const infrastructures = await getInfrastructures();
     const surfaceFilter = form.terrains.surface;
     let courts = infrastructures.filter((i) => {

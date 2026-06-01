@@ -6,8 +6,6 @@ import {
   resolveCreneauType,
   type CreneauType,
 } from "@/lib/v2/reservations-utils";
-import { eachDayOfStage } from "@/lib/v2/stage-calculations";
-
 export type TerrainCreneauV2 = "matin" | "apres_midi" | "journee";
 
 export function creneauTerrainToIso(
@@ -94,11 +92,11 @@ export function mergeReservationSources(
   terrainRows: ReservationEnrichedV2[]
 ): ReservationEnrichedV2[] {
   const byKey = new Map<string, ReservationEnrichedV2>();
-  // terrain_reservations = source prioritaire (rubrique Stages)
-  for (const r of terrainRows) {
+  // reservations_infrastructure = source canonique (alignée avec reserverTerrains)
+  for (const r of infraRows) {
     byKey.set(reservationMergeKey(r), r);
   }
-  for (const r of infraRows) {
+  for (const r of terrainRows) {
     const key = reservationMergeKey(r);
     if (!byKey.has(key)) {
       byKey.set(key, r);
@@ -193,47 +191,6 @@ export function finalizeReservationsFromStageBesoins(
       continue;
     }
     adjusted.push(r);
-  }
-
-  for (const stage of stages) {
-    const besoins = besoinsByStage.get(stage.id);
-    if (!besoins?.length) continue;
-    for (const besoin of besoins) {
-      const target = besoinPrimaryCreneau(besoin);
-      const creneauxRaw = besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const);
-      const days =
-        besoin.jours?.length ?
-          [...new Set(besoin.jours.map((d) => d.slice(0, 10)))]
-        : eachDayOfStage(stage.date_debut, stage.date_fin);
-
-      for (const day of days) {
-        for (const creneauRaw of creneauxRaw) {
-          const mapped = creneauTerrainToIso(day, creneauRaw === "apres-midi" ? "apres_midi" : creneauRaw);
-          const candidate: ReservationEnrichedV2 = {
-            id: `besoin-${stage.id}-${besoin.terrainId}-${day}-${mapped.creneau}`,
-            infrastructure_id: besoin.terrainId,
-            stage_id: stage.id,
-            date_debut: mapped.debut,
-            date_fin: mapped.fin,
-            creneau: mapped.creneau,
-            heure_debut: mapped.heure_debut,
-            heure_fin: mapped.heure_fin,
-            statut: "confirmee",
-            notes: null,
-            stage_nom: stage.stage_action ?? null,
-            stage_categorie: stage.categorie ?? null,
-            court_nom: besoin.terrainNom ?? null,
-            court_surface: besoin.terrainSurface ?? null,
-            groupe: stage.categorie ?? null,
-          };
-          const key = reservationMergeKey(candidate);
-          if (byKey.has(key)) continue;
-          if (target === "journee" && mapped.creneau !== "journee") continue;
-          byKey.set(key, candidate);
-          adjusted.push(candidate);
-        }
-      }
-    }
   }
 
   return adjusted.sort((a, b) => a.date_debut.localeCompare(b.date_debut));

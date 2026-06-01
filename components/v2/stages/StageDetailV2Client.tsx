@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { addDays, format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ArrowLeft, CalendarDays, FileDown, FileText, Pencil, Trash2 } from "lucide-react";
+import { syncStageTerrainReservationsForStageAction } from "@/lib/actions/reservations-sync-actions";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import { StageLettreModal } from "@/components/v2/stages/StageLettreModal";
 import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
@@ -58,7 +59,6 @@ import { cn } from "@/lib/utils/cn";
 import {
   getTerrains,
   getReservationsStageTerrains,
-  reserverTerrains,
   supprimerReservationTerrain,
   type Creneau,
 } from "@/services/terrainService";
@@ -441,33 +441,27 @@ export function StageDetailV2Client({ id }: { id: string }) {
         mode: terrainMode,
         joueurIds: terrainMode === "dispatch" ? dispatchJoueurIds : [],
       };
-      const { ok, conflits } = await reserverTerrains({
-        id: stage.id,
-        nom: stage.stage_action,
-        dateDebut: stage.date_debut,
-        dateFin: stage.date_fin,
-        besoins: { terrains: [besoin] },
-      });
-      if (conflits.length > 0) {
-        toast(
-          `${ok.length} réservé(s), ${conflits.length} conflit(s): ${conflits.join(", ")}`,
-          "warning"
-        );
-      } else {
-        toast(`${ok.length} créneau(x) réservé(s)`, "success");
-      }
-
       const updatedNotes = appendTerrainBesoinToNotes(stage.notes, besoin);
       const stageUp = await updateStageQuickAction(stage.id, {
         terrains: true,
         notes: updatedNotes,
       });
       if (!stageUp.ok) {
-        toast(stageUp.error ?? "Réservation OK mais mise à jour stage incomplète", "warning");
-      } else {
-        setStage((prev) =>
-          prev ? { ...prev, terrains: true, notes: updatedNotes } : prev
+        toast(stageUp.error ?? "Notes stage non mises à jour", "error");
+        return;
+      }
+      setStage((prev) =>
+        prev ? { ...prev, terrains: true, notes: updatedNotes } : prev
+      );
+
+      const sync = await syncStageTerrainReservationsForStageAction(stage.id);
+      if (sync.conflits.length > 0) {
+        toast(
+          `${sync.synced} réservé(s), ${sync.conflits.length} conflit(s): ${sync.conflits.join(", ")}`,
+          "warning"
         );
+      } else {
+        toast(`${sync.synced} créneau(x) réservé(s)`, "success");
       }
 
       await syncStageLinkedViewsAction(stage.id);

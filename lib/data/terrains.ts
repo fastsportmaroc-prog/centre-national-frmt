@@ -1,5 +1,15 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
+
+/** Écritures serveur (session authentifiée) ; lectures client conservent le client navigateur. */
+async function getTerrainsSupabaseClient(): Promise<SupabaseClient> {
+  if (typeof window === "undefined") {
+    const { getSupabaseServerDataClient } = await import("@/lib/supabase/data-client.server");
+    return getSupabaseServerDataClient();
+  }
+  return getSupabaseDataClient();
+}
 
 /* ─── TYPES ─── */
 export type Creneau = "matin" | "apres-midi" | "journee";
@@ -103,7 +113,7 @@ async function buildLegacyCalendrierRows(filters?: {
   dateDebut?: string;
   dateFin?: string;
 }) {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   let q = supabase
     .from("reservations_infrastructure")
     .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes");
@@ -215,7 +225,7 @@ async function buildLegacyCalendrierRows(filters?: {
 
 async function enrichDispatchNames(rows: any[]): Promise<any[]> {
   if (!rows.length) return rows;
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const reservationIds = [...new Set(rows.map((r: any) => r.reservation_id).filter(Boolean))];
   if (!reservationIds.length) return rows;
   const dispatchRes = await supabase
@@ -256,7 +266,7 @@ async function enrichDispatchNames(rows: any[]): Promise<any[]> {
 
 /* ─── LISTER TOUS LES TERRAINS ─── */
 export const getTerrains = async () => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("terrains")
     .select("*")
@@ -316,7 +326,7 @@ export const getTerrains = async () => {
 
 /* ─── OCCUPATION GLOBALE ─── */
 export const getOccupation = async () => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("v_occupation_terrains")
     .select("*");
@@ -398,7 +408,7 @@ export const getCalendrierTerrain = async (
   dateDebut: string,
   dateFin: string
 ) => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("v_calendrier_terrains")
     .select("*")
@@ -411,7 +421,7 @@ export const getCalendrierTerrain = async (
 
 /* ─── CALENDRIER TOUS TERRAINS (période libre) ─── */
 export const getCalendrierPeriode = async (dateDebut: string, dateFin: string) => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("v_calendrier_terrains")
     .select("*")
@@ -428,7 +438,7 @@ export const getCalendrierMois = async (annee: number, mois: number) => {
   const debut = `${annee}-${String(mois).padStart(2, "0")}-01`;
   const lastDay = new Date(annee, mois, 0).getDate();
   const fin = `${annee}-${String(mois).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("v_calendrier_terrains")
     .select("*")
@@ -465,7 +475,7 @@ function dedupeStageTerrainRows(rows: any[]): any[] {
 
 /* ─── RÉSERVATIONS TERRAINS D'UN STAGE ─── */
 export const getReservationsStageTerrains = async (stageId: string) => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data, error } = await supabase
     .from("v_calendrier_terrains")
     .select("*")
@@ -485,7 +495,7 @@ export const verifierConflits = async (
   creneau: Creneau,
   stageIdExclu?: string
 ): Promise<boolean> => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   let q = supabase
     .from("terrain_reservations")
     .select("id")
@@ -504,7 +514,7 @@ export const reserverTerrains = async (stage: any): Promise<{
   ok: string[];
   conflits: string[];
 }> => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const ok: string[] = [];
   const conflits: string[] = [];
   const creneauLegacy = (c: Creneau): "matin" | "apres_midi" | "journee" =>
@@ -596,11 +606,8 @@ export const reserverTerrains = async (stage: any): Promise<{
     return out;
   };
 
-  const { error: terrainReservationsProbeErr } = await supabase
-    .from("terrain_reservations")
-    .select("id")
-    .limit(1);
-  const useLegacyReservations = !!terrainReservationsProbeErr;
+  // Rubrique Réservations V2 lit `reservations_infrastructure` — toujours persister ici en priorité.
+  const useLegacyReservations = true;
   const ensureLegacyInfrastructureId = async (besoin: TerrainBesoin): Promise<string | null> => {
     // 1) ID déjà valide côté infrastructures
     const { data: infraById } = await supabase
@@ -1050,7 +1057,7 @@ export function stripTerrainsBesoinsFromNotes(notes: string | null | undefined):
  * Ne pas appeler automatiquement : respecter le créneau choisi par l'utilisateur.
  */
 export async function upgradeStageTerrainsMatinToJourneeInDb(stageId: string): Promise<number> {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   let n = 0;
   const { data: infraRows } = await supabase
     .from("reservations_infrastructure")
@@ -1092,7 +1099,7 @@ export async function upgradeStageTerrainsMatinToJourneeInDb(stageId: string): P
 
 /** Supprime matin/aprem quand une réservation journée existe déjà (doublons legacy). */
 export async function cleanupDuplicateMatinWhenJourneeExists(): Promise<number> {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data: journeeRows } = await supabase
     .from("terrain_reservations")
     .select("stage_id, terrain_id, date_debut")
@@ -1139,7 +1146,7 @@ export async function resyncStageTerrainsFromNotes(
     creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
     mode: b.mode ?? "stage",
   }));
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   for (const besoin of normalized) {
     const wantsJournee = besoin.creneaux?.includes("journee");
     if (!wantsJournee) continue;
@@ -1178,7 +1185,7 @@ export async function resyncStageTerrainsFromNotes(
 
 /** Alignement automatique Stages → Réservations pour tous les stages avec besoins terrain. */
 export async function resyncAllStageTerrainsFromNotes(): Promise<number> {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const { data: stages } = await supabase
     .from("stages_programme")
     .select("id, stage_action, date_debut, date_fin, notes, statut")
@@ -1202,7 +1209,7 @@ export async function resyncAllStageTerrainsFromNotes(): Promise<number> {
 
 /* ─── SUPPRIMER RÉSERVATIONS D'UN STAGE ─── */
 export const supprimerReservationsStage = async (stageId: string) => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   await supabase
     .from("terrain_reservations")
     .delete()
@@ -1211,7 +1218,7 @@ export const supprimerReservationsStage = async (stageId: string) => {
 
 /* ─── SUPPRIMER UNE RÉSERVATION TERRAIN ─── */
 export const supprimerReservationTerrain = async (reservationId: string): Promise<boolean> => {
-  const supabase = await getSupabaseDataClient();
+  const supabase = await getTerrainsSupabaseClient();
   const r1 = await supabase.from("terrain_reservations").delete().eq("id", reservationId);
   if (!r1.error) return true;
   const r2 = await supabase.from("reservations_infrastructure").delete().eq("id", reservationId);

@@ -251,10 +251,11 @@ export function ReservationsV2Client() {
       setItems(r.filter((x) => normalizeStatut(x.statut) !== "annule"));
       setStages(s);
       setInfrastructures(i);
+      const parts: string[] = [];
+      if (result.synced > 0) parts.push(`${result.synced} stage(s) resynchronisé(s)`);
+      if (result.cleaned > 0) parts.push(`${result.cleaned} doublon(s) supprimé(s)`);
       toast(
-        result.cleaned > 0
-          ? `${result.cleaned} doublon(s) matin/journée supprimé(s)`
-          : "Réservations à jour (créneaux conservés)",
+        parts.length > 0 ? parts.join(" · ") : "Réservations alignées sur les stages",
         "success"
       );
     } catch (e) {

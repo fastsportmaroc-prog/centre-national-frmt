@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { createStageComplet, deleteStageQuickAction, updateStageQuickAction } from "@/lib/actions/stage-actions";
+import { syncStageTerrainReservationsForStageAction } from "@/lib/actions/reservations-sync-actions";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import {
   getEntraineurs,
@@ -48,12 +49,7 @@ import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { LayoutGrid, List, Plus, Search, Trophy, Trash2 } from "lucide-react";
 import { useRole } from "@/lib/hooks/useRole";
 import { useAuth } from "@/components/auth/AuthProvider";
-import {
-  getTerrains,
-  reserverTerrains,
-  type Creneau,
-  type TerrainBesoin,
-} from "@/services/terrainService";
+import { getTerrains, type Creneau, type TerrainBesoin } from "@/services/terrainService";
 
 type StageFilter = "tous" | "avenir" | "encours" | "termine" | "annule";
 type ViewMode = "grid" | "list";
@@ -260,24 +256,14 @@ export function StagesV2Client() {
     toast(result.message ?? "Stage créé");
 
     if (result.stage_id && terrainsBesoins.length > 0) {
-      await updateStageQuickAction(result.stage_id, {
-        terrains: true,
-        notes: payload.notes || null,
-      });
-      const { ok, conflits } = await reserverTerrains({
-        id: result.stage_id,
-        nom: form.stage_action,
-        dateDebut: form.date_debut,
-        dateFin: form.date_fin,
-        besoins: { terrains: terrainsBesoins },
-      });
-      if (conflits.length > 0) {
+      const sync = await syncStageTerrainReservationsForStageAction(result.stage_id);
+      if (sync.conflits.length > 0) {
         toast(
-          `${ok.length} terrain(s) réservé(s). ${conflits.length} conflit(s) détecté(s) : ${conflits.join(", ")}`,
+          `${sync.synced} terrain(s) réservé(s). ${sync.conflits.length} conflit(s) : ${sync.conflits.join(", ")}`,
           "warning"
         );
-      } else {
-        toast(`${ok.length} terrain(s) réservé(s) avec succès !`, "success");
+      } else if (sync.synced > 0) {
+        toast(`${sync.synced} terrain(s) réservé(s) avec succès !`, "success");
       }
       await syncStageLinkedViewsAction(result.stage_id);
       await load();
