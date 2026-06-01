@@ -830,6 +830,83 @@ export function exportLogistiquePDF(rows: Record<string, string>[]) {
   });
 }
 
+export function exportStagesLogistiquePDF(params: {
+  periodeLabel: string;
+  generatedBy: string;
+  rows: {
+    stage: string;
+    categorie: string;
+    dates: string;
+    duree: string;
+    joueurs: string;
+    coachs: string;
+    chambres: string;
+    hebergement: string;
+    restauration: string;
+    terrains: string;
+    terrainsSupp: string;
+    lettreEnvoyee: string;
+    licencesVerifiees: string;
+    observations: string;
+  }[];
+  totals: { joueurs: number; coachs: number; chambres: number };
+}) {
+  runFrmPdf({
+    title: "Planification Logistique des Stages",
+    subtitle: "CENTRE NATIONAL FRMT",
+    periode: `${params.periodeLabel} • Généré le ${formatDateFR(new Date().toISOString())} • Généré par: ${params.generatedBy}`,
+    orientation: "landscape",
+    filename: buildPdfFilename("LOGISTIQUE-STAGES", "planification", new Date().toISOString().slice(0, 10)),
+    columns: [
+      { header: "Stage", key: "stage", width: 30, align: "left" },
+      { header: "Catégorie", key: "categorie", width: 16, align: "center" },
+      { header: "Dates", key: "dates", width: 30, align: "left" },
+      { header: "Durée", key: "duree", width: 10, align: "center" },
+      { header: "Nb joueurs", key: "joueurs", width: 12, align: "center" },
+      { header: "Nb coachs", key: "coachs", width: 12, align: "center" },
+      { header: "Nb chambres", key: "chambres", width: 14, align: "center" },
+      { header: "Héb.", key: "hebergement", width: 9, align: "center" },
+      { header: "Rest.", key: "restauration", width: 9, align: "center" },
+      { header: "Terr.", key: "terrains", width: 9, align: "center" },
+      { header: "Terr. supp.", key: "terrainsSupp", width: 14, align: "center" },
+      { header: "Lettre", key: "lettreEnvoyee", width: 10, align: "center" },
+      { header: "Licences", key: "licencesVerifiees", width: 12, align: "center" },
+      { header: "Observations", key: "observations", width: 24, align: "left" },
+    ],
+    data: params.rows.length ? params.rows : [{
+      stage: "—",
+      categorie: "—",
+      dates: "—",
+      duree: "—",
+      joueurs: "0",
+      coachs: "0",
+      chambres: "0",
+      hebergement: "Non",
+      restauration: "Non",
+      terrains: "Non",
+      terrainsSupp: "Non",
+      lettreEnvoyee: "Non",
+      licencesVerifiees: "Non",
+      observations: "Aucune donnée",
+    }],
+    sections: [
+      {
+        title: "Total général",
+        columns: [
+          { header: "Indicateur", key: "label", width: 65, align: "left" },
+          { header: "Valeur", key: "value", width: 35, align: "right" },
+        ],
+        data: [
+          { label: "Total joueurs", value: String(params.totals.joueurs), _isTotal: true },
+          { label: "Total coachs", value: String(params.totals.coachs), _isTotal: true },
+          { label: "Total chambres", value: String(params.totals.chambres), _isTotal: true },
+        ],
+      },
+    ],
+    showSignataires: true,
+  });
+}
+
 export function exportRapportMensuelPDF(
   mois: number,
   annee: number,

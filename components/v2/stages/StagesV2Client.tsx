@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { V2PageActions } from "@/components/v2/V2PageActions";
+import { ExportPdfButton } from "@/components/v2/ui/ExportPdfButton";
 import { StageDashboardCard as StageCard } from "@/components/v2/dashboard/StageDashboardCard";
 import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
 import { Button } from "@/components/ui/Button";
@@ -25,7 +26,7 @@ import {
   getJoueursByStage,
   getEntraineursByStage,
 } from "@/lib/supabase/queries";
-import { exportStagePDF } from "@/lib/pdf/pdf-exports";
+import { exportStagePDF, exportStagesLogistiquePDF } from "@/lib/pdf/pdf-exports";
 import { emptyStageForm } from "@/lib/v2/form-defaults";
 import { loadAllStageCards, type StageDashboardCard } from "@/lib/v2/dashboard-data";
 import { getCategoryStyle } from "@/lib/v2/category-colors";
@@ -46,6 +47,7 @@ import { useToast } from "@/components/v2/ui/ToastProvider";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { LayoutGrid, List, Plus, Search, Trophy, Trash2 } from "lucide-react";
 import { useRole } from "@/lib/hooks/useRole";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   getTerrains,
   reserverTerrains,
@@ -77,6 +79,7 @@ function Toggle({
 export function StagesV2Client() {
   const { toast } = useToast();
   const { canWrite, canDelete } = useRole();
+  const { user } = useAuth();
   const [deleteTarget, setDeleteTarget] = useState<StageProgrammeV2 | null>(null);
   const [editTarget, setEditTarget] = useState<StageProgrammeV2 | null>(null);
   const [stages, setStages] = useState<StageDashboardCard[]>([]);
@@ -385,6 +388,73 @@ export function StagesV2Client() {
     });
   }
 
+  function yesNo(v: boolean): string {
+    return v ? "Oui" : "Non";
+  }
+
+  function toDateIso(value: string): string {
+    return value.includes("T") ? value : `${value}T12:00:00`;
+  }
+
+  function hasTerrainsSupp(notes: string | null | undefined): boolean {
+    if (!notes) return false;
+    const m = notes.match(/\[TERRAINS_BESOINS:(.+?)\]/);
+    if (!m?.[1]) return false;
+    try {
+      const parsed = JSON.parse(m[1]) as Array<{ terrainId?: string }>;
+      const uniq = new Set(parsed.map((x) => x.terrainId).filter(Boolean));
+      return uniq.size > 1;
+    } catch {
+      return false;
+    }
+  }
+
+  function licencesVerifiees(notes: string | null | undefined): boolean {
+    const n = (notes ?? "").toLowerCase();
+    return n.includes("licence ok") || n.includes("licences ok") || n.includes("licences vérifiées");
+  }
+
+  function lettreEnvoyee(notes: string | null | undefined): boolean {
+    const n = (notes ?? "").toLowerCase();
+    return n.includes("lettre envoy") || n.includes("lettre officielle générée");
+  }
+
+  function handleExportLogistiquePdf() {
+    const rows = filtered.map((s) => ({
+      stage: s.stage_action,
+      categorie: s.categorie,
+      dates: `${format(parseISO(toDateIso(s.date_debut)), "dd/MM/yyyy")} - ${format(parseISO(toDateIso(s.date_fin)), "dd/MM/yyyy")}`,
+      duree: `${s.jours_duree} j`,
+      joueurs: String(s.nb_joueurs),
+      coachs: String(s.nb_coachs),
+      chambres: String(s.chambres ?? 0),
+      hebergement: yesNo(Boolean(s.has_hebergement)),
+      restauration: yesNo(Boolean(s.has_restauration)),
+      terrains: yesNo(Boolean(s.has_terrains)),
+      terrainsSupp: yesNo(hasTerrainsSupp(s.notes)),
+      lettreEnvoyee: yesNo(lettreEnvoyee(s.notes)),
+      licencesVerifiees: yesNo(licencesVerifiees(s.notes)),
+      observations: (s.notes ?? "").trim() || "—",
+    }));
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        joueurs: acc.joueurs + Number(r.joueurs),
+        coachs: acc.coachs + Number(r.coachs),
+        chambres: acc.chambres + Number(r.chambres),
+      }),
+      { joueurs: 0, coachs: 0, chambres: 0 }
+    );
+
+    const generatedBy = user?.fullName ?? user?.email ?? "Utilisateur FRMT";
+    const periodeLabel =
+      filtered.length > 0 ?
+        `Du ${format(parseISO(toDateIso(filtered[0]!.date_debut)), "dd/MM/yyyy")} au ${format(parseISO(toDateIso(filtered[filtered.length - 1]!.date_fin)), "dd/MM/yyyy")}`
+      : "Aucune période";
+
+    exportStagesLogistiquePDF({ rows, totals, generatedBy, periodeLabel });
+  }
+
   function toggleId(list: string[], id: string): string[] {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
@@ -436,6 +506,12 @@ export function StagesV2Client() {
                 if (stages.length === 0) return;
                 void handleExportPdf(stages[0]!);
               }}
+              extra={
+                <ExportPdfButton
+                  onExport={handleExportLogistiquePdf}
+                  label="Exporter PDF Logistique"
+                />
+              }
             />
           </div>
         }
