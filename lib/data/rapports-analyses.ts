@@ -15,7 +15,6 @@ import { getStagesProgramme } from "@/lib/data/stages";
 import type { StageProgramme } from "@/lib/types/stages";
 import type { ReportMeta } from "@/lib/export/reports";
 import { formatDatePrint, formatPeriodePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
 import { statutStageLabel } from "@/lib/utils/stage-automation";
 
 export type RapportStageDetail = {
@@ -188,7 +187,6 @@ export function buildRapportStagePdfMeta(detail: RapportStageDetail): ReportMeta
     headerAlign: ["left", "left"],
     cellAlign: ["left", "left"],
     lignes,
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -295,7 +293,6 @@ export async function buildRapportMensuelMeta(): Promise<ReportMeta> {
     ],
     colonnes: ["Stage", "Début", "Fin", "Catégorie", "Statut", "Joueurs"],
     lignes: lignes.length ? lignes : [["—", "—", "—", "—", "—", "0"]],
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -348,6 +345,5 @@ export async function buildRapportAnnuelMeta(): Promise<ReportMeta> {
           footer: [["TOTAL", String(duAn.length), duAn.length ? "100%" : "0%"]],
         }
       : undefined,
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

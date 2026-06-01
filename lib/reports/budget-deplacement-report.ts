@@ -5,8 +5,6 @@ import {
   CATEGORIES_BUDGET_COACH,
 } from "@/lib/constants/budget-deplacement";
 import { formatPeriodePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
-
 function daysBetween(start: string, end: string): number {
   const a = new Date(start.slice(0, 10));
   const b = new Date(end.slice(0, 10));
@@ -133,6 +131,5 @@ export function buildBudgetDeplacementReport(
     headerAlign: ["left", "left", "center", "center", "center", "center"],
     cellAlign: ["left", "left", "center", "center", "center", "center"],
     lignes: rows,
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

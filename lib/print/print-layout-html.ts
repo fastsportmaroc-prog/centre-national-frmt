@@ -162,14 +162,6 @@ export function buildReportTableHtml(section: ReportTableSection, legacy = false
   </table>`;
 }
 
-export function buildObservationsHtml(text: string): string {
-  return `
-  <h2 class="section-title">Observations</h2>
-  <div class="meta-box no-break">
-    <p class="report-note">${esc(text)}</p>
-  </div>`;
-}
-
 export function buildPrintFooterHtml(legacy = false): string {
   return `
   <footer class="print-footer${legacy ? " print-footer--legacy" : ""}">
@@ -209,7 +201,6 @@ export function buildInstitutionalPrintHtml(meta: ReportMeta, legacy = meta.lega
     ${meta.metaRows?.length ? buildMetaBoxHtml(meta.metaRows) : ""}
     ${meta.kpis?.length ? buildKpiGridHtml(meta.kpis, legacy) : ""}
     ${sectionsHtml}
-    ${meta.observations ? buildObservationsHtml(meta.observations) : ""}
     ${
       legacy
         ? `<div class="no-break" style="margin-top:20px">

@@ -24,7 +24,6 @@ export function BilanStageClient({ stageId }: { stageId: string }) {
   const [hebergement, setHebergement] = useState<Awaited<ReturnType<typeof getHebergementByStage>>>(null);
   const [restauration, setRestauration] = useState<Awaited<ReturnType<typeof getRestaurationByStage>>>(null);
   const [planning, setPlanning] = useState<Awaited<ReturnType<typeof getPlanningByStage>>>([]);
-  const [observations, setObservations] = useState("");
   const [recommandations, setRecommandations] = useState("");
 
   useEffect(() => {
@@ -69,7 +68,6 @@ export function BilanStageClient({ stageId }: { stageId: string }) {
         ["Coût restauration", `${finance.montantRestauration.toLocaleString("fr-FR")} MAD`],
         ["Coût terrains", `${finance.montantTerrains.toLocaleString("fr-FR")} MAD`],
         ["TOTAL", `${finance.montantTotal.toLocaleString("fr-FR")} MAD`],
-        ["Observations", observations || "—"],
         ["Recommandations", recommandations || "—"],
       ],
       `bilan-stage-${stage.id}.pdf`
@@ -96,12 +94,6 @@ export function BilanStageClient({ stageId }: { stageId: string }) {
           {finance && <p className="font-semibold">Total financier : {finance.montantTotal.toLocaleString("fr-FR")} MAD</p>}
         </Card>
         <Card className="space-y-2 p-4">
-          <label className="text-sm">Observations responsable logistique</label>
-          <textarea
-            className="h-24 w-full rounded border border-[var(--border)] bg-[var(--bg-card)] p-2 text-sm"
-            value={observations}
-            onChange={(e) => setObservations(e.target.value)}
-          />
           <label className="text-sm">Recommandations prochains stages</label>
           <textarea
             className="h-24 w-full rounded border border-[var(--border)] bg-[var(--bg-card)] p-2 text-sm"

@@ -205,7 +205,6 @@ export async function buildReportFromEntity(report: StoredReportV2): Promise<Rap
     return {
       ...data,
       titre: report.titre,
-      observations: report.observations ?? data.observations,
       recommandations: report.recommandations ?? data.recommandations,
     };
   }
@@ -214,7 +213,6 @@ export async function buildReportFromEntity(report: StoredReportV2): Promise<Rap
     const data = await getStageReportData(entityId ?? MOCK_STAGE_U18_ID);
     return {
       ...data,
-      observations: report.observations ?? data.observations,
       recommandations: report.recommandations ?? data.recommandations,
     };
   }
@@ -224,7 +222,6 @@ export async function buildReportFromEntity(report: StoredReportV2): Promise<Rap
     return {
       ...data,
       titre: report.titre,
-      observations: report.observations ?? data.observations,
       recommandations: report.recommandations ?? data.recommandations,
     };
   }

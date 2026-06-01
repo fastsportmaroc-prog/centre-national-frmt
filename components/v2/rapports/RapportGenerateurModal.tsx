@@ -184,11 +184,6 @@ export function RapportGenerateurModal({ generator, onGenerated }: Props) {
             </p>
           </div>
           <Input
-            placeholder="Observations (optionnel)"
-            value={state.observations}
-            onChange={(e) => patch({ observations: e.target.value })}
-          />
-          <Input
             placeholder="Recommandations (optionnel)"
             value={state.recommandations}
             onChange={(e) => patch({ recommandations: e.target.value })}

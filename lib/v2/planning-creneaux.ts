@@ -66,7 +66,6 @@ export type PlanningSessionRow = {
   terrains_supplementaires: boolean;
   lettre_envoyee: boolean;
   licences_verifiees: boolean;
-  observations: string;
 };
 
 function sessionKey(stageId: string, date: string, creneau: PlanningCreneauSlot, infraId?: string | null) {
@@ -86,7 +85,6 @@ function stageMeta(stage: StageProgrammeV2, statut: string): Omit<PlanningSessio
     terrains_supplementaires: n.includes("[terrains_besoins:") || n.includes("terrain supp"),
     lettre_envoyee: n.includes("lettre envoy") || n.includes("lettre officielle générée"),
     licences_verifiees: n.includes("licences vérifiées") || n.includes("licence ok"),
-    observations: notes.trim() || "—",
   };
 }
 

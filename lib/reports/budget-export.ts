@@ -1,8 +1,6 @@
 import type { ReportMeta } from "@/lib/export/reports";
 import type { BudgetDashboard } from "@/lib/types/budget";
 import { CATEGORIES_BUDGET } from "@/lib/constants/budget";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
-
 function mad(n: number) {
   return `${n.toLocaleString("fr-FR")} MAD`;
 }
@@ -77,7 +75,6 @@ export function buildBudgetAnnuelReport(dashboard: BudgetDashboard): ReportMeta 
           cellAlign: ["left", "center", "center"],
         }
       : undefined,
-    observations: DEFAULT_OBSERVATIONS,
     legacyPrintStyle: true,
   };
 }
@@ -121,7 +118,6 @@ export function buildBudgetJoueursReport(dashboard: BudgetDashboard): ReportMeta
         `${moyenne}%`,
       ],
     ],
-    observations: DEFAULT_OBSERVATIONS,
     legacyPrintStyle: true,
   };
 }

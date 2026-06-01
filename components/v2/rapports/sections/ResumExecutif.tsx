@@ -19,9 +19,6 @@ export function ResumExecutif({ data }: { data: RapportEntityData }) {
           <p><span className="text-muted">Responsable :</span> {data.responsable}</p>
         )}
       </div>
-      {data.observations && (
-        <p className="rounded-md bg-[var(--bg-muted)]/40 p-3 text-sm">{data.observations}</p>
-      )}
     </Card>
   );
 }

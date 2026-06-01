@@ -1,8 +1,6 @@
 import type { ReportMeta } from "@/lib/export/reports";
 import type { StageProgramme } from "@/lib/types/stages";
 import { formatDatePrint, formatPeriodePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
-
 type Options = {
   vue: "liste" | "mois" | "annee";
   periodeLabel?: string;
@@ -107,6 +105,5 @@ export function buildCalendrierStagesReport(
           cellAlign: ["left", "center", "center"],
         }
       : undefined,
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

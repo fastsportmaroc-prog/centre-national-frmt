@@ -161,7 +161,6 @@ export function RapportDetailClient({ reportId }: { reportId: string }) {
         {sections.resultats && <SectionResultats resultats={data.resultats} />}
         {sections.recommandations && (
           <SectionRecommandations
-            observations={data.observations ?? report.observations}
             recommandations={data.recommandations ?? report.recommandations}
           />
         )}

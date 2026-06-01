@@ -154,9 +154,6 @@ export function buildEmptyPeriodReport(report: StoredReportV2): StageReportData 
     },
     resultats: [],
     kpis: buildPeriodKpis(report.type, periodLabel, 0, 0),
-    observations:
-      report.observations ??
-      "Aucun stage enregistré sur cette période dans la base de données.",
     recommandations: report.recommandations,
   };
 }
@@ -275,9 +272,6 @@ export function aggregateStageReports(
       joueurs.length,
       staff.length
     ),
-    observations:
-      report.observations ??
-      `Synthèse de ${reports.length} stage(s) sur la période ${periodLabel}.`,
     recommandations: report.recommandations,
   };
 }

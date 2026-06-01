@@ -6,7 +6,6 @@ import { getDemandesLogistique } from "@/lib/data/logistique";
 import { getBilletsAvion } from "@/lib/data/billets";
 import { getGroupes } from "@/lib/data/groupes";
 import { formatDatePrint, formatDateTimePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
 import { calculerAge } from "@/lib/utils/joueur";
 
 export async function reportListeJoueurs(): Promise<ReportMeta> {
@@ -39,7 +38,6 @@ export async function reportListeJoueurs(): Promise<ReportMeta> {
       j.groupe?.nom ?? "—",
       j.niveau ?? "—",
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -63,7 +61,6 @@ export async function reportJoueursParGroupe(groupeId: string): Promise<ReportMe
       j.categorie_age,
       j.classement ?? "—",
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -90,7 +87,6 @@ export async function reportReservationsCourts(): Promise<ReportMeta> {
       formatDateTimePrint(r.date_debut),
       formatDateTimePrint(r.date_fin),
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -124,7 +120,6 @@ export async function reportOccupationCourts(): Promise<ReportMeta> {
       String(c.reservations_count),
       `${c.taux_occupation}%`,
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -158,7 +153,6 @@ export async function reportDemandesLogistique(): Promise<ReportMeta> {
       x.demandeur_nom,
       formatDatePrint(x.created_at),
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }
 
@@ -185,6 +179,5 @@ export async function reportBilletsAvion(): Promise<ReportMeta> {
       `${formatDatePrint(x.date_aller)}${x.date_retour ? ` / ${formatDatePrint(x.date_retour)}` : ""}`,
       x.urgence ? "Oui" : "Non",
     ]),
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

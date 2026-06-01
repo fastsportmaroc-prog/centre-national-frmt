@@ -773,7 +773,6 @@ export function exportPlanningPDF(
     terrains_supplementaires?: string;
     lettre_envoyee?: string;
     licences_verifiees?: string;
-    observations?: string;
   }[],
   options?: string | {
     weekLabel?: string;
@@ -806,7 +805,6 @@ export function exportPlanningPDF(
       terrainsSupp: safePdfCell(r.terrains_supplementaires ?? "Non"),
       lettreEnvoyee: safePdfCell(r.lettre_envoyee ?? "Non"),
       licencesVerifiees: safePdfCell(r.licences_verifiees ?? "Non"),
-      observations: safePdfCell(r.observations ?? "—"),
     }));
 
   const dates = seances.map((s) => s.date).filter(Boolean).sort();
@@ -844,7 +842,6 @@ export function exportPlanningPDF(
       { header: "Terr. supp.", key: "terrainsSupp", width: 12, align: "center" },
       { header: "Lettre", key: "lettreEnvoyee", width: 9, align: "center" },
       { header: "Licences", key: "licencesVerifiees", width: 10, align: "center" },
-      { header: "Observations", key: "observations", width: 18, align: "left" },
     ],
     data,
     sections:

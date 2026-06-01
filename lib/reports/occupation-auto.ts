@@ -1,7 +1,5 @@
 import type { ReportMeta } from "@/lib/export/reports";
 import { formatDatePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
-
 export function buildOccupationAutoReport(
   data: {
     date: string;
@@ -48,6 +46,5 @@ export function buildOccupationAutoReport(
       ["Salle natation", `${data.taux_natation_pct}%`],
       ["Alertes", data.alertes.length ? data.alertes.join(" · ") : "Aucune"],
     ],
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

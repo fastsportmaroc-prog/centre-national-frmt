@@ -70,7 +70,6 @@ export function getMockStageU18Report(): StageReportData {
       dej: 182,
       diner: 182,
       montant_mad: montantRestauration,
-      observations: "Régime adapté aux charges d'entraînement. Aucun incident alimentaire.",
     },
     hebergement: {
       date_debut: "2026-05-04",
@@ -114,8 +113,6 @@ export function getMockStageU18Report(): StageReportData {
       { joueur: "Karim Benjelloun", epreuve: "Tests physiques", resultat: "Progression +8%", classement: "—" },
       { joueur: "Lina Tazi", epreuve: "Tests physiques", resultat: "Progression +6%", classement: "—" },
     ],
-    observations:
-      "Stage conforme au programme fédéral U18. Bonne dynamique de groupe et respect des plannings.",
     recommandations:
       "Prévoir une séance kiné quotidienne pour les catégories U18 lors des stages de plus de 10 jours. Renforcer le suivi nutritionnel.",
     kpis: [
@@ -192,7 +189,6 @@ export function getMockCompetitionReport(): CompetitionReportData {
       ],
     },
     resultats: [],
-    observations: "Délégation en préparation — convocations en cours.",
     recommandations: "Valider les visas et billets 3 semaines avant le départ.",
     kpis: [
       { label: "Participants", value: "6" },

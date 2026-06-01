@@ -1,5 +1,4 @@
 import type { ReportMeta } from "@/lib/export/reports";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
 import { formatDatePrint, formatPeriodePrint } from "@/lib/print/format-date";
 import type { StageProvisionSummary } from "@/lib/data/stage-besoins";
 import type { StageRestaurationRecord } from "@/lib/types/stage-services";
@@ -132,6 +131,5 @@ export function buildRestaurationStagesReport(
       headerAlign: ["left", "center", "center", "center"],
       cellAlign: ["left", "center", "center", "center"],
     },
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

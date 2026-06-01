@@ -82,10 +82,6 @@ export async function exportFrmtPdfFromMeta(
       content: meta.kpis.map((k) => `${k.label} : ${k.value}${k.sub ? ` (${k.sub})` : ""}`).join("\n"),
     });
   }
-  if (meta.observations) {
-    extraSections.push({ title: "Observations", content: meta.observations });
-  }
-
   const hasMainTable = meta.colonnes.length > 0 && meta.lignes.length > 0;
   const outName = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
 

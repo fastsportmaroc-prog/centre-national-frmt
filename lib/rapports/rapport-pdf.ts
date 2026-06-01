@@ -133,12 +133,19 @@ export function buildRapportPdfMeta(
     });
   }
 
-  const obsParts: string[] = [];
   if (sectionEnabled(report, "recommandations")) {
-    if (data.observations) obsParts.push(`Observations : ${data.observations}`);
-    if (data.recommandations) obsParts.push(`Recommandations : ${data.recommandations}`);
-    if (report.observations) obsParts.push(report.observations);
-    if (report.recommandations) obsParts.push(report.recommandations);
+    const recLines = [
+      data.recommandations,
+      report.recommandations,
+    ].filter((t): t is string => Boolean(t?.trim()));
+    const unique = [...new Set(recLines)];
+    if (unique.length) {
+      sections.push({
+        title: SECTION_LABELS.recommandations,
+        colonnes: ["Recommandations"],
+        lignes: unique.map((t) => [t]),
+      });
+    }
   }
 
   return {
@@ -161,7 +168,6 @@ export function buildRapportPdfMeta(
       ],
     ],
     sections,
-    observations: obsParts.length ? obsParts.join("\n\n") : undefined,
   };
 }
 

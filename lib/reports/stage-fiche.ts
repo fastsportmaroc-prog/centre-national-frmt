@@ -9,7 +9,6 @@ import {
   creneauHoraires,
 } from "@/lib/stages/stage-calculations";
 import { formatDatePrint, formatPeriodePrint } from "@/lib/print/format-date";
-import { DEFAULT_OBSERVATIONS } from "@/lib/print/report-enrich";
 import { stripLogistiqueFromNotes } from "@/lib/stages/stage-logistique-serializer";
 
 export function buildStageFicheReport(
@@ -111,6 +110,5 @@ export function buildStageFicheReport(
     headerAlign: ["left", "left"],
     cellAlign: ["left", "left"],
     lignes,
-    observations: DEFAULT_OBSERVATIONS,
   };
 }

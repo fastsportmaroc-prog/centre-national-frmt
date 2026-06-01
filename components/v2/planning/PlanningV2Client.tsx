@@ -290,7 +290,6 @@ export function PlanningV2Client() {
                   terrains_supplementaires: yesNo(r.terrains_supplementaires),
                   lettre_envoyee: yesNo(r.lettre_envoyee),
                   licences_verifiees: yesNo(r.licences_verifiees),
-                  observations: r.observations,
                 })),
                 {
                   weekLabel,

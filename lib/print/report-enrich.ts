@@ -1,9 +1,6 @@
 import type { ReportMeta, ReportKpi } from "@/lib/export/reports";
 import { formatGeneratedDatePrint } from "@/lib/print/format-date";
 
-export const DEFAULT_OBSERVATIONS =
-  "Document établi par la Fédération Royale Marocaine de Tennis. Données issues du système de gestion opérationnelle. Usage interne — diffusion restreinte.";
-
 export function enrichReportMeta(meta: ReportMeta): ReportMeta {
   const rowCount = meta.lignes.length;
   const metaRows =
@@ -44,11 +41,12 @@ export function enrichReportMeta(meta: ReportMeta): ReportMeta {
           { label: "Référence", value: meta.reference ?? "—", sub: "document" },
         ]);
 
+  const { observations: _omit, ...rest } = meta;
+
   return {
-    ...meta,
+    ...rest,
     metaRows,
     kpis,
-    observations: meta.observations ?? DEFAULT_OBSERVATIONS,
     reference: meta.reference ?? `CNF-${new Date().getFullYear()}`,
   };
 }

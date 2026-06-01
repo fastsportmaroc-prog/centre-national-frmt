@@ -22,7 +22,6 @@ export function SectionRestauration({ data }: { data: RestaurationReportData }) 
       <p className="text-sm font-semibold">
         Montant : {data.montant_mad.toLocaleString("fr-FR")} MAD
       </p>
-      {data.observations && <p className="text-sm text-[var(--text-secondary)]">{data.observations}</p>}
     </Card>
   );
 }

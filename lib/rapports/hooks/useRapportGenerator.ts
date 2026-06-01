@@ -20,7 +20,6 @@ export type GeneratorState = {
   periodeDebut: string;
   periodeFin: string;
   sections: ReportSectionsConfig;
-  observations: string;
   recommandations: string;
 };
 
@@ -32,7 +31,6 @@ const INITIAL: GeneratorState = {
   periodeDebut: "",
   periodeFin: "",
   sections: { ...DEFAULT_SECTIONS_CONFIG },
-  observations: "",
   recommandations: "",
 };
 
@@ -115,7 +113,6 @@ export function useRapportGenerator(onCreated?: (report: StoredReportV2) => void
       periode,
       statut: "genere",
       sections: state.sections,
-      observations: state.observations || undefined,
       recommandations: state.recommandations || undefined,
       generated_at: new Date().toISOString(),
       generated_by: "s.abderrazzaq@frmt.ma",

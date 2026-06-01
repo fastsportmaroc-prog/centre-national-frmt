@@ -72,7 +72,6 @@ function seedMockReportIfNeeded(): void {
     periode: { debut: "2026-05-04", fin: "2026-05-17", label: "Mai 2026" },
     statut: "genere",
     sections: DEFAULT_SECTIONS_CONFIG,
-    observations: "Stage conforme au programme fédéral U18.",
     recommandations: "Renforcer le suivi kinésithérapie pour les stages > 10 jours.",
     generated_at: "2026-05-18T10:00:00.000Z",
     generated_by: "s.abderrazzaq@frmt.ma",
