@@ -7,8 +7,15 @@ import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { V2PageActions } from "@/components/v2/V2PageActions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input, Select } from "@/components/ui/Input";
+import { Input, Label, Select } from "@/components/ui/Input";
+import { LogistiqueStageFiltersBar } from "@/components/v2/ui/LogistiqueStageFiltersBar";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
+import { useDebounced } from "@/lib/hooks/useDebounced";
+import {
+  emptyLogistiqueFilters,
+  filterLogistiqueStageRows,
+  type LogistiqueStageFilters,
+} from "@/lib/v2/logistique-stage-filters";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import {
@@ -34,7 +41,9 @@ export function RestaurationV2Client() {
   const [items, setItems] = useState<RestaurationStageV2[]>([]);
   const [stages, setStages] = useState<StageProgrammeV2[]>([]);
   const [facturesByStage, setFacturesByStage] = useState<Record<string, FacturePrestataireV2>>({});
-  const [stageFilter, setStageFilter] = useState("");
+  const [filters, setFilters] = useState<LogistiqueStageFilters>(emptyLogistiqueFilters);
+  const [repasFilter, setRepasFilter] = useState<"" | "pdj" | "dej" | "diner">("");
+  const debouncedSearch = useDebounced(filters.search, 300);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [savingFacture, setSavingFacture] = useState<Record<string, boolean>>({});
   const [factureUrlByStage, setFactureUrlByStage] = useState<Record<string, string>>({});
@@ -72,17 +81,25 @@ export function RestaurationV2Client() {
 
   useEffect(() => {
     const stageFromUrl = searchParams.get("stage");
-    if (stageFromUrl) setStageFilter(stageFromUrl);
+    if (stageFromUrl) {
+      setFilters((f) => ({ ...f, stageId: stageFromUrl }));
+    }
   }, [searchParams]);
 
+  const filtersForQuery = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [filters, debouncedSearch]
+  );
+
   const groups = useMemo(() => {
-    const stageMap = new Map(stages.map((s) => [s.id, s]));
-    return items
-      .filter((r) => !stageFilter || r.stage_id === stageFilter)
-      .map((r) => ({ restauration: r, stage: stageMap.get(r.stage_id)! }))
-      .filter((g) => g.stage)
-      .sort((a, b) => a.stage.date_debut.localeCompare(b.stage.date_debut));
-  }, [items, stages, stageFilter]);
+    const rows = filterLogistiqueStageRows(items, stages, filtersForQuery, (r) => {
+      if (repasFilter === "pdj") return r.petit_dejeuner;
+      if (repasFilter === "dej") return r.dejeuner;
+      if (repasFilter === "diner") return r.diner;
+      return true;
+    });
+    return rows.map(({ item: restauration, stage }) => ({ restauration, stage }));
+  }, [items, stages, filtersForQuery, repasFilter]);
 
   async function confirmDelete() {
     if (!deleteId) return;
@@ -175,8 +192,8 @@ export function RestaurationV2Client() {
           <V2PageActions
             onExportPdf={() =>
               exportRestaurationPDF(
-                items.map((r) => ({
-                  Stage: stages.find((s) => s.id === r.stage_id)?.stage_action ?? r.stage_id,
+                groups.map(({ stage, restauration: r }) => ({
+                  Stage: stage.stage_action,
                   Période: `${r.date_debut} → ${r.date_fin}`,
                   PDJ: r.petit_dejeuner ? "Oui" : "Non",
                   Déjeuner: r.dejeuner ? "Oui" : "Non",
@@ -185,9 +202,9 @@ export function RestaurationV2Client() {
                   "Total repas": String(r.total_repas),
                   Statut: r.statut,
                 })),
-                items.length
+                groups.length
                   ? {
-                      "TOTAL REPAS": String(items.reduce((s, x) => s + x.total_repas, 0)),
+                      "TOTAL REPAS": String(groups.reduce((s, g) => s + g.restauration.total_repas, 0)),
                     }
                   : undefined
               )
@@ -196,23 +213,38 @@ export function RestaurationV2Client() {
         }
       />
       <main className="space-y-4 p-4 sm:p-6">
-        <Card className="p-4">
-          <label className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Vue par stage</label>
-          <Select className="mt-1 max-w-md" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-            <option value="">Tous les stages</option>
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.stage_action}
-              </option>
-            ))}
-          </Select>
-        </Card>
+        <LogistiqueStageFiltersBar
+          stages={stages}
+          filters={filters}
+          onChange={setFilters}
+          resultCount={groups.length}
+          totalCount={items.length}
+          extraFilters={
+            <div>
+              <Label>Type de repas</Label>
+              <Select
+                className="mt-1"
+                value={repasFilter}
+                onChange={(e) => setRepasFilter(e.target.value as "" | "pdj" | "dej" | "diner")}
+              >
+                <option value="">Tous</option>
+                <option value="pdj">Avec petit-déjeuner</option>
+                <option value="dej">Avec déjeuner</option>
+                <option value="diner">Avec dîner</option>
+              </Select>
+            </div>
+          }
+        />
 
         {groups.length === 0 ? (
           <EmptyState
             icon={UtensilsCrossed}
-            title="Aucune restauration"
-            description="Les repas apparaissent ici lors de la création d'un stage avec restauration."
+            title={items.length === 0 ? "Aucune restauration" : "Aucun résultat"}
+            description={
+              items.length === 0 ?
+                "Les repas apparaissent ici lors de la création d'un stage avec restauration."
+              : "Modifiez les filtres ou réinitialisez la recherche."
+            }
           />
         ) : (
           groups.map(({ stage, restauration: r }) => {

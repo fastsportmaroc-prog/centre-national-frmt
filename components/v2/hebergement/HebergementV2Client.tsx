@@ -8,8 +8,15 @@ import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { V2PageActions } from "@/components/v2/V2PageActions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input, Select } from "@/components/ui/Input";
+import { Input, Label, Select } from "@/components/ui/Input";
+import { LogistiqueStageFiltersBar } from "@/components/v2/ui/LogistiqueStageFiltersBar";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
+import { useDebounced } from "@/lib/hooks/useDebounced";
+import {
+  emptyLogistiqueFilters,
+  filterLogistiqueStageRows,
+  type LogistiqueStageFilters,
+} from "@/lib/v2/logistique-stage-filters";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
@@ -22,18 +29,15 @@ import { uploadDocument } from "@/lib/storage/upload-document";
 import { computeHebergementPrevuMad } from "@/lib/v2/budget-centre-calcul";
 import { useTarifsBudget } from "@/lib/v2/use-tarifs-budget";
 
-type StageHebergGroup = {
-  stage: StageProgrammeV2;
-  hebergement: HebergementStageV2;
-};
-
 export function HebergementV2Client() {
   const { toast } = useToast();
   const tarifsBudget = useTarifsBudget();
   const [items, setItems] = useState<HebergementStageV2[]>([]);
   const [stages, setStages] = useState<StageProgrammeV2[]>([]);
   const [facturesByStage, setFacturesByStage] = useState<Record<string, FacturePrestataireV2>>({});
-  const [stageFilter, setStageFilter] = useState("");
+  const [filters, setFilters] = useState<LogistiqueStageFilters>(emptyLogistiqueFilters);
+  const [kitchenetteFilter, setKitchenetteFilter] = useState<"" | "yes" | "no">("");
+  const debouncedSearch = useDebounced(filters.search, 300);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [factureUrlByStage, setFactureUrlByStage] = useState<Record<string, string>>({});
   const [factureRefByStage, setFactureRefByStage] = useState<Record<string, string>>({});
@@ -69,17 +73,19 @@ export function HebergementV2Client() {
     void load();
   }, [load]);
 
+  const filtersForQuery = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [filters, debouncedSearch]
+  );
+
   const groups = useMemo(() => {
-    const stageMap = new Map(stages.map((s) => [s.id, s]));
-    const result: StageHebergGroup[] = [];
-    for (const h of items) {
-      const stage = stageMap.get(h.stage_id);
-      if (!stage) continue;
-      if (stageFilter && h.stage_id !== stageFilter) continue;
-      result.push({ stage, hebergement: h });
-    }
-    return result.sort((a, b) => a.stage.date_debut.localeCompare(b.stage.date_debut));
-  }, [items, stages, stageFilter]);
+    const rows = filterLogistiqueStageRows(items, stages, filtersForQuery, (h) => {
+      if (kitchenetteFilter === "yes") return Boolean(h.kitchenette);
+      if (kitchenetteFilter === "no") return !h.kitchenette;
+      return true;
+    });
+    return rows.map(({ item: hebergement, stage }) => ({ stage, hebergement }));
+  }, [items, stages, filtersForQuery, kitchenetteFilter]);
 
   async function confirmDelete() {
     if (!deleteId) return;
@@ -159,41 +165,52 @@ export function HebergementV2Client() {
           <V2PageActions
             onExportPdf={() =>
               exportHebergementPDF(
-                items.map((r) => {
-                  const sn = stages.find((s) => s.id === r.stage_id)?.stage_action ?? r.stage_id;
-                  return {
-                    Stage: sn,
-                    Début: r.date_debut,
-                    Fin: r.date_fin,
-                    "Ch. joueurs": String(r.nb_chambres_joueurs ?? r.chambres ?? 0),
-                    "Ch. coachs": String(r.nb_chambres_coachs ?? 0),
-                    Kitchenette: r.kitchenette ? "Oui" : "Non",
-                    Statut: r.statut,
-                  };
-                })
+                groups.map(({ stage, hebergement: r }) => ({
+                  Stage: stage.stage_action,
+                  Début: r.date_debut,
+                  Fin: r.date_fin,
+                  "Ch. joueurs": String(r.nb_chambres_joueurs ?? r.chambres ?? 0),
+                  "Ch. coachs": String(r.nb_chambres_coachs ?? 0),
+                  Kitchenette: r.kitchenette ? "Oui" : "Non",
+                  Statut: r.statut,
+                }))
               )
             }
           />
         }
       />
       <main className="space-y-4 p-4 sm:p-6">
-        <Card className="p-4">
-          <label className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Filtré par stage</label>
-          <Select className="mt-1 max-w-md" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-            <option value="">Tous les stages</option>
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.stage_action}
-              </option>
-            ))}
-          </Select>
-        </Card>
+        <LogistiqueStageFiltersBar
+          stages={stages}
+          filters={filters}
+          onChange={setFilters}
+          resultCount={groups.length}
+          totalCount={items.length}
+          extraFilters={
+            <div>
+              <Label>Kitchenette</Label>
+              <Select
+                className="mt-1"
+                value={kitchenetteFilter}
+                onChange={(e) => setKitchenetteFilter(e.target.value as "" | "yes" | "no")}
+              >
+                <option value="">Toutes</option>
+                <option value="yes">Avec kitchenette</option>
+                <option value="no">Sans kitchenette</option>
+              </Select>
+            </div>
+          }
+        />
 
         {groups.length === 0 ? (
           <EmptyState
             icon={Hotel}
-            title="Aucun hébergement"
-            description="Créez un stage avec hébergement activé pour voir les attributions ici."
+            title={items.length === 0 ? "Aucun hébergement" : "Aucun résultat"}
+            description={
+              items.length === 0 ?
+                "Créez un stage avec hébergement activé pour voir les attributions ici."
+              : "Modifiez les filtres ou réinitialisez la recherche."
+            }
             actionLabel="Voir les stages"
             onAction={() => (window.location.href = "/v2/stages")}
           />
