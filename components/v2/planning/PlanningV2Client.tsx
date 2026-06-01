@@ -11,95 +11,143 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
-import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
-import { syncAllStagesPlanningAction } from "@/lib/actions/stage-planning-actions";
-import {
-  createSeance,
-  deleteSeance,
-  getInfrastructures,
-  getPlanning,
-  getPlanningByStage,
-  getStages,
-} from "@/lib/supabase/queries";
+import { getStages } from "@/lib/supabase/queries";
 import { exportPlanningPDF } from "@/lib/pdf/pdf-exports";
-import type { InfrastructureV2, PlanningSeanceV2, StageProgrammeV2 } from "@/lib/types/v2";
+import type { StageProgrammeV2 } from "@/lib/types/v2";
 import { CalendarDays } from "lucide-react";
-import { cn } from "@/lib/utils/cn";
-import { eachDayOfStage } from "@/lib/v2/stage-calculations";
 
 type Creneau = "matin" | "apres_midi";
-type StageViewMode = "prevus" | "tous";
-type StageMeta = Pick<StageProgrammeV2, "id" | "stage_action" | "statut" | "date_debut" | "date_fin" | "categorie">;
+type StageStatusFilter = "prevus_confirmes" | "en_cours" | "tous";
+type PlanningSession = {
+  id: string;
+  stageId: string;
+  stageName: string;
+  categorie: string;
+  date: string;
+  creneau: Creneau;
+  heure_debut: string;
+  heure_fin: string;
+  nombre_joueurs: number;
+  nombre_coachs: number;
+  statut: string;
+};
 
-function slotForHeure(h: string): Creneau {
-  const hour = parseInt(h.split(":")[0] ?? "12", 10);
-  return hour < 13 ? "matin" : "apres_midi";
+function stageStatus(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
+function parseDateSafe(value: unknown): Date | null {
+  if (!value) return null;
+  const raw = String(value);
+  const normalized = raw.includes("T") ? raw : `${raw}T12:00:00`;
+  const parsed = parseISO(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function pickStageDate(stage: StageProgrammeV2, kind: "start" | "end"): Date | null {
+  const dynamicStage = stage as unknown as Record<string, unknown>;
+  const keys =
+    kind === "start" ?
+      ["date_debut", "start_date", "dateDebut", "startDate"]
+    : ["date_fin", "end_date", "dateFin", "endDate"];
+
+  for (const key of keys) {
+    const parsed = parseDateSafe(dynamicStage[key]);
+    if (parsed) return parsed;
+  }
+  return null;
 }
 
 function slotLabel(slot: Creneau): string {
-  return slot === "matin" ? "Matin (09:00-13:00)" : "Après-midi (14:00-18:00)";
+  return slot === "matin" ? "Matin (09:00-11:00)" : "Après-midi (15:00-17:00)";
 }
 
-async function ensurePlanningFromStagesClient(stages: StageProgrammeV2[]): Promise<number> {
-  let created = 0;
+function shouldIncludeStageStatus(status: string): boolean {
+  return status === "prevu" || status === "confirme" || status === "en_cours";
+}
+
+export function generatePlanningSessionsFromStages(
+  stages: StageProgrammeV2[],
+  selectedWeekStart: Date
+): PlanningSession[] {
+  const weekStart = startOfWeek(selectedWeekStart, { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 6);
+  const out: PlanningSession[] = [];
+
   for (const stage of stages) {
-    if (stage.statut === "annule") continue;
-    const existing = await getPlanningByStage(stage.id);
-    if (existing.length > 0) continue;
-    const days = eachDayOfStage(stage.date_debut, stage.date_fin);
-    for (const day of days) {
-      const res = await createSeance({
-        stage_id: stage.id,
-        date: day,
-        heure_debut: "09:00",
-        heure_fin: "13:00",
-        infrastructure_id: null,
-        surface: null,
-        coach_id: null,
-        groupe: stage.categorie ?? null,
-        statut: "prevu",
-      });
-      if (!res.error && res.data) created++;
+    const statut = stageStatus(stage.statut);
+    if (!shouldIncludeStageStatus(statut)) continue;
+
+    const start = pickStageDate(stage, "start");
+    const end = pickStageDate(stage, "end");
+    if (!start || !end) continue;
+
+    const current = new Date(start);
+    while (current <= end) {
+      if (current >= weekStart && current <= weekEnd) {
+        const day = format(current, "yyyy-MM-dd");
+        out.push({
+          id: `${stage.id}-${day}-matin`,
+          stageId: stage.id,
+          stageName: stage.stage_action ?? "Stage",
+          categorie: stage.categorie ?? "—",
+          date: day,
+          creneau: "matin",
+          heure_debut: "09:00",
+          heure_fin: "11:00",
+          nombre_joueurs: Number(stage.nombre_joueurs ?? 0),
+          nombre_coachs: Number(stage.nombre_encadrants ?? 0),
+          statut,
+        });
+        out.push({
+          id: `${stage.id}-${day}-apres_midi`,
+          stageId: stage.id,
+          stageName: stage.stage_action ?? "Stage",
+          categorie: stage.categorie ?? "—",
+          date: day,
+          creneau: "apres_midi",
+          heure_debut: "15:00",
+          heure_fin: "17:00",
+          nombre_joueurs: Number(stage.nombre_joueurs ?? 0),
+          nombre_coachs: Number(stage.nombre_encadrants ?? 0),
+          statut,
+        });
+      }
+      current.setDate(current.getDate() + 1);
     }
   }
-  return created;
+
+  return out.sort((a, b) => {
+    const k1 = `${a.date}|${a.creneau}|${a.stageName}`;
+    const k2 = `${b.date}|${b.creneau}|${b.stageName}`;
+    return k1.localeCompare(k2);
+  });
 }
 
 export function PlanningV2Client() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const stageFromUrl = searchParams.get("stage") ?? "";
-  const [items, setItems] = useState<PlanningSeanceV2[]>([]);
-  const [infrastructures, setInfrastructures] = useState<InfrastructureV2[]>([]);
-  const [stageNames, setStageNames] = useState<Record<string, string>>({});
-  const [stageMeta, setStageMeta] = useState<Record<string, StageMeta>>({});
+  const [stages, setStages] = useState<StageProgrammeV2[]>([]);
   const [stageFilter, setStageFilter] = useState(stageFromUrl);
-  const [viewMode, setViewMode] = useState<StageViewMode>("tous");
+  const [statusFilter, setStatusFilter] = useState<StageStatusFilter>("tous");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [weekOffset, setWeekOffset] = useState(0);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const isDev = process.env.NODE_ENV !== "production";
 
   const load = useCallback(async () => {
-    const [p, s, infra] = await Promise.all([getPlanning(), getStages(), getInfrastructures()]);
-    setItems(p);
-    setInfrastructures(infra.slice(0, 5));
-    setStageNames(Object.fromEntries(s.map((x) => [x.id, x.stage_action])));
-    setStageMeta(
-      Object.fromEntries(
-        s.map((x) => [
-          x.id,
-          {
-            id: x.id,
-            stage_action: x.stage_action,
-            statut: x.statut,
-            date_debut: x.date_debut,
-            date_fin: x.date_fin,
-            categorie: x.categorie,
-          } satisfies StageMeta,
-        ])
-      )
-    );
+    setLoading(true);
+    const s = await getStages();
+    setStages(s);
+    if (isDev) {
+      console.info("[PlanningV2] stages loaded:", s.length);
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -107,41 +155,8 @@ export function PlanningV2Client() {
   }, [stageFromUrl]);
 
   useEffect(() => {
-    if (!stageFromUrl || items.length === 0) return;
-    const first = items.find((s) => s.stage_id === stageFromUrl);
-    if (!first?.date) return;
-    const d = parseISO(first.date);
-    if (Number.isNaN(d.getTime())) return;
-    const base = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const target = startOfWeek(d, { weekStartsOn: 1 });
-    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    setWeekOffset(Math.round((target.getTime() - base.getTime()) / msPerWeek));
-  }, [stageFromUrl, items]);
-
-  useEffect(() => {
     (async () => {
-      setSyncing(true);
-      try {
-        let created = 0;
-        try {
-          const serverSync = await syncAllStagesPlanningAction();
-          created += serverSync.created;
-        } catch {
-          // fallback client below
-        }
-
-        const currentStages = await getStages();
-        created += await ensurePlanningFromStagesClient(currentStages);
-
-        if (created > 0) {
-          toast(`${created} séance(s) créées/synchronisées depuis les stages`, "success");
-        }
-      } catch {
-        /* sync best-effort */
-      } finally {
-        setSyncing(false);
-        await load();
-      }
+      await load();
     })();
   }, [load]);
 
@@ -153,83 +168,68 @@ export function PlanningV2Client() {
 
   const weekLabel = `Semaine du ${format(weekStart, "dd/MM", { locale: fr })}`;
 
-  const weekDates = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd")),
-    [weekStart]
+  const generatedSessions = useMemo(() => generatePlanningSessionsFromStages(stages, weekStart), [stages, weekStart]);
+
+  const stageById = useMemo(
+    () => Object.fromEntries(stages.map((s) => [s.id, s])),
+    [stages]
   );
 
-  const scopedItems = useMemo(() => {
-    return items.filter((seance) => {
-      if (stageFilter && seance.stage_id !== stageFilter) return false;
-      if (viewMode === "tous") return true;
-      const statut = String(stageMeta[seance.stage_id]?.statut ?? "").toLowerCase();
-      // Focus pro: on met en avant les stages à planifier / à exécuter.
-      return statut === "prevu" || statut === "confirme";
+  const categories = useMemo(() => {
+    return [...new Set(stages.map((s) => s.categorie).filter(Boolean))].sort();
+  }, [stages]);
+
+  useEffect(() => {
+    if (!stageFromUrl) return;
+    const stage = stageById[stageFromUrl];
+    if (!stage) return;
+    const start = pickStageDate(stage, "start");
+    if (!start) return;
+    const base = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const target = startOfWeek(start, { weekStartsOn: 1 });
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    setWeekOffset(Math.round((target.getTime() - base.getTime()) / msPerWeek));
+  }, [stageById, stageFromUrl]);
+
+  const filteredSessions = useMemo(() => {
+    return generatedSessions.filter((session) => {
+      if (stageFilter && session.stageId !== stageFilter) return false;
+      if (categoryFilter !== "all" && session.categorie !== categoryFilter) return false;
+      if (statusFilter === "en_cours") return stageStatus(session.statut) === "en_cours";
+      if (statusFilter === "prevus_confirmes") {
+        const s = stageStatus(session.statut);
+        return s === "prevu" || s === "confirme";
+      }
+      return true;
     });
-  }, [items, stageFilter, viewMode, stageMeta]);
-
-  const weekItems = useMemo(() => {
-    return scopedItems
-      .filter((s) => weekDates.includes(s.date))
-      .sort((a, b) => {
-        const k1 = `${a.date}|${a.heure_debut}|${a.infrastructure_id ?? ""}`;
-        const k2 = `${b.date}|${b.heure_debut}|${b.infrastructure_id ?? ""}`;
-        return k1.localeCompare(k2);
-      });
-  }, [scopedItems, weekDates]);
-
-  const grid = useMemo(() => {
-    const courts = infrastructures.length
-      ? infrastructures
-      : [{ id: "c1", nom: "Court 1" }, { id: "c2", nom: "Court 2" }, { id: "c3", nom: "Court 3" }];
-    const creneaux: Creneau[] = ["matin", "apres_midi"];
-    const cells: Record<string, string> = {};
-
-    for (const seance of weekItems) {
-      const slot = slotForHeure(seance.heure_debut);
-      const courtId = seance.infrastructure_id ?? courts[0]?.id ?? "default";
-      const key = `${seance.date}|${courtId}|${slot}`;
-      const label = stageNames[seance.stage_id] ?? "Séance";
-      cells[key] = cells[key] ? `${cells[key]}, ${label}` : label;
-    }
-
-    return { courts, creneaux, cells };
-  }, [weekItems, infrastructures, weekDates, stageNames]);
+  }, [generatedSessions, stageFilter, categoryFilter, statusFilter]);
 
   const weekSummary = useMemo(() => {
-    const uniqueStages = new Set(weekItems.map((s) => s.stage_id)).size;
-    const matin = weekItems.filter((s) => slotForHeure(s.heure_debut) === "matin").length;
-    const apm = weekItems.length - matin;
-    return { total: weekItems.length, uniqueStages, matin, apm };
-  }, [weekItems]);
-
-  async function confirmDelete() {
-    if (!deleteId) return;
-    await deleteSeance(deleteId);
-    toast("Séance supprimée");
-    setDeleteId(null);
-    await load();
-  }
+    const uniqueStages = new Set(filteredSessions.map((s) => s.stageId)).size;
+    const matin = filteredSessions.filter((s) => s.creneau === "matin").length;
+    const apm = filteredSessions.filter((s) => s.creneau === "apres_midi").length;
+    return { total: filteredSessions.length, uniqueStages, matin, apm };
+  }, [filteredSessions]);
 
   return (
     <>
       <V2PageHeader
         title="Planning des séances"
-        description={syncing ? "Synchronisation avec les stages…" : `Vue auto planning · ${weekLabel}`}
+        description={loading ? "Chargement des stages…" : `Planning auto depuis stages · ${weekLabel}`}
         actions={
           <V2PageActions
             onExportPdf={() =>
               exportPlanningPDF(
-                items.map((r) => ({
+                filteredSessions.map((r) => ({
                   date: r.date,
                   heure_debut: r.heure_debut,
                   heure_fin: r.heure_fin,
-                  court: r.infrastructure_id ?? "—",
-                  surface: r.surface ?? "—",
-                  coach: r.coach_id ?? "—",
-                  groupe: r.groupe ?? "—",
+                  court: slotLabel(r.creneau),
+                  surface: r.categorie,
+                  coach: String(r.nombre_coachs),
+                  groupe: `${r.categorie} (${r.nombre_joueurs} joueurs)`,
                   statut: r.statut,
-                  stage: stageNames[r.stage_id],
+                  stage: r.stageName,
                 })),
                 weekLabel
               )
@@ -241,15 +241,24 @@ export function PlanningV2Client() {
         <Card className="flex flex-wrap items-center gap-3 p-4">
           <Select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="max-w-xs">
             <option value="">Tous les stages</option>
-            {Object.entries(stageNames).map(([id, nom]) => (
-              <option key={id} value={id}>
-                {nom}
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.stage_action}
               </option>
             ))}
           </Select>
-          <Select value={viewMode} onChange={(e) => setViewMode(e.target.value as StageViewMode)} className="max-w-xs">
-            <option value="prevus">Stages prévus/confirmés</option>
-            <option value="tous">Tous les statuts</option>
+          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="max-w-xs">
+            <option value="all">Toutes catégories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StageStatusFilter)} className="max-w-xs">
+            <option value="prevus_confirmes">Stages prévus/confirmés</option>
+            <option value="en_cours">En cours</option>
+            <option value="tous">Tous</option>
           </Select>
           {stageFilter && (
             <>
@@ -299,86 +308,39 @@ export function PlanningV2Client() {
           </Card>
         </div>
 
-        {scopedItems.length === 0 ? (
+        {filteredSessions.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
             title="Aucune séance planifiée"
-            description="Les séances sont créées automatiquement avec les stages."
+            description="Aucune séance générée pour cette semaine avec les filtres actuels."
           />
         ) : (
-          <>
-            <Card className="overflow-x-auto p-0">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--bg-card-hover)] text-xs uppercase tracking-wider text-[var(--text-secondary)]">
-                    <th className="p-3 text-left">Créneau</th>
-                    {grid.courts.map((c) => (
-                      <th key={c.id} className="p-3 text-left">
-                        {c.nom}
-                        {(c as InfrastructureV2).surface ? ` ${(c as InfrastructureV2).surface}` : ""}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {grid.creneaux.map((slot) => (
-                    <tr key={slot} className="border-b border-[var(--border)]">
-                      <td className="p-3 font-medium text-[var(--text-secondary)]">
-                        {slotLabel(slot)}
-                      </td>
-                      {grid.courts.map((c) => {
-                        const dayCells = weekDates
-                          .map((d) => grid.cells[`${d}|${c.id}|${slot}`])
-                          .filter(Boolean);
-                        const text = dayCells.length ? dayCells.join(" · ") : "—";
-                        return (
-                          <td
-                            key={c.id}
-                            className={cn(
-                              "p-3 align-top",
-                              dayCells.length ? "bg-[#0d2137]/50 text-[#3498db]" : "text-[var(--text-muted)]"
-                            )}
-                          >
-                            {text}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Liste séances</h3>
-              <div className="space-y-2">
-                {weekItems
-                  .slice(0, 30)
-                  .map((r) => (
-                    <div key={r.id} className="flex items-center justify-between rounded border border-[var(--border)] p-2 text-sm">
-                      <span>
-                        <strong>{r.date}</strong> {r.heure_debut}-{r.heure_fin} · {stageNames[r.stage_id] ?? "Stage"} ·{" "}
-                        {r.infrastructure_id ?? "Terrain non défini"}
-                      </span>
-                      <Button variant="danger" size="sm" onClick={() => setDeleteId(r.id)}>
-                        Suppr.
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            </Card>
-          </>
+          <Card className="p-4">
+            <h3 className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Séances générées automatiquement</h3>
+            <div className="space-y-2">
+              {filteredSessions.map((s) => (
+                <div key={s.id} className="rounded border border-[var(--border)] p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold">{s.stageName}</p>
+                    <p className="text-xs text-muted">{s.date} · {slotLabel(s.creneau)}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    Catégorie: {s.categorie} · Joueurs: {s.nombre_joueurs} · Coachs: {s.nombre_coachs} · Statut: {s.statut}
+                  </p>
+                  <div className="mt-2 flex gap-3 text-xs">
+                    <Link href={`/v2/stages/${s.stageId}`} className="text-[#3498db] underline-offset-2 hover:underline">
+                      Fiche stage →
+                    </Link>
+                    <Link href={`/v2/calendrier?stage=${s.stageId}`} className="text-frmt-green underline-offset-2 hover:underline">
+                      Calendrier →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
       </main>
-
-      <ConfirmDialog
-        open={!!deleteId}
-        title="Supprimer cette séance ?"
-        description="Cette action est irréversible."
-        confirmLabel="Supprimer définitivement"
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setDeleteId(null)}
-      />
     </>
   );
 }
