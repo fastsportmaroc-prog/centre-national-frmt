@@ -1,7 +1,7 @@
--- Conflits terrain : horaires explicites, dédoublonnage, index
--- Compatible prod sans table terrain_reservations (optionnelle, voir 031).
+-- Conflits terrain — PROD (sans terrain_reservations)
+-- Table utilisée par l'app V2 : reservations_infrastructure (+ planning si présent).
 
--- ─── reservations_infrastructure (source canonique V2) ───
+-- ─── reservations_infrastructure ───
 alter table public.reservations_infrastructure
   add column if not exists creneau text,
   add column if not exists heure_debut text,
@@ -19,8 +19,8 @@ set
   )
 where heure_debut is null
    or heure_fin is null
-   or trim(heure_debut) = ''
-   or trim(heure_fin) = '';
+   or trim(coalesce(heure_debut, '')) = ''
+   or trim(coalesce(heure_fin, '')) = '';
 
 update public.reservations_infrastructure
 set creneau = case
@@ -30,7 +30,7 @@ set creneau = case
   when heure_fin <= '13:00' then 'matin'
   else 'journee'
 end
-where creneau is null or trim(creneau) = '';
+where creneau is null or trim(coalesce(creneau, '')) = '';
 
 delete from public.reservations_infrastructure a
 using public.reservations_infrastructure b
@@ -52,52 +52,15 @@ create unique index if not exists unique_res_infra_stage_day_creneau
   )
   where stage_id is not null;
 
--- ─── planning ───
-alter table public.planning
-  add column if not exists notes text;
-
-create index if not exists idx_planning_stage_date
-  on public.planning (stage_id, date);
-
--- ─── terrain_reservations (uniquement si migration 031 déjà appliquée) ───
-do $$
+-- ─── planning (SQL dynamique : pas de référence compilée si table absente) ───
+do $migration$
 begin
-  if to_regclass('public.terrain_reservations') is null then
-    raise notice 'terrain_reservations absente — étape ignorée (OK en prod V2).';
+  if to_regclass('public.planning') is null then
+    raise notice 'Table planning absente — étape ignorée.';
     return;
   end if;
 
-  alter table public.terrain_reservations
-    add column if not exists heure_debut time,
-    add column if not exists heure_fin time;
-
-  update public.terrain_reservations
-  set
-    heure_debut = case creneau
-      when 'matin' then '09:00'::time
-      when 'apres-midi' then '14:00'::time
-      when 'journee' then '09:00'::time
-      else '09:00'::time
-    end,
-    heure_fin = case creneau
-      when 'matin' then '13:00'::time
-      when 'apres-midi' then '18:00'::time
-      when 'journee' then '18:00'::time
-      else '18:00'::time
-    end
-  where heure_debut is null;
-
-  delete from public.terrain_reservations a
-  using public.terrain_reservations b
-  where a.id < b.id
-    and a.stage_id = b.stage_id
-    and a.terrain_id = b.terrain_id
-    and a.date_debut = b.date_debut
-    and a.creneau = b.creneau;
-
-  create unique index if not exists unique_terrain_res_stage_terrain_date_creneau
-    on public.terrain_reservations (stage_id, terrain_id, creneau, date_debut);
-
-  create index if not exists idx_terrain_res_lookup
-    on public.terrain_reservations (terrain_id, date_debut);
-end $$;
+  execute 'alter table public.planning add column if not exists notes text';
+  execute 'create index if not exists idx_planning_stage_date on public.planning (stage_id, date)';
+end
+$migration$;
