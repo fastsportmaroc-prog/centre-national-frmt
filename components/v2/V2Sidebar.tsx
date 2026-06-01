@@ -62,7 +62,7 @@ export function V2Sidebar() {
                       <Icon className="shrink-0" strokeWidth={1.75} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {badge > 0 && (
-                        <span className="rounded-full bg-[var(--accent-red-bg)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-red-text)]">
+                        <span className="rounded-full bg-[var(--color-amber-bg)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-amber-text)]">
                           {badge}
                         </span>
                       )}

@@ -90,7 +90,7 @@ export function GlobalSearchBar({ className }: { className?: string }) {
           }}
           onFocus={() => setOpen(true)}
           placeholder="Rechercher joueur, coach, stage, compétition…"
-          className="w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-inset)] py-0 pl-9 pr-9 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent-red)] h-8"
+          className="w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-inset)] py-0 pl-9 pr-9 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent-ui)] h-8"
           autoComplete="off"
           aria-label="Recherche globale"
           aria-expanded={open}

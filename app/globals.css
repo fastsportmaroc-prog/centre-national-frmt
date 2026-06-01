@@ -34,6 +34,9 @@
   --text-ghost: #2d3748;
   --accent-red: #c53030;
   --accent-red-bg: #2d1010;
+  --accent-ui: #2c7a7b;
+  --accent-ui-bg: #0d2626;
+  --accent-ui-text: #81e6d9;
   --color-blue: #2b6cb0;
   --color-blue-bg: #0d1a30;
   --color-blue-text: #63b3ed;
@@ -62,7 +65,7 @@
   --warning: #e67e22;
   --danger: #e74c3c;
   --info: #3498db;
-  --accent: var(--accent-red);
+  --accent: var(--accent-ui);
   --accent-dim: #2d1010;
   --tennis: var(--frmt-green-bright);
   --tennis-dim: var(--frmt-green);
@@ -217,7 +220,7 @@ body {
   line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-ghost);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .v2-sidebar-section-label::before {
@@ -225,22 +228,23 @@ body {
 }
 
 .v2-sidebar-nav-link {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.78);
   border-left: 2px solid transparent;
   border-radius: 6px;
   padding: 7px 8px;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .v2-sidebar-nav-link:hover {
   background: var(--bg-inset);
-  color: var(--text-secondary);
+  color: #f7fafc;
 }
 
 .v2-sidebar-nav-link--active {
   background: var(--bg-inset);
-  color: #e2e8f0;
-  border-left-color: var(--accent-red);
+  color: #ffffff;
+  border-left-color: var(--accent-ui-text);
   padding-left: 6px;
 }
 
@@ -481,18 +485,19 @@ body {
   padding: 6px 14px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.55);
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .dashboard-view-tab:hover {
-  color: var(--text-secondary);
-  border-color: var(--border-main);
+  color: rgba(255, 255, 255, 0.85);
+  border-color: var(--accent-ui);
+  background: var(--accent-ui-bg);
 }
 
 .dashboard-view-tab--active {
-  background: var(--accent-red);
-  border-color: var(--accent-red);
+  background: var(--accent-ui);
+  border-color: var(--accent-ui);
   color: #fff;
 }
 
@@ -506,18 +511,18 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  background: var(--accent-red);
+  background: var(--color-amber);
   padding: 0 4px;
   font-size: 9px;
   font-weight: 500;
-  color: #fff;
+  color: #1a1200;
   border: 2px solid var(--bg-base);
 }
 
 .dashboard-view-tab--active .dashboard-view-tab-badge {
   background: #fff;
-  color: var(--accent-red);
-  border-color: var(--accent-red);
+  color: var(--accent-ui);
+  border-color: var(--accent-ui);
 }
 
 .v2-kpi-card {
