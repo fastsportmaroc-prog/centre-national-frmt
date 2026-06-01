@@ -2,11 +2,12 @@ import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
-  size?: "sm" | "md" | "lg" | "xl" | "2xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
 };
 
 const sizes = {
+  xs: 28,
   sm: 40,
   md: 56,
   lg: 80,
@@ -24,7 +25,7 @@ export function LogoPlaceholder({ size = "md", className }: Props) {
       width={px}
       height={px}
       className={cn("shrink-0 object-contain", className)}
-      priority={size === "lg" || size === "xl" || size === "2xl"}
+      priority={size === "xs" || size === "lg" || size === "xl" || size === "2xl"}
     />
   );
 }

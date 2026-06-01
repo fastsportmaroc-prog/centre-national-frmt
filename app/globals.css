@@ -263,19 +263,57 @@ body {
   min-width: 0;
 }
 
-.v2-topbar-mark {
+.v2-topbar-logo-img {
   display: flex;
-  height: 28px;
-  width: 28px;
+  height: 32px;
+  width: 32px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border-radius: 6px;
-  background: var(--accent-red);
+  background: #fff;
+  padding: 2px;
+}
+
+.v2-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-light);
+  padding: 10px 10px 12px;
+  transition: background 0.15s;
+}
+
+.v2-sidebar-brand:hover {
+  background: var(--bg-inset);
+}
+
+.v2-sidebar-logo {
+  display: flex;
+  height: 32px;
+  width: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  padding: 2px;
+}
+
+.v2-sidebar-brand-title {
   font-size: 10px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.v2-sidebar-brand-sub {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.2;
 }
 
 .v2-topbar-brand-title {

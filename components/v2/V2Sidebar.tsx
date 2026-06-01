@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { LogoPlaceholder } from "@/components/brand/LogoPlaceholder";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { NAV_BADGE_KEYS, v2NavSections } from "./nav-items";
 import { loadNavBadges } from "@/lib/v2/nav-badges";
@@ -26,7 +27,16 @@ export function V2Sidebar() {
   return (
     <aside className="v2-sidebar hidden h-screen w-[200px] shrink-0 flex-col border-r md:flex">
       <div className="frmt-tricolor shrink-0" />
-      <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto p-2 pt-3">
+      <Link href="/v2/dashboard" className="v2-sidebar-brand shrink-0">
+        <div className="v2-sidebar-logo">
+          <LogoPlaceholder size="xs" className="h-full w-full" />
+        </div>
+        <div className="min-w-0">
+          <p className="v2-sidebar-brand-title truncate">Centre National</p>
+          <p className="v2-sidebar-brand-sub truncate">CNE — V2</p>
+        </div>
+      </Link>
+      <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto p-2 pt-2">
         {v2NavSections.map((section) => (
           <div
             key={section.id}

@@ -1,6 +1,7 @@
 "use client";
 
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { LogoPlaceholder } from "@/components/brand/LogoPlaceholder";
 import { DisplayDateBlock } from "@/components/v2/ui/DisplayDateBlock";
 import { GlobalSearchBar } from "@/components/v2/GlobalSearchBar";
 import { V2UserHeader } from "@/components/v2/V2UserHeader";
@@ -8,9 +9,9 @@ import { V2UserHeader } from "@/components/v2/V2UserHeader";
 function TopBarBrand() {
   return (
     <div className="v2-topbar-logo">
-      <span className="v2-topbar-mark" aria-hidden>
-        FRMT
-      </span>
+      <div className="v2-topbar-logo-img">
+        <LogoPlaceholder size="xs" className="h-full w-full" />
+      </div>
       <div className="min-w-0">
         <p className="v2-topbar-brand-title truncate">Centre National</p>
         <p className="v2-topbar-brand-sub truncate">CNE — V2</p>
