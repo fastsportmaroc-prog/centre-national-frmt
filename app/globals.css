@@ -670,11 +670,12 @@ body {
 }
 
 .stage-card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  color: var(--text-primary);
+  text-transform: none;
+  color: #f7fafc;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -727,21 +728,21 @@ body {
 }
 
 .stage-card-stat-value {
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.3px;
   line-height: 1.2;
-  color: var(--text-primary);
+  color: #f7fafc;
   font-variant-numeric: tabular-nums;
 }
 
 .stage-card-stat-label {
   margin-top: 2px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: #4a5568;
 }
 
 .stage-card-badges {
@@ -755,50 +756,67 @@ body {
 .stage-card-badges > .stage-card-badge {
   width: 100%;
   min-width: 0;
-  min-height: 26px;
+  min-height: 28px;
   justify-content: center;
-  padding: 0 6px;
+  padding: 4px 10px;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 9px;
+  font-size: 11px;
+  border-radius: 6px;
+  gap: 5px;
 }
 
 .stage-card-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  border-radius: 4px;
+  gap: 5px;
+  border-radius: 6px;
   border: 1px solid var(--border-main);
-  padding: 0 8px;
-  font-size: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
+/* Statut stage (Terminé / Prévu / En cours / Annulé) */
 .stage-card-badge--status-prevu {
-  border-color: rgba(201, 162, 39, 0.35);
-  background: rgba(201, 162, 39, 0.08);
-  color: #d4b85a;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #2d1a00;
+  border: 1px solid #6b3a00;
+  color: #f6ad55;
 }
 
 .stage-card-badge--status-encours {
-  border-color: rgba(104, 211, 145, 0.3);
-  background: rgba(39, 103, 73, 0.15);
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #0d2010;
+  border: 1px solid #1a4a1a;
   color: #68d391;
 }
 
 .stage-card-badge--status-termine {
-  border-color: rgba(99, 179, 237, 0.45);
-  background: var(--frmt-navy-tab);
-  color: #f0f9ff;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
   font-weight: 600;
+  background: #1a1a1a;
+  border: 1px solid #2d3748;
+  color: #718096;
 }
 
 .stage-card-badge--status-annule {
-  border-color: rgba(252, 129, 129, 0.3);
-  background: rgba(197, 48, 48, 0.1);
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #2d0d0d;
+  border: 1px solid #5a1a1a;
   color: #fc8181;
 }
 
@@ -809,16 +827,30 @@ body {
   font-weight: 600;
 }
 
+/* Logistique confirmée (Hébergement / Resto / Terrains ✓) */
 .stage-card-badge--on {
-  border-color: rgba(104, 211, 145, 0.25);
-  background: rgba(13, 32, 16, 0.6);
+  background: #0d2010;
+  border: 1px solid #1a4a1a;
+  color: #68d391;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.stage-card-badge--on span[aria-hidden] {
   color: #68d391;
 }
 
+/* Logistique manquante */
 .stage-card-badge--off {
-  border-color: var(--border-main);
-  background: var(--bg-inset);
-  color: var(--text-muted);
+  background: #2d0d0d;
+  border: 1px solid #5a1a1a;
+  color: #fc8181;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.stage-card-badge--off span[aria-hidden] {
+  color: #fc8181;
 }
 
 .stage-card-progress-wrap {
