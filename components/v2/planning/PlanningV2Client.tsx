@@ -42,7 +42,7 @@ export function PlanningV2Client() {
   const [stageNames, setStageNames] = useState<Record<string, string>>({});
   const [stageMeta, setStageMeta] = useState<Record<string, StageMeta>>({});
   const [stageFilter, setStageFilter] = useState(stageFromUrl);
-  const [viewMode, setViewMode] = useState<StageViewMode>("prevus");
+  const [viewMode, setViewMode] = useState<StageViewMode>("tous");
   const [weekOffset, setWeekOffset] = useState(0);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(true);
