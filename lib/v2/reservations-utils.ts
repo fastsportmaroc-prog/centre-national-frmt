@@ -67,23 +67,12 @@ export function inferCreneauFromTimes(debutIso: string, finIso: string): Creneau
 export function resolveCreneauType(
   r: Pick<ReservationEnrichedV2, "creneau" | "date_debut" | "date_fin" | "heure_debut" | "heure_fin" | "stage_id">
 ): CreneauType {
+  if (r.creneau) {
+    return normalizeCreneauType(r.creneau);
+  }
   const fromHeures = creneauFromHeureFields(r.heure_debut, r.heure_fin);
-  const fromTimes = inferCreneauFromTimes(r.date_debut, r.date_fin);
-
-  if (r.stage_id) {
-    const stored = r.creneau ? normalizeCreneauType(r.creneau) : null;
-    if (stored === "apres_midi") return "apres_midi";
-    if (stored === "matin" || fromHeures === "matin" || fromTimes === "matin" || !stored) {
-      return "journee";
-    }
-  }
-
   if (fromHeures) return fromHeures;
-  if (fromTimes === "journee" && r.creneau && normalizeCreneauType(r.creneau) === "matin") {
-    return "journee";
-  }
-  if (r.creneau) return normalizeCreneauType(r.creneau);
-  return fromTimes;
+  return inferCreneauFromTimes(r.date_debut, r.date_fin);
 }
 
 export type CreneauInfo = {
@@ -146,11 +135,7 @@ export function formatCreneauLabel(raw: string | null | undefined): string {
 }
 
 export function getCreneauInfoForReservation(r: ReservationEnrichedV2): CreneauInfo {
-  let type = resolveCreneauType(r);
-  // Règle métier : réservation liée à un stage = journée complète (sauf aprem seul)
-  if (r.stage_id && type === "matin") {
-    type = "journee";
-  }
+  const type = resolveCreneauType(r);
   const { debut, fin } = creneauHorairesFixed(type);
   const meta = CRENEAU_META[type];
   return { ...meta, heureDebut: debut, heureFin: fin };

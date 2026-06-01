@@ -314,13 +314,11 @@ export function normalizeStageLinkedCourtReservations(
     if (besoins?.length) {
       const day = dateOnlyString(r.date_debut);
       const besoin = besoins.find((b) => reservationMatchesBesoin(r, b, day));
-      if (besoin?.creneaux?.length && !besoin.creneaux.includes("journee")) {
-        return r;
+      if (besoin) {
+        const target = besoinPrimaryCreneau(besoin);
+        const current = resolveCreneauType(r);
+        if (current !== target) return applyCreneauToRow(r, target);
       }
-    }
-
-    if (resolveCreneauType(r) === "matin") {
-      return applyCreneauToRow(r, "journee");
     }
     return r;
   });

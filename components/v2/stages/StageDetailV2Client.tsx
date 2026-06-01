@@ -67,7 +67,6 @@ import {
   appendTerrainBesoinToNotes,
   stageHasTerrainsConfigured,
 } from "@/lib/v2/stage-terrain-status";
-import { creneauTerrainToIso } from "@/lib/v2/terrain-reservation-map";
 
 type Tab =
   | "infos"
@@ -931,21 +930,21 @@ export function StageDetailV2Client({ id }: { id: string }) {
                             {r.date_fin !== r.date_debut ? ` → ${r.date_fin}` : ""}
                           </td>
                           <td className="p-2">
-                            {(() => {
-                              const day = String(r.date_debut).slice(0, 10);
-                              const mapped = creneauTerrainToIso(day, String(r.creneau ?? "journee"));
-                              return getCreneauInfoForReservation({
-                                id: String(r.reservation_id),
-                                infrastructure_id: String(r.terrain_id ?? ""),
-                                stage_id: stage.id,
-                                date_debut: mapped.debut,
-                                date_fin: mapped.fin,
-                                creneau: mapped.creneau,
-                                heure_debut: mapped.heure_debut,
-                                heure_fin: mapped.heure_fin,
-                                statut: String(r.resa_statut ?? "confirmee"),
-                              }).label;
-                            })()}
+                            {getCreneauInfoForReservation({
+                              id: String(r.reservation_id),
+                              infrastructure_id: String(r.terrain_id ?? ""),
+                              stage_id: stage.id,
+                              date_debut: String(r.date_debut).includes("T")
+                                ? String(r.date_debut)
+                                : `${String(r.date_debut).slice(0, 10)}T12:00:00`,
+                              date_fin: String(r.date_fin).includes("T")
+                                ? String(r.date_fin)
+                                : `${String(r.date_fin).slice(0, 10)}T12:00:00`,
+                              creneau: String(r.creneau ?? "journee").replace("apres-midi", "apres_midi"),
+                              heure_debut: null,
+                              heure_fin: null,
+                              statut: String(r.resa_statut ?? "confirmee"),
+                            }).label}
                           </td>
                           <td className="p-2">{r.mode}</td>
                           <td className="p-2">{r.nb_joueurs_dispatches ?? 0}</td>
