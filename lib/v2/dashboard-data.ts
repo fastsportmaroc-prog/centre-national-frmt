@@ -7,6 +7,7 @@ import {
   getOccupationPourcentage,
   getReservationsEnriched,
   getRestaurations,
+  getStageIdsWithFosAgriDocuments,
   getStageIdsWithTerrainReservations,
   getStages,
   getStageCoachLinks,
@@ -28,6 +29,7 @@ export type StageDashboardCard = StageProgrammeV2 & {
   has_hebergement: boolean;
   has_restauration: boolean;
   has_terrains: boolean;
+  has_fos_agri: boolean;
   has_billets: boolean;
   checklist_done: number;
   checklist_total: number;
@@ -118,7 +120,8 @@ function enrichStage(
   restByStage: Set<string>,
   billetsByStage: Set<string>,
   terrResaCountByStage: Map<string, number>,
-  terrainStageIds: Set<string>
+  terrainStageIds: Set<string>,
+  fosAgriByStage: Set<string>
 ): StageDashboardCard {
   const today = new Date().toISOString().slice(0, 10);
   const start = parseISO(s.date_debut.includes("T") ? s.date_debut : `${s.date_debut}T12:00:00`);
@@ -142,6 +145,7 @@ function enrichStage(
         notes: s.notes,
         terrainReservationCount: terrResaCountByStage.get(s.id) ?? 0,
       }),
+    has_fos_agri: fosAgriByStage.has(s.id),
     has_billets: billetsByStage.has(s.id),
     jours_duree,
     jours_avant,
@@ -166,6 +170,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
     reservations,
     passportVisaStats,
     terrainStageIds,
+    fosAgriStageIds,
   ] = await Promise.all([
       getStages(),
       getJoueurs(),
@@ -178,6 +183,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
       getReservationsEnriched(),
       getAdminDocumentAlertStats(),
       getStageIdsWithTerrainReservations(),
+      getStageIdsWithFosAgriDocuments(),
     ]);
 
   const hebByStage = new Set(hebergements.map((h) => h.stage_id));
@@ -210,7 +216,8 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
         restByStage,
         billetsByStage,
         terrResaCountByStage,
-        terrainStageIds
+        terrainStageIds,
+        fosAgriStageIds
       )
     )
     .sort((a, b) => a.date_debut.localeCompare(b.date_debut));
@@ -355,7 +362,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
 
 /** Tous les stages enrichis (page Stages, filtres complets). */
 export async function loadAllStageCards(): Promise<StageDashboardCard[]> {
-  const [stages, hebergements, restaurations, billets, linksJ, linksC, reservations, terrainStageIds] =
+  const [stages, hebergements, restaurations, billets, linksJ, linksC, reservations, terrainStageIds, fosAgriStageIds] =
     await Promise.all([
       getStages(),
       getHebergements(),
@@ -365,6 +372,7 @@ export async function loadAllStageCards(): Promise<StageDashboardCard[]> {
       getStageCoachLinks(),
       getReservationsEnriched(),
       getStageIdsWithTerrainReservations(),
+      getStageIdsWithFosAgriDocuments(),
     ]);
 
   const hebByStage = new Set(hebergements.map((h) => h.stage_id));
@@ -392,7 +400,8 @@ export async function loadAllStageCards(): Promise<StageDashboardCard[]> {
         restByStage,
         billetsByStage,
         terrResaCountByStage,
-        terrainStageIds
+        terrainStageIds,
+        fosAgriStageIds
       )
     )
     .sort((a, b) => a.date_debut.localeCompare(b.date_debut));

@@ -26,6 +26,17 @@ export type StageProgrammeV2 = {
 
 export type StageProgrammeInputV2 = Omit<StageProgrammeV2, "id" | "created_at" | "updated_at">;
 
+export type StageFosAgriDocumentV2 = {
+  id: string;
+  stage_id: string;
+  slot: 1 | 2;
+  file_name: string;
+  storage_path: string;
+  file_url: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 /** Dates d'hébergement par participant (arrivée tardive / départ anticipé). */
 export type HebergementParticipantsDatesStore = {
   actif: boolean;

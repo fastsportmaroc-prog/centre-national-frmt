@@ -750,6 +750,18 @@ export async function getReservationsInfrastructure(options?: {
   );
 }
 
+/** Stage ids ayant au moins un PDF procédure FOS AGRI. */
+export async function getStageIdsWithFosAgriDocuments(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const rows = await runSelect<{ stage_id: string }[]>("stage_fos_agri_documents", (c) =>
+    c.from("stage_fos_agri_documents").select("stage_id")
+  );
+  for (const row of rows) {
+    if (row.stage_id) ids.add(row.stage_id);
+  }
+  return ids;
+}
+
 /** Stage ids ayant au moins une réservation terrain (calendrier ou infra). */
 export async function getStageIdsWithTerrainReservations(): Promise<Set<string>> {
   const ids = new Set<string>();

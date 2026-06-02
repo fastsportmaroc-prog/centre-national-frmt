@@ -31,9 +31,26 @@ function statutPresentation(statut: string, visual: VisualState) {
   return base;
 }
 
-function ServiceBadge({ ok, label, icon }: { ok: boolean; label: string; icon: string }) {
+function ServiceBadge({
+  ok,
+  label,
+  icon,
+  compact,
+}: {
+  ok: boolean;
+  label: string;
+  icon: string;
+  compact?: boolean;
+}) {
   return (
-    <span className={cn("stage-card-badge", ok ? "stage-card-badge--on" : "stage-card-badge--off")}>
+    <span
+      className={cn(
+        "stage-card-badge",
+        ok ? "stage-card-badge--on" : "stage-card-badge--off",
+        compact && "stage-card-badge--compact"
+      )}
+      title={label}
+    >
       <span aria-hidden>{icon}</span>
       {label}
     </span>
@@ -101,6 +118,12 @@ export function StageDashboardCard({
           <ServiceBadge ok={stage.has_hebergement} label="Hébergement" icon="🏨" />
           <ServiceBadge ok={stage.has_restauration} label="Resto" icon="🍽️" />
           <ServiceBadge ok={stage.has_terrains} label="Terrains" icon="🎾" />
+          <ServiceBadge
+            ok={stage.has_fos_agri}
+            label="Procédure administrative FOS AGRI"
+            icon="📄"
+            compact
+          />
         </div>
 
         <div className="stage-card-progress-wrap">

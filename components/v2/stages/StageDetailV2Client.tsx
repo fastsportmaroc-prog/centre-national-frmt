@@ -14,6 +14,7 @@ import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions
 import { StageLettreModal } from "@/components/v2/stages/StageLettreModal";
 import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
 import { StageHebergementSection } from "@/components/v2/stages/StageHebergementSection";
+import { StageFosAgriSection } from "@/components/v2/stages/StageFosAgriSection";
 import { StageKinesitherapieSection } from "@/components/v2/stages/StageKinesitherapieSection";
 import { StageParticipantsAssign } from "@/components/v2/stages/StageParticipantsAssign";
 import { getStageHebergementAction } from "@/lib/actions/stage-hebergement-actions";
@@ -662,35 +663,43 @@ export function StageDetailV2Client({ id }: { id: string }) {
           </div>
 
           <div className="p-4">
-            {tab === "infos" && (
-              <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-[var(--text-muted)]">Catégorie</dt>
-                  <dd>{stage.categorie}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Statut</dt>
-                  <dd>
-                    <StatusBadge statut={String(stage.statut)} />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Durée</dt>
-                  <dd>
-                    {jours} jour{jours > 1 ? "s" : ""}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Participants</dt>
-                  <dd>
-                    {joueurs.length} joueurs · {coachs.length} coachs
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Kinésithérapie</dt>
-                  <dd>{stage.kinesitherapie ? "Oui" : "Non"}</dd>
-                </div>
-              </dl>
+            {tab === "infos" && stage && (
+              <>
+                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Catégorie</dt>
+                    <dd>{stage.categorie}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Statut</dt>
+                    <dd>
+                      <StatusBadge statut={String(stage.statut)} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Durée</dt>
+                    <dd>
+                      {jours} jour{jours > 1 ? "s" : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Participants</dt>
+                    <dd>
+                      {joueurs.length} joueurs · {coachs.length} coachs
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Kinésithérapie</dt>
+                    <dd>{stage.kinesitherapie ? "Oui" : "Non"}</dd>
+                  </div>
+                </dl>
+
+                <StageFosAgriSection
+                  stageId={stage.id}
+                  canManage={canWrite || isAdmin}
+                  toast={toast}
+                />
+              </>
             )}
 
             {tab === "participants" && stage && (
