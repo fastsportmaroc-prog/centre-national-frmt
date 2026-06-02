@@ -125,6 +125,9 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
     if (!r.ok) erreurs.push(`stage_coachs ${coach_id}: ${r.error}`);
   }
 
+  const { syncStageParticipantCountsServer } = await import("@/lib/data/stage-relations.server");
+  await syncStageParticipantCountsServer(stage_id);
+
   if (form.hebergement.actif) {
     const hebForm = {
       ...hebergementForm,

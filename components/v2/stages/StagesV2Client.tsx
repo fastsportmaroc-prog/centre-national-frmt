@@ -597,7 +597,9 @@ export function StagesV2Client() {
                         {format(start, "dd/MM", { locale: fr })}-{format(end, "dd/MM", { locale: fr })}
                       </td>
                       <td className="p-3">{s.jours_duree}j</td>
-                      <td className="p-3">{s.nb_joueurs + s.nb_coachs}</td>
+                      <td className="p-3 tabular-nums whitespace-nowrap">
+                        {s.nb_joueurs} j · {s.nb_coachs} c
+                      </td>
                       <td className="p-3">
                         <StatusBadge statut={String(s.statut)} />
                       </td>

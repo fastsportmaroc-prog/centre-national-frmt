@@ -391,7 +391,12 @@ export function StageParticipantsAssign({
         )}
       >
         <p className="text-[var(--text-muted)]">
-          Affectez joueurs et staff sur ce stage — passé, en cours ou à venir.
+          <span className="font-semibold text-[var(--text-primary)]">
+            {joueurs.length} joueur{joueurs.length !== 1 ? "s" : ""} · {coachs.length} coach
+            {coachs.length !== 1 ? "s" : ""}
+          </span>
+          {" "}
+          — affectez des personnes depuis la recherche ci-dessous.
         </p>
         <span className="inline-flex items-center gap-2">
           <StatusBadge statut={phase.statut} />

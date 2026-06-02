@@ -130,8 +130,8 @@ function enrichStage(
   const base = {
     ...s,
     statut,
-    nb_joueurs: joueursByStage.get(s.id) ?? s.nombre_joueurs,
-    nb_coachs: coachsByStage.get(s.id) ?? s.nombre_encadrants,
+    nb_joueurs: joueursByStage.get(s.id) ?? 0,
+    nb_coachs: coachsByStage.get(s.id) ?? 0,
     has_hebergement: hebByStage.has(s.id) || s.hebergement,
     has_restauration: restByStage.has(s.id),
     has_terrains:

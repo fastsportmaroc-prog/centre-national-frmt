@@ -204,9 +204,30 @@ export function StageDetailV2Client({ id }: { id: string }) {
     (nextJoueurs: JoueurV2[], nextCoachs: EntraineurV2[]) => {
       setJoueurs(nextJoueurs);
       setCoachs(nextCoachs);
+      setStage((prev) =>
+        prev
+          ? {
+              ...prev,
+              nombre_joueurs: nextJoueurs.length,
+              nombre_encadrants: nextCoachs.length,
+            }
+          : prev
+      );
     },
     []
   );
+
+  useEffect(() => {
+    if (tab !== "participants" || !stage?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const p = await getStageParticipantsAction(stage.id);
+      if (!cancelled) refreshParticipants(p.joueurs, p.coachs);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, stage?.id, refreshParticipants]);
 
   const refreshHebergement = useCallback(
     (next: HebergementStageV2 | null, stagePatch?: Pick<StageProgrammeV2, "hebergement" | "chambres">) => {
@@ -605,7 +626,9 @@ export function StageDetailV2Client({ id }: { id: string }) {
                   tab === t.id && "v2-stage-detail-tab--active"
                 )}
               >
-                {t.label}
+                {t.id === "participants"
+                  ? `Participants (${joueurs.length} j · ${coachs.length} c)`
+                  : t.label}
               </button>
             ))}
           </div>
