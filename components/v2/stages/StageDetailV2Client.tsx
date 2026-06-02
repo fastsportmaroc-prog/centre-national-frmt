@@ -121,7 +121,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const [restaurationActive, setRestaurationActive] = useState(false);
   const [restDates, setRestDates] = useState<{ debut: string; fin: string }>({ debut: "", fin: "" });
   const [restMeals, setRestMeals] = useState({ pdj: true, dej: true, din: true, eau: false });
-  const [restNotes, setRestNotes] = useState("");
   const [savingRestauration, setSavingRestauration] = useState(false);
   const [planning, setPlanning] = useState<PlanningSeanceV2[]>([]);
   const [terrains, setTerrains] = useState<any[]>([]);
@@ -159,7 +158,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
     const baseFin = r?.date_fin ?? s.date_fin;
     const rawNotes = r?.remarques ?? "";
     const eauTag = /\[EAU:(oui|non)\]/i.exec(rawNotes)?.[1]?.toLowerCase() === "oui";
-    const cleanNotes = rawNotes.replace(/\s*\[EAU:(oui|non)\]\s*/gi, " ").trim();
     setRestaurationActive(Boolean(r));
     setRestDates({ debut: baseDebut, fin: baseFin });
     setRestMeals({
@@ -168,7 +166,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
       din: r?.diner ?? true,
       eau: eauTag,
     });
-    setRestNotes(cleanNotes);
     setPlanning(p);
     const [t, tr] = await Promise.all([
       getTerrains().catch(() => []),
@@ -401,8 +398,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
         return;
       }
 
-      const eauTag = `[EAU:${restMeals.eau ? "oui" : "non"}]`;
-      const remarques = `${restNotes.trim()} ${eauTag}`.trim();
+      const remarques = `[EAU:${restMeals.eau ? "oui" : "non"}]`;
       const accurateRepas = await getStageRepasPrevusCountAction(stage.id).catch(() => 0);
       const payload = {
         stage_id: stage.id,
@@ -665,10 +661,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
                   <dt className="text-[var(--text-muted)]">Kinésithérapie</dt>
                   <dd>{stage.kinesitherapie ? "Oui" : "Non"}</dd>
                 </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-[var(--text-muted)]">Notes</dt>
-                  <dd>{stage.notes ?? "—"}</dd>
-                </div>
               </dl>
             )}
 
@@ -737,14 +729,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
                       />
                       Eau incluse
                     </label>
-                    <div>
-                      <Label>Remarques</Label>
-                      <Input
-                        value={restNotes}
-                        onChange={(e) => setRestNotes(e.target.value)}
-                        placeholder="Allergies, régimes…"
-                      />
-                    </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => void saveRestaurationAndFacture()}

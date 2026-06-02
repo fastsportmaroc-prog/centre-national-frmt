@@ -242,7 +242,7 @@ export function StagesV2Client() {
         : "";
     const payload = {
       ...form,
-      notes: [form.notes.trim(), terrainMeta].filter(Boolean).join(" ").trim(),
+      notes: terrainMeta || null,
     };
     const result = await createStageComplet(payload);
     setSaving(false);
@@ -717,10 +717,6 @@ export function StagesV2Client() {
               <div className="sm:col-span-2">
                 <Label>Lieu</Label>
                 <Input value={form.lieu} onChange={(e) => setForm({ ...form, lieu: e.target.value })} />
-              </div>
-              <div className="sm:col-span-2">
-                <Label>Notes</Label>
-                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
           </section>

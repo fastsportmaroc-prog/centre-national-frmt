@@ -136,16 +136,6 @@ export function StageKinesitherapieSection({
             </div>
           </div>
 
-          <div>
-            <Label>Remarques</Label>
-            <Input
-              value={remarques}
-              disabled={!canManage}
-              onChange={(e) => setRemarques(e.target.value)}
-              placeholder="Ex. protocole, fréquence…"
-            />
-          </div>
-
           <div className="rounded-lg border border-[var(--border)] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">Joueurs du stage — prise en charge kiné</p>

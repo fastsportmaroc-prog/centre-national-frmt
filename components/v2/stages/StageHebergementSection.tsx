@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BedDouble, Calculator, Save } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Input, Label, Select, Textarea } from "@/components/ui/Input";
+import { Input, Label, Select } from "@/components/ui/Input";
 import { NumericInput } from "@/components/ui/NumericInput";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import {
@@ -306,15 +306,6 @@ export function StageHebergementSection({
                 />
               </div>
 
-              <div>
-                <Label>Remarques</Label>
-                <Textarea
-                  rows={3}
-                  value={form.remarques}
-                  onChange={(e) => setForm({ ...form, remarques: e.target.value })}
-                  placeholder="Notes hébergement, pavillon, demandes particulières…"
-                />
-              </div>
             </>
           )}
 
@@ -337,10 +328,6 @@ export function StageHebergementSection({
                 <strong>{totalChambres}</strong> · <strong>{totalNuitees}</strong> nuitées
               </p>
               {form.kitchenette && <p>Kitchenette : oui</p>}
-              {form.dates_participants_actif && (
-                <p>Dates par participant : activées</p>
-              )}
-              {form.remarques && <p className="italic">{form.remarques}</p>}
             </>
           ) : (
             <p>Pas d&apos;hébergement pour ce stage.</p>
