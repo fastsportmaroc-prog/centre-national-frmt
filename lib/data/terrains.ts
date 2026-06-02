@@ -117,43 +117,37 @@ async function fetchLegacyReservationsInfra(
 ) {
   const { fetchAllPages } = await import("@/lib/supabase/paged-select");
 
-  const applyFilters = <Q extends ReturnType<typeof supabase.from>>(q: Q): Q => {
-    let query = q;
-    if (filters?.stageId) query = query.eq("stage_id", filters.stageId) as Q;
-    if (filters?.terrainId) query = query.eq("infrastructure_id", filters.terrainId) as Q;
-    if (filters?.dateDebut) query = query.gte("date_fin", filters.dateDebut) as Q;
-    if (filters?.dateFin) query = query.lte("date_debut", filters.dateFin) as Q;
-    return query;
-  };
+  const selectWithCreneau =
+    "id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes";
+  const selectLegacy = "id, infrastructure_id, stage_id, date_debut, date_fin, statut, notes";
 
-  const probe = await applyFilters(
-    supabase
-      .from("reservations_infrastructure")
-      .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes")
-  )
+  function baseQuery(columns: string) {
+    let q = supabase.from("reservations_infrastructure").select(columns);
+    if (filters?.stageId) q = q.eq("stage_id", filters.stageId);
+    if (filters?.terrainId) q = q.eq("infrastructure_id", filters.terrainId);
+    if (filters?.dateDebut) q = q.gte("date_fin", filters.dateDebut);
+    if (filters?.dateFin) q = q.lte("date_debut", filters.dateFin);
+    return q;
+  }
+
+  const probe = await baseQuery(selectWithCreneau)
     .order("date_debut", { ascending: true })
     .range(0, 0);
 
   if (!probe.error) {
     return fetchAllPages<Record<string, unknown>>((from, to) =>
-      applyFilters(
-        supabase
-          .from("reservations_infrastructure")
-          .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes")
-      )
+      baseQuery(selectWithCreneau)
         .order("date_debut", { ascending: true })
         .range(from, to)
+        .then(({ data, error }) => ({ data: data as Record<string, unknown>[] | null, error }))
     );
   }
 
   const rows = await fetchAllPages<Record<string, unknown>>((from, to) =>
-    applyFilters(
-      supabase
-        .from("reservations_infrastructure")
-        .select("id, infrastructure_id, stage_id, date_debut, date_fin, statut, notes")
-    )
+    baseQuery(selectLegacy)
       .order("date_debut", { ascending: true })
       .range(from, to)
+      .then(({ data, error }) => ({ data: data as Record<string, unknown>[] | null, error }))
   );
   return rows.map((r) => ({
     ...r,
