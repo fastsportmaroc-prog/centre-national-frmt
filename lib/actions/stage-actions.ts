@@ -38,6 +38,7 @@ import type {
   StageProgrammeInputV2,
 } from "@/lib/types/v2";
 import { parseTerrainsBesoinsFromNotes, resyncStageTerrainsFromNotes } from "@/lib/data/terrains";
+import { syncStageTerrainReservationsForStageAction } from "@/lib/actions/reservations-sync-actions";
 import { syncStagePlanning } from "@/lib/v2/sync-stage-planning";
 import { revalidateStageLinkedPaths } from "@/lib/server/revalidate-stage-paths";
 import { getAuthUserFromServer } from "@/lib/auth/server-session";
@@ -241,6 +242,9 @@ export async function createStageComplet(form: StageCompletFormData): Promise<Cr
         else if (resa) reservations_creees++;
       }
     }
+    await syncStageTerrainReservationsForStageAction(stage_id).catch((err) => {
+      console.warn("[createStage] terrain sync:", err);
+    });
   }
 
   if (form.transport_avion.actif) {
@@ -385,6 +389,16 @@ export async function updateStageQuickAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await updateStageServer(id, data);
   if (res.ok) {
+    const terrainFieldsTouched =
+      data.date_debut !== undefined ||
+      data.date_fin !== undefined ||
+      data.notes !== undefined ||
+      data.terrains !== undefined;
+    if (terrainFieldsTouched) {
+      await syncStageTerrainReservationsForStageAction(id).catch((err) => {
+        console.warn("[updateStageQuickAction] terrain sync:", err);
+      });
+    }
     revalidateStageLinkedPaths(id);
   }
   return res;

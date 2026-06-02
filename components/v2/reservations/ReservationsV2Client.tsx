@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useRole } from "@/lib/hooks/useRole";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { FileDown, Pencil, Plus, Trash2 } from "lucide-react";
@@ -27,6 +29,7 @@ import {
   CRENEAU_OPTIONS,
   buildReservationDateTimes,
   conflictStageNames,
+  dedupeReservationsForDisplay,
   detectConflicts,
   formatDateHeader,
   getCreneauInfoForReservation,
@@ -70,6 +73,7 @@ function stageLine(r: ReservationEnrichedV2): string {
 
 export function ReservationsV2Client() {
   const { toast } = useToast();
+  const { isAdmin } = useRole();
   const [items, setItems] = useState<ReservationEnrichedV2[]>([]);
   const [stages, setStages] = useState<Awaited<ReturnType<typeof getStages>>>([]);
   const [infrastructures, setInfrastructures] = useState<InfrastructureV2[]>([]);
@@ -96,7 +100,9 @@ export function ReservationsV2Client() {
       getStages(),
       getInfrastructures(),
     ]);
-    setItems(r.filter((x) => normalizeStatut(x.statut) !== "annule"));
+    setItems(
+      dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
+    );
     setStages(s);
     setInfrastructures(i);
     if (i[0]) {
@@ -108,6 +114,31 @@ export function ReservationsV2Client() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) return;
+    const channel = supabase
+      .channel("reservations-v2-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reservations_infrastructure" },
+        () => {
+          void load();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stages_programme" },
+        () => {
+          void load();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [load]);
 
   const conflictIds = useMemo(() => detectConflicts(items), [items]);
@@ -251,11 +282,14 @@ export function ReservationsV2Client() {
         getStages(),
         getInfrastructures(),
       ]);
-      setItems(r.filter((x) => normalizeStatut(x.statut) !== "annule"));
+      setItems(
+      dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
+    );
       setStages(s);
       setInfrastructures(i);
       const parts: string[] = [];
-      if (result.synced > 0) parts.push(`${result.synced} stage(s) resynchronisé(s)`);
+      if (result.processed > 0) parts.push(`${result.processed} stage(s) traité(s)`);
+      if (result.synced > 0) parts.push(`${result.synced} avec réservations mises à jour`);
       if (result.cleaned > 0) parts.push(`${result.cleaned} doublon(s) supprimé(s)`);
       toast(
         parts.length > 0 ? parts.join(" · ") : "Réservations alignées sur les stages",
@@ -275,14 +309,16 @@ export function ReservationsV2Client() {
         description="Planning terrains — créneaux Matin, Après-midi, Journée complète"
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={syncing}
-              onClick={() => void forceSyncAndReload()}
-            >
-              {syncing ? "Sync…" : "Sync stages"}
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={syncing}
+                onClick={() => void forceSyncAndReload()}
+              >
+                {syncing ? "Synchronisation…" : "Sync tous les stages"}
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => setManualOpen(true)}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               Réservation manuelle

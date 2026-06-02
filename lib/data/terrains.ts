@@ -1240,29 +1240,45 @@ export async function cleanupDuplicateMatinWhenJourneeExists(): Promise<number> 
   return cleaned;
 }
 
-/** Recrée les réservations terrain depuis les métadonnées `[TERRAINS_BESOINS:…]` du stage. */
-export async function resyncStageTerrainsFromNotes(
-  stage: {
-    id: string;
-    nom?: string;
-    stage_action?: string;
-    date_debut: string;
-    date_fin: string;
-    notes?: string | null;
-  },
-  options?: { reserve?: boolean }
-): Promise<{ ok: string[]; conflits: string[] }> {
-  const besoins = parseTerrainsBesoinsFromNotes(stage.notes);
-  if (!besoins?.length) return { ok: [], conflits: [] };
-  const normalized = besoins.map((b) => ({
-    ...b,
-    creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
-    mode: b.mode ?? "stage",
+/** Déduit les besoins terrain depuis les lignes `reservations_infrastructure` existantes. */
+async function inferTerrainsBesoinsFromInfrastructure(
+  supabase: SupabaseClient,
+  stageId: string
+): Promise<TerrainBesoin[] | null> {
+  const { data: rows } = await supabase
+    .from("reservations_infrastructure")
+    .select("infrastructure_id, creneau, date_debut, heure_debut, heure_fin")
+    .eq("stage_id", stageId);
+  if (!rows?.length) return null;
+
+  const byInfra = new Map<string, { creneaux: Set<Creneau>; jours: Set<string> }>();
+  for (const row of rows) {
+    const infraId = String(row.infrastructure_id ?? "");
+    if (!infraId) continue;
+    if (!byInfra.has(infraId)) {
+      byInfra.set(infraId, { creneaux: new Set(), jours: new Set() });
+    }
+    const group = byInfra.get(infraId)!;
+    group.jours.add(String(row.date_debut).slice(0, 10));
+    const inferred = inferCreneauFromLegacyRow(row);
+    group.creneaux.add(inferred === "apres-midi" ? "apres-midi" : inferred);
+  }
+
+  return [...byInfra.entries()].map(([terrainId, group]) => ({
+    terrainId,
+    creneaux: group.creneaux.size ? [...group.creneaux] : (["journee"] as Creneau[]),
+    jours: [...group.jours],
+    mode: "stage" as const,
   }));
-  const supabase = await getTerrainsSupabaseClient();
+}
+
+async function upgradePartialCreneauxToJournee(
+  supabase: SupabaseClient,
+  stage: { id: string; date_debut: string; date_fin: string },
+  normalized: TerrainBesoin[]
+): Promise<void> {
   for (const besoin of normalized) {
-    const wantsJournee = besoin.creneaux?.includes("journee");
-    if (!wantsJournee) continue;
+    if (!besoin.creneaux?.includes("journee")) continue;
     const infraId = besoin.terrainId;
     const days =
       besoin.jours?.length ?
@@ -1286,39 +1302,123 @@ export async function resyncStageTerrainsFromNotes(
         .in("creneau", ["matin", "apres_midi"]);
     }
   }
-  if (options?.reserve === false) return { ok: [], conflits: [] };
-  return reserverTerrains({
+}
+
+/**
+ * Génère ou met à jour les réservations terrain d'un stage (idempotent).
+ * Sources : notes `[TERRAINS_BESOINS:…]`, puis lignes infra existantes.
+ */
+export async function ensureStageTerrainReservations(
+  stage: {
+    id: string;
+    nom?: string;
+    stage_action?: string;
+    date_debut: string;
+    date_fin: string;
+    notes?: string | null;
+    terrains?: boolean | null;
+  }
+): Promise<{ ok: string[]; conflits: string[]; skipped?: boolean }> {
+  let besoins = parseTerrainsBesoinsFromNotes(stage.notes);
+  const supabase = await getTerrainsSupabaseClient();
+
+  if (!besoins?.length) {
+    besoins = await inferTerrainsBesoinsFromInfrastructure(supabase, stage.id);
+  }
+
+  if (!besoins?.length) {
+    return { ok: [], conflits: [], skipped: true };
+  }
+
+  const normalized = besoins.map((b) => ({
+    ...b,
+    creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
+    mode: b.mode ?? "stage",
+  }));
+
+  await upgradePartialCreneauxToJournee(supabase, stage, normalized);
+
+  const { ok, conflits } = await reserverTerrains({
     id: stage.id,
     nom: stage.nom ?? stage.stage_action ?? "Stage",
     dateDebut: stage.date_debut,
     dateFin: stage.date_fin,
     besoins: { terrains: normalized },
   });
+
+  return { ok, conflits };
 }
 
-/** Alignement automatique Stages → Réservations pour tous les stages avec besoins terrain. */
-export async function resyncAllStageTerrainsFromNotes(): Promise<number> {
+/** Recrée les réservations terrain depuis les métadonnées `[TERRAINS_BESOINS:…]` du stage. */
+export async function resyncStageTerrainsFromNotes(
+  stage: {
+    id: string;
+    nom?: string;
+    stage_action?: string;
+    date_debut: string;
+    date_fin: string;
+    notes?: string | null;
+    terrains?: boolean | null;
+  },
+  options?: { reserve?: boolean }
+): Promise<{ ok: string[]; conflits: string[] }> {
+  const besoins = parseTerrainsBesoinsFromNotes(stage.notes);
+  if (!besoins?.length) {
+    return ensureStageTerrainReservations(stage);
+  }
+
+  if (options?.reserve === false) {
+    const normalized = besoins.map((b) => ({
+      ...b,
+      creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
+      mode: b.mode ?? "stage",
+    }));
+    const supabase = await getTerrainsSupabaseClient();
+    await upgradePartialCreneauxToJournee(supabase, stage, normalized);
+    return { ok: [], conflits: [] };
+  }
+
+  return ensureStageTerrainReservations(stage);
+}
+
+/** Alignement automatique Stages → Réservations (notes, flag terrains, ou lignes infra). */
+export async function resyncAllStageTerrainsFromNotes(): Promise<{
+  synced: number;
+  processed: number;
+}> {
   const supabase = await getTerrainsSupabaseClient();
   const { data: stages } = await supabase
     .from("stages_programme")
-    .select("id, stage_action, date_debut, date_fin, notes, statut")
+    .select("id, stage_action, date_debut, date_fin, notes, statut, terrains")
     .neq("statut", "annule");
   let synced = 0;
+  let processed = 0;
   await cleanupDuplicateMatinWhenJourneeExists();
   for (const s of stages ?? []) {
-    const hasBesoins = Boolean(parseTerrainsBesoinsFromNotes(s.notes)?.length);
-    if (!hasBesoins) continue;
-    const { ok } = await resyncStageTerrainsFromNotes({
+    const hasNotesBesoins = Boolean(parseTerrainsBesoinsFromNotes(s.notes)?.length);
+    let shouldSync = hasNotesBesoins || s.terrains === true;
+    if (!shouldSync) {
+      const { count } = await supabase
+        .from("reservations_infrastructure")
+        .select("id", { count: "exact", head: true })
+        .eq("stage_id", s.id);
+      shouldSync = (count ?? 0) > 0;
+    }
+    if (!shouldSync) continue;
+
+    processed++;
+    const { ok, skipped } = await ensureStageTerrainReservations({
       id: s.id,
       stage_action: s.stage_action,
       date_debut: s.date_debut,
       date_fin: s.date_fin,
       notes: s.notes,
+      terrains: s.terrains,
     });
-    if (ok.length > 0) synced++;
+    if (!skipped && ok.length > 0) synced++;
   }
-  return synced;
-};
+  return { synced, processed };
+}
 
 /* ─── SUPPRIMER RÉSERVATIONS D'UN STAGE ─── */
 export const supprimerReservationsStage = async (stageId: string) => {

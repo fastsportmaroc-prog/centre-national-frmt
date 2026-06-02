@@ -807,12 +807,21 @@ export async function getReservationsEnriched(options?: {
   const year = new Date().getFullYear();
   const calDebut = options?.dateDebut ?? `${year - 1}-01-01`;
   const calFin = options?.dateFin ?? `${year + 2}-12-31`;
+  const rangeStart = options?.dateDebut?.slice(0, 10);
+  const rangeEnd = options?.dateFin?.slice(0, 10);
+  const inSelectedRange = (dateIso: string): boolean => {
+    const day = dateIso.slice(0, 10);
+    if (rangeStart && day < rangeStart) return false;
+    if (rangeEnd && day > rangeEnd) return false;
+    return true;
+  };
   const terrainRows = await getCalendrierPeriode(calDebut, calFin).catch(
     () => [] as Record<string, unknown>[]
   );
   const terrainEnriched = terrainRows
     .map((row) => mapCalendrierTerrainRow(row as Record<string, unknown>))
     .filter((r): r is ReservationEnrichedV2 => r !== null)
+    .filter((r) => inSelectedRange(r.date_debut))
     .map((r) => {
       const infra = infraMap.get(r.infrastructure_id);
       const coachId = r.stage_id ? stageFirstCoach.get(r.stage_id) : null;

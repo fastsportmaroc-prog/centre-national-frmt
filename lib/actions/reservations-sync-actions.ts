@@ -2,8 +2,8 @@
 
 import {
   cleanupDuplicateMatinWhenJourneeExists,
+  ensureStageTerrainReservations,
   resyncAllStageTerrainsFromNotes,
-  resyncStageTerrainsFromNotes,
 } from "@/lib/data/terrains";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import { updateStageServer } from "@/lib/supabase/stage-write.server";
@@ -24,11 +24,12 @@ function revalidateStageReservationPaths(stageId?: string) {
 export async function reconcileStageTerrainReservationsAction(): Promise<{
   cleaned: number;
   synced: number;
+  processed: number;
 }> {
-  const synced = await resyncAllStageTerrainsFromNotes();
+  const { synced, processed } = await resyncAllStageTerrainsFromNotes();
   const cleaned = await cleanupDuplicateMatinWhenJourneeExists();
   revalidateStageReservationPaths();
-  return { cleaned, synced };
+  return { cleaned, synced, processed };
 }
 
 /**
@@ -45,7 +46,7 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
   const supabase = await getSupabaseServerDataClient();
   const { data: stage, error } = await supabase
     .from("stages_programme")
-    .select("id, stage_action, date_debut, date_fin, notes")
+    .select("id, stage_action, date_debut, date_fin, notes, terrains")
     .eq("id", stageId)
     .single();
 
@@ -53,12 +54,13 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
     return { ok: false, synced: 0, conflits: [], cleaned: 0, error: "Stage introuvable" };
   }
 
-  const { ok, conflits } = await resyncStageTerrainsFromNotes({
+  const { ok, conflits } = await ensureStageTerrainReservations({
     id: stage.id,
     stage_action: stage.stage_action,
     date_debut: stage.date_debut,
     date_fin: stage.date_fin,
     notes: stage.notes,
+    terrains: stage.terrains,
   });
 
   await updateStageServer(stageId, { terrains: true });

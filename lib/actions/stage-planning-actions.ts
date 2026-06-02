@@ -1,5 +1,6 @@
 "use server";
 
+import { ensureStageTerrainReservations } from "@/lib/data/terrains";
 import { syncAllStagesPlanning, syncStagePlanning } from "@/lib/v2/sync-stage-planning";
 import { getStageDetailV2Action } from "@/lib/actions/stage-detail-actions";
 import { getEntraineursByStage } from "@/lib/supabase/queries";
@@ -12,7 +13,7 @@ async function runStagePlanningSync(stageId: string): Promise<number> {
   const coachs = await getEntraineursByStage(stageId);
   const coach_id = coachs[0]?.id ?? null;
 
-  return syncStagePlanning({
+  const created = await syncStagePlanning({
     stage_id: stage.id,
     date_debut: stage.date_debut,
     date_fin: stage.date_fin,
@@ -20,6 +21,19 @@ async function runStagePlanningSync(stageId: string): Promise<number> {
     categorie: stage.categorie,
     coach_id,
   });
+
+  if (stage.terrains || stage.notes?.includes("[TERRAINS_BESOINS:")) {
+    await ensureStageTerrainReservations({
+      id: stage.id,
+      stage_action: stage.stage_action,
+      date_debut: stage.date_debut,
+      date_fin: stage.date_fin,
+      notes: stage.notes,
+      terrains: stage.terrains,
+    }).catch((err) => console.warn("[syncStagePlanning] terrains:", err));
+  }
+
+  return created;
 }
 
 export async function syncStagePlanningAction(stageId: string): Promise<{ created: number }> {

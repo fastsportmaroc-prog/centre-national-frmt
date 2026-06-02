@@ -12,10 +12,12 @@ import {
   startOfWeek,
 } from "date-fns";
 import { fr } from "date-fns/locale";
+import { reservationMergeKey } from "@/lib/v2/terrain-reservation-map";
 import { reservationToConflictRow } from "@/lib/terrain/conflict-adapters";
 import {
   conflictIdSet,
   detectConflicts as detectTerrainConflicts,
+  getTimeRange,
 } from "@/services/conflictDetector";
 import type { ReservationEnrichedV2 } from "@/lib/types/v2";
 
@@ -278,20 +280,37 @@ export function periodeToIsoRange(periode: PeriodeFilter): { dateDebut: string; 
   };
 }
 
-/** Plage de chargement : filtre actif + mois courant (KPI « ce mois »). */
+/** Plage de chargement alignée sur le filtre sélectionné (mois, semaine, tout). */
 export function loadRangeForReservations(periode: PeriodeFilter): {
   dateDebut?: string;
   dateFin?: string;
 } {
-  const now = new Date();
-  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
-  const filterRange = periodeToIsoRange(periode);
-  if (!filterRange) return {};
-  const dateDebut =
-    filterRange.dateDebut < monthStart ? filterRange.dateDebut : monthStart;
-  const dateFin = filterRange.dateFin > monthEnd ? filterRange.dateFin : monthEnd;
-  return { dateDebut, dateFin };
+  return periodeToIsoRange(periode) ?? {};
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isReservationUuid(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+/** Évite les faux conflits quand calendrier + infra dupliquent la même réservation. */
+export function dedupeReservationsForDisplay(
+  items: ReservationEnrichedV2[]
+): ReservationEnrichedV2[] {
+  const byKey = new Map<string, ReservationEnrichedV2>();
+  for (const r of items) {
+    const key = reservationMergeKey(r);
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, r);
+      continue;
+    }
+    if (isReservationUuid(r.id) && !isReservationUuid(prev.id)) {
+      byKey.set(key, r);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.date_debut.localeCompare(b.date_debut));
 }
 
 export function matchPeriode(debutIso: string, periode: PeriodeFilter): boolean {
@@ -312,7 +331,9 @@ export function matchPeriode(debutIso: string, periode: PeriodeFilter): boolean 
 }
 
 export function detectConflicts(items: ReservationEnrichedV2[]): Set<string> {
-  const active = items.filter((r) => normalizeStatut(r.statut) !== "annule");
+  const active = dedupeReservationsForDisplay(items).filter(
+    (r) => normalizeStatut(r.statut) !== "annule"
+  );
   const rows = active.map(reservationToConflictRow);
   return conflictIdSet(detectTerrainConflicts(rows));
 }
@@ -326,12 +347,14 @@ export function conflictStageNames(
   const day = format(parseReservationDate(r.date_debut), "yyyy-MM-dd");
   const myCreneau = resolveCreneauType(r);
   const names = new Set<string>();
+  const myRange = getTimeRange(reservationToConflictRow(r));
   for (const o of all) {
     if (o.id === r.id || !conflictIds.has(o.id)) continue;
     if (r.stage_id && o.stage_id === r.stage_id) continue;
     if (o.infrastructure_id !== r.infrastructure_id) continue;
     if (format(parseReservationDate(o.date_debut), "yyyy-MM-dd") !== day) continue;
-    if (!creneauxOverlap(myCreneau, resolveCreneauType(o))) continue;
+    const otherRange = getTimeRange(reservationToConflictRow(o));
+    if (!(myRange.start < otherRange.end && myRange.end > otherRange.start)) continue;
     if (o.stage_nom) names.add(o.stage_nom);
   }
   return [...names].join(" + ");
