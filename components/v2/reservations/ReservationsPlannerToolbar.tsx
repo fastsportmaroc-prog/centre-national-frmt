@@ -16,9 +16,7 @@ const PERIOD_OPTIONS: { value: PlannerPeriodMode; label: string }[] = [
 
 const VIEW_OPTIONS: { value: PlannerViewMode; label: string }[] = [
   { value: "list", label: "Liste" },
-  { value: "week", label: "Grille semaine" },
-  { value: "month", label: "Calendrier" },
-  { value: "year", label: "Vue annuelle" },
+  { value: "table", label: "Tableau" },
 ];
 
 type Props = {

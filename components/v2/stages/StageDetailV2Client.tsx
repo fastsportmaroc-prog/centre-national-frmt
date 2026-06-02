@@ -6,7 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { addDays, format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ArrowLeft, CalendarDays, FileDown, FileText, Pencil, Trash2 } from "lucide-react";
+import { getTerrainOccupancyAction } from "@/lib/actions/terrain-occupancy-actions";
+import type { TerrainOccupancySlot } from "@/lib/actions/terrain-occupancy-actions";
 import { syncStageTerrainReservationsForStageAction } from "@/lib/actions/reservations-sync-actions";
+import { StageTerrainOccupancyGrid } from "@/components/v2/stages/StageTerrainOccupancyGrid";
 import { syncStageLinkedViewsAction } from "@/lib/actions/stage-planning-actions";
 import { StageLettreModal } from "@/components/v2/stages/StageLettreModal";
 import { StageQuickEditModal } from "@/components/v2/stages/StageQuickEditModal";
@@ -131,6 +134,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const [terrainJours, setTerrainJours] = useState<string[]>([]);
   const [dispatchJoueurIds, setDispatchJoueurIds] = useState<string[]>([]);
   const [savingTerrain, setSavingTerrain] = useState(false);
+  const [terrainOccupancy, setTerrainOccupancy] = useState<TerrainOccupancySlot[]>([]);
   const [loading, setLoading] = useState(true);
   const hasLoadedOnce = useRef(false);
 
@@ -299,6 +303,24 @@ export function StageDetailV2Client({ id }: { id: string }) {
       setTerrainJours([]);
     }
   }, [stageDays]);
+
+  const loadTerrainOccupancy = useCallback(async () => {
+    if (!stage) return;
+    try {
+      const slots = await getTerrainOccupancyAction({
+        dateDebut: stage.date_debut,
+        dateFin: stage.date_fin,
+        excludeStageId: stage.id,
+      });
+      setTerrainOccupancy(slots);
+    } catch {
+      setTerrainOccupancy([]);
+    }
+  }, [stage]);
+
+  useEffect(() => {
+    if (tab === "terrains" && stage) void loadTerrainOccupancy();
+  }, [tab, stage, loadTerrainOccupancy]);
 
   async function handlePdf() {
     if (!stage) return;
@@ -500,6 +522,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
       setTerrainCreneau("journee");
       setTerrainJours(stageDays);
       setDispatchJoueurIds([]);
+      await loadTerrainOccupancy();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erreur réservation terrain", "error");
     } finally {
@@ -820,6 +843,19 @@ export function StageDetailV2Client({ id }: { id: string }) {
                       ))}
                     </div>
                   </div>
+
+                  <div className="mt-3 rounded-md border border-border bg-[var(--bg-main)] p-2">
+                    <StageTerrainOccupancyGrid
+                      days={terrainJours.length > 0 ? terrainJours : stageDays}
+                      infrastructureId={terrainId}
+                      infrastructureNom={terrains.find((t) => t.id === terrainId)?.nom}
+                      occupancy={terrainOccupancy}
+                      selectedCreneau={
+                        terrainCreneau === "apres-midi" ? "apres_midi" : terrainCreneau
+                      }
+                    />
+                  </div>
+
                   <div className="mt-3 space-y-2">
                     <p className="text-xs text-muted">Créneau (un seul choix)</p>
                     <div className="flex flex-wrap gap-4 text-sm">

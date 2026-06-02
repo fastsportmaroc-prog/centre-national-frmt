@@ -1,9 +1,6 @@
 "use server";
 
-import {
-  resyncAllStageTerrainsFromNotes,
-  syncReservationsFromPlanning,
-} from "@/lib/data/terrains";
+import { resyncAllStageTerrainsFromNotes } from "@/lib/data/terrains";
 import { loadReservationsPageServer } from "@/lib/supabase/reservations-read.server";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import type { ReservationEnrichedV2 } from "@/lib/types/v2";
@@ -12,18 +9,18 @@ import { revalidatePath } from "next/cache";
 export async function loadReservationsPageAction(options?: {
   dateDebut?: string;
   dateFin?: string;
-  /** Synchronise planning → infra avant lecture (défaut: true). */
+  /** Recopie les onglets Terrains des stages → réservations (défaut: true). */
   syncBeforeLoad?: boolean;
 }): Promise<{
   reservations: ReservationEnrichedV2[];
-  sync?: { planningUpserted: number; planningSkipped: number };
+  sync?: { stagesProcessed: number; stagesSynced: number };
 }> {
-  let sync: { planningUpserted: number; planningSkipped: number } | undefined;
+  let sync: { stagesProcessed: number; stagesSynced: number } | undefined;
 
   if (options?.syncBeforeLoad !== false) {
     const supabase = await getSupabaseServerDataClient();
-    const { upserted, skipped } = await syncReservationsFromPlanning(supabase);
-    sync = { planningUpserted: upserted, planningSkipped: skipped };
+    const { processed, synced } = await resyncAllStageTerrainsFromNotes(supabase);
+    sync = { stagesProcessed: processed, stagesSynced: synced };
   }
 
   const reservations = await loadReservationsPageServer({

@@ -1,21 +1,17 @@
 "use server";
 
-import { syncReservationsFromPlanning } from "@/lib/data/terrains";
-import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
-import { loadReservationsPlannerBundle } from "@/lib/supabase/reservations-planner.server";
+import { loadReservationsPageAction } from "@/lib/actions/reservations-page-actions";
 
+/** @deprecated Préférer loadReservationsPageAction — source unique stages → terrains. */
 export async function loadReservationsPlannerAction(options?: {
   dateDebut?: string;
   dateFin?: string;
   syncBeforeLoad?: boolean;
 }) {
-  if (options?.syncBeforeLoad !== false) {
-    const supabase = await getSupabaseServerDataClient();
-    await syncReservationsFromPlanning(supabase);
-  }
-
-  return loadReservationsPlannerBundle({
+  const { reservations } = await loadReservationsPageAction({
     dateDebut: options?.dateDebut,
     dateFin: options?.dateFin,
+    syncBeforeLoad: options?.syncBeforeLoad,
   });
+  return { reservations, planning: [] };
 }

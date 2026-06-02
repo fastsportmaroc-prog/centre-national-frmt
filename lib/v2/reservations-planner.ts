@@ -15,7 +15,7 @@ import { fr } from "date-fns/locale";
 
 export type PlannerPeriodMode = "week" | "month" | "year" | "all";
 
-export type PlannerViewMode = "list" | "week" | "month" | "year";
+export type PlannerViewMode = "list" | "table";
 
 export type PlannerRange = {
   dateDebut: string;
