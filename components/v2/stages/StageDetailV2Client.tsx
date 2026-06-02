@@ -318,7 +318,6 @@ export function StageDetailV2Client({ id }: { id: string }) {
       const slots = await getTerrainOccupancyAction({
         dateDebut: stage.date_debut,
         dateFin: stage.date_fin,
-        excludeStageId: stage.id,
       });
       setTerrainOccupancy(slots);
     } catch {
@@ -554,6 +553,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
     }
     const tr = await getReservationsStageTerrains(stage?.id ?? "").catch(() => []);
     setTerrainReservations(tr);
+    await loadTerrainOccupancy();
   }
 
   async function handleDeleteStage() {
@@ -877,6 +877,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
                       infrastructureId={terrainId}
                       infrastructureNom={terrains.find((t) => t.id === terrainId)?.nom}
                       occupancy={terrainOccupancy}
+                      currentStageId={stage.id}
                       selectedCreneau={
                         terrainCreneau === "apres-midi" ? "apres_midi" : terrainCreneau
                       }

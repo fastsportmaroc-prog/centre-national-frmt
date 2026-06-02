@@ -18,6 +18,8 @@ type Props = {
   infrastructureNom?: string;
   occupancy: TerrainOccupancySlot[];
   selectedCreneau?: CreneauType;
+  /** Stage ouvert dans la fiche — pour distinguer « ce stage » vs conflit. */
+  currentStageId?: string;
 };
 
 function slotKey(date: string, infraId: string, creneau: CreneauType): string {
@@ -35,6 +37,7 @@ export function StageTerrainOccupancyGrid({
   infrastructureNom,
   occupancy,
   selectedCreneau,
+  currentStageId,
 }: Props) {
   const byKey = new Map<string, TerrainOccupancySlot[]>();
   for (const o of occupancy) {
@@ -51,7 +54,7 @@ export function StageTerrainOccupancyGrid({
   if (!infrastructureId || days.length === 0) {
     return (
       <p className="text-xs text-muted">
-        Sélectionnez un terrain et des jours pour voir les créneaux déjà pris par d&apos;autres stages.
+        Sélectionnez un terrain et des jours pour voir l&apos;occupation des créneaux.
       </p>
     );
   }
@@ -59,7 +62,7 @@ export function StageTerrainOccupancyGrid({
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted">
-        Disponibilité — {infrastructureNom ?? "terrain"} (autres stages)
+        Occupation — {infrastructureNom ?? "terrain"}
       </p>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full min-w-[420px] text-xs">
@@ -83,26 +86,45 @@ export function StageTerrainOccupancyGrid({
                   const occupants = byKey.get(slotKey(day, infrastructureId, c.key)) ?? [];
                   const busy = occupants.length > 0;
                   const isSelected = selectedCreneau === c.key;
+                  const hasConflict = occupants.some(
+                    (o) => currentStageId && o.stage_id && o.stage_id !== currentStageId
+                  );
+                  const onlyCurrentStage =
+                    busy &&
+                    currentStageId &&
+                    occupants.every((o) => o.stage_id === currentStageId);
+
                   return (
                     <td
                       key={c.key}
                       className={cn(
                         "p-2 text-center align-top",
                         isSelected && "ring-1 ring-inset ring-frmt-green/50",
-                        busy ? "bg-red-500/10" : "bg-emerald-500/5"
+                        !busy && "bg-emerald-500/5",
+                        onlyCurrentStage && "bg-frmt-green/10",
+                        hasConflict && "bg-red-500/10"
                       )}
                     >
                       {busy ? (
                         <div className="space-y-0.5">
-                          {occupants.slice(0, 2).map((o) => (
-                            <span
-                              key={o.reservation_id}
-                              className="block truncate text-[10px] font-medium text-red-400"
-                              title={o.stage_nom}
-                            >
-                              {o.stage_nom}
-                            </span>
-                          ))}
+                          {occupants.slice(0, 2).map((o) => {
+                            const isCurrent = currentStageId && o.stage_id === currentStageId;
+                            return (
+                              <span
+                                key={o.reservation_id}
+                                className={cn(
+                                  "block truncate text-[10px] font-medium",
+                                  isCurrent ? "text-frmt-green" : "text-red-400"
+                                )}
+                                title={o.stage_nom}
+                              >
+                                {o.stage_nom}
+                                {isCurrent && (
+                                  <span className="ml-1 text-[9px] opacity-80">(ce stage)</span>
+                                )}
+                              </span>
+                            );
+                          })}
                           {occupants.length > 2 && (
                             <span className="text-[10px] text-muted">+{occupants.length - 2}</span>
                           )}
@@ -119,8 +141,9 @@ export function StageTerrainOccupancyGrid({
         </table>
       </div>
       <p className="text-[10px] text-muted">
-        Rouge = autre stage sur ce créneau. Les réservations de ce stage apparaissent dans le tableau
-        ci-dessous et dans la rubrique Réservations après validation.
+        <span className="text-frmt-green">Vert</span> = réservation de ce stage ·{" "}
+        <span className="text-red-400">Rouge</span> = autre stage sur le même créneau ·{" "}
+        <span className="text-emerald-600">Libre</span> = disponible
       </p>
     </div>
   );
