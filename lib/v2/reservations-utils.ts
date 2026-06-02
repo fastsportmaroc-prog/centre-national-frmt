@@ -255,6 +255,45 @@ export function statutLabel(statut: string): string {
 
 export type PeriodeFilter = "week" | "month" | "next_month" | "all";
 
+/** Plage ISO (yyyy-MM-dd) pour charger les réservations côté serveur. */
+export function periodeToIsoRange(periode: PeriodeFilter): { dateDebut: string; dateFin: string } | null {
+  if (periode === "all") return null;
+  const now = new Date();
+  if (periode === "week") {
+    return {
+      dateDebut: format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+      dateFin: format(endOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"),
+    };
+  }
+  if (periode === "month") {
+    return {
+      dateDebut: format(startOfMonth(now), "yyyy-MM-dd"),
+      dateFin: format(endOfMonth(now), "yyyy-MM-dd"),
+    };
+  }
+  const next = addMonths(now, 1);
+  return {
+    dateDebut: format(startOfMonth(next), "yyyy-MM-dd"),
+    dateFin: format(endOfMonth(next), "yyyy-MM-dd"),
+  };
+}
+
+/** Plage de chargement : filtre actif + mois courant (KPI « ce mois »). */
+export function loadRangeForReservations(periode: PeriodeFilter): {
+  dateDebut?: string;
+  dateFin?: string;
+} {
+  const now = new Date();
+  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+  const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+  const filterRange = periodeToIsoRange(periode);
+  if (!filterRange) return {};
+  const dateDebut =
+    filterRange.dateDebut < monthStart ? filterRange.dateDebut : monthStart;
+  const dateFin = filterRange.dateFin > monthEnd ? filterRange.dateFin : monthEnd;
+  return { dateDebut, dateFin };
+}
+
 export function matchPeriode(debutIso: string, periode: PeriodeFilter): boolean {
   if (periode === "all") return true;
   const d = parseReservationDate(debutIso);

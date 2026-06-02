@@ -31,6 +31,7 @@ import {
   formatDateHeader,
   getCreneauInfoForReservation,
   infraLine,
+  loadRangeForReservations,
   matchPeriode,
   normalizeStatut,
   parseReservationDate,
@@ -89,8 +90,9 @@ export function ReservationsV2Client() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const load = useCallback(async () => {
+    const range = loadRangeForReservations(periodeFilter);
     const [r, s, i] = await Promise.all([
-      getReservationsEnriched(),
+      getReservationsEnriched(range),
       getStages(),
       getInfrastructures(),
     ]);
@@ -102,7 +104,7 @@ export function ReservationsV2Client() {
         f.infrastructure_id ? f : { ...f, infrastructure_id: i[0]!.id }
       );
     }
-  }, []);
+  }, [periodeFilter]);
 
   useEffect(() => {
     void load();
@@ -243,8 +245,9 @@ export function ReservationsV2Client() {
     setSyncing(true);
     try {
       const result = await reconcileStageTerrainReservationsAction();
+      const range = loadRangeForReservations(periodeFilter);
       const [r, s, i] = await Promise.all([
-        getReservationsEnriched(),
+        getReservationsEnriched(range),
         getStages(),
         getInfrastructures(),
       ]);

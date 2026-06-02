@@ -161,6 +161,8 @@ async function ensureLegacyStageRow(stageId: string): Promise<boolean> {
   }
 }
 
+import { applyReservationDateRange, fetchAllPages } from "@/lib/supabase/paged-select";
+
 type QueryResult<T> = { data: T | null; error: { message: string } | null };
 
 async function runSelect<T>(
@@ -725,9 +727,22 @@ export async function getInfrastructures(): Promise<InfrastructureV2[]> {
   return runSelect<InfrastructureV2[]>("infrastructures", (c) => c.from("infrastructures").select("*").order("nom"));
 }
 
-export async function getReservationsInfrastructure(): Promise<ReservationInfraV2[]> {
-  return runSelect<ReservationInfraV2[]>("reservations_infrastructure", (c) =>
-    c.from("reservations_infrastructure").select("*").order("date_debut", { ascending: true })
+export async function getReservationsInfrastructure(options?: {
+  dateDebut?: string;
+  dateFin?: string;
+}): Promise<ReservationInfraV2[]> {
+  const c = clientOrNull();
+  if (!c) return [];
+  return fetchAllPages<ReservationInfraV2>(
+    (from, to) => {
+      let q = c
+        .from("reservations_infrastructure")
+        .select("*")
+        .order("date_debut", { ascending: true });
+      q = applyReservationDateRange(q, options?.dateDebut, options?.dateFin);
+      return q.range(from, to);
+    },
+    (msg) => warn("reservations_infrastructure select", msg)
   );
 }
 
@@ -751,9 +766,12 @@ export async function getStageIdsWithTerrainReservations(): Promise<Set<string>>
   return ids;
 }
 
-export async function getReservationsEnriched(): Promise<ReservationEnrichedV2[]> {
+export async function getReservationsEnriched(options?: {
+  dateDebut?: string;
+  dateFin?: string;
+}): Promise<ReservationEnrichedV2[]> {
   const [reservations, stages, infrastructures, entraineurs, stageCoachLinks] = await Promise.all([
-    getReservationsInfrastructure(),
+    getReservationsInfrastructure(options),
     getStages(),
     getInfrastructures(),
     getEntraineurs(),
@@ -787,7 +805,9 @@ export async function getReservationsEnriched(): Promise<ReservationEnrichedV2[]
   });
 
   const year = new Date().getFullYear();
-  const terrainRows = await getCalendrierPeriode(`${year - 1}-01-01`, `${year + 2}-12-31`).catch(
+  const calDebut = options?.dateDebut ?? `${year - 1}-01-01`;
+  const calFin = options?.dateFin ?? `${year + 2}-12-31`;
+  const terrainRows = await getCalendrierPeriode(calDebut, calFin).catch(
     () => [] as Record<string, unknown>[]
   );
   const terrainEnriched = terrainRows

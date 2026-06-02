@@ -106,6 +106,61 @@ function extractLegacyModeAndDispatch(notes: string | null | undefined): {
   return { mode, nbDispatch };
 }
 
+async function fetchLegacyReservationsInfra(
+  supabase: Awaited<ReturnType<typeof getTerrainsSupabaseClient>>,
+  filters?: {
+    stageId?: string;
+    terrainId?: string;
+    dateDebut?: string;
+    dateFin?: string;
+  }
+) {
+  const { fetchAllPages } = await import("@/lib/supabase/paged-select");
+
+  const applyFilters = <Q extends ReturnType<typeof supabase.from>>(q: Q): Q => {
+    let query = q;
+    if (filters?.stageId) query = query.eq("stage_id", filters.stageId) as Q;
+    if (filters?.terrainId) query = query.eq("infrastructure_id", filters.terrainId) as Q;
+    if (filters?.dateDebut) query = query.gte("date_fin", filters.dateDebut) as Q;
+    if (filters?.dateFin) query = query.lte("date_debut", filters.dateFin) as Q;
+    return query;
+  };
+
+  const probe = await applyFilters(
+    supabase
+      .from("reservations_infrastructure")
+      .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes")
+  )
+    .order("date_debut", { ascending: true })
+    .range(0, 0);
+
+  if (!probe.error) {
+    return fetchAllPages<Record<string, unknown>>((from, to) =>
+      applyFilters(
+        supabase
+          .from("reservations_infrastructure")
+          .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes")
+      )
+        .order("date_debut", { ascending: true })
+        .range(from, to)
+    );
+  }
+
+  const rows = await fetchAllPages<Record<string, unknown>>((from, to) =>
+    applyFilters(
+      supabase
+        .from("reservations_infrastructure")
+        .select("id, infrastructure_id, stage_id, date_debut, date_fin, statut, notes")
+    )
+      .order("date_debut", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map((r) => ({
+    ...r,
+    creneau: inferCreneauFromLegacyRow(r),
+  }));
+}
+
 async function buildLegacyCalendrierRows(filters?: {
   stageId?: string;
   terrainId?: string;
@@ -113,33 +168,7 @@ async function buildLegacyCalendrierRows(filters?: {
   dateFin?: string;
 }) {
   const supabase = await getTerrainsSupabaseClient();
-  let q = supabase
-    .from("reservations_infrastructure")
-    .select("id, infrastructure_id, stage_id, date_debut, date_fin, creneau, statut, notes");
-
-  if (filters?.stageId) q = q.eq("stage_id", filters.stageId);
-  if (filters?.terrainId) q = q.eq("infrastructure_id", filters.terrainId);
-  if (filters?.dateDebut) q = q.gte("date_fin", filters.dateDebut);
-  if (filters?.dateFin) q = q.lte("date_debut", filters.dateFin);
-
-  let { data: resa, error: resaErr } = await q.order("date_debut", { ascending: true });
-  if (resaErr) {
-    // Fallback schéma legacy sans colonne creneau
-    let q2 = supabase
-      .from("reservations_infrastructure")
-      .select("id, infrastructure_id, stage_id, date_debut, date_fin, statut, notes");
-    if (filters?.stageId) q2 = q2.eq("stage_id", filters.stageId);
-    if (filters?.terrainId) q2 = q2.eq("infrastructure_id", filters.terrainId);
-    if (filters?.dateDebut) q2 = q2.gte("date_fin", filters.dateDebut);
-    if (filters?.dateFin) q2 = q2.lte("date_debut", filters.dateFin);
-    const r2 = await q2.order("date_debut", { ascending: true });
-    resa = (r2.data ?? []).map((r: any) => ({
-      ...r,
-      creneau: inferCreneauFromLegacyRow(r),
-    }));
-    resaErr = r2.error;
-  }
-  if (resaErr) throw asError(resaErr, "Erreur lecture reservations_infrastructure");
+  const resa = await fetchLegacyReservationsInfra(supabase, filters);
   if (!resa?.length) return [];
 
   const infraIds = [...new Set(resa.map((r: any) => r.infrastructure_id).filter(Boolean))];
