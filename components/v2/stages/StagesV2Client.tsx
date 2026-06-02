@@ -242,7 +242,7 @@ export function StagesV2Client() {
         : "";
     const payload = {
       ...form,
-      notes: terrainMeta || null,
+      notes: terrainMeta,
     };
     const result = await createStageComplet(payload);
     setSaving(false);
