@@ -83,7 +83,7 @@ export function StageFosAgriSection({
   return (
     <div className="mt-6 border-t border-border pt-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-frmt-green">Procédure administrative FOS AGRI</h3>
+        <h3 className="text-sm font-semibold text-frmt-green">Procédure administrative</h3>
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",

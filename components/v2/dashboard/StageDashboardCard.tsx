@@ -118,12 +118,7 @@ export function StageDashboardCard({
           <ServiceBadge ok={stage.has_hebergement} label="Hébergement" icon="🏨" />
           <ServiceBadge ok={stage.has_restauration} label="Resto" icon="🍽️" />
           <ServiceBadge ok={stage.has_terrains} label="Terrains" icon="🎾" />
-          <ServiceBadge
-            ok={stage.has_fos_agri}
-            label="Procédure administrative FOS AGRI"
-            icon="📄"
-            compact
-          />
+          <ServiceBadge ok={stage.has_fos_agri} label="Procédure administrative" icon="📄" />
         </div>
 
         <div className="stage-card-progress-wrap">

@@ -750,7 +750,7 @@ export async function getReservationsInfrastructure(options?: {
   );
 }
 
-/** Stage ids ayant au moins un PDF procédure FOS AGRI. */
+/** Stage ids ayant au moins un PDF procédure administrative. */
 export async function getStageIdsWithFosAgriDocuments(): Promise<Set<string>> {
   const ids = new Set<string>();
   const rows = await runSelect<{ stage_id: string }[]>("stage_fos_agri_documents", (c) =>
