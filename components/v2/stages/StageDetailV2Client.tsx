@@ -476,12 +476,18 @@ export function StageDetailV2Client({ id }: { id: string }) {
 
       const sync = await syncStageTerrainReservationsForStageAction(stage.id);
       if (sync.conflits.length > 0) {
+        const details = sync.conflits.slice(0, 3).join(" · ");
         toast(
-          `${sync.synced} réservé(s), ${sync.conflits.length} conflit(s): ${sync.conflits.join(", ")}`,
-          "warning"
+          `${sync.synced} réservé(s), ${sync.conflits.length} alerte(s) : ${details}${sync.conflits.length > 3 ? "…" : ""}`,
+          sync.synced > 0 ? "warning" : "error"
         );
       } else {
         toast(`${sync.synced} créneau(x) réservé(s)`, "success");
+      }
+
+      if (sync.synced > 0) {
+        const refreshed = await getStageDetailV2Action(stage.id);
+        if (refreshed) setStage(refreshed);
       }
 
       await syncStageLinkedViewsAction(stage.id);

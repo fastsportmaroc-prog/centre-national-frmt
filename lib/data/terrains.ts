@@ -286,24 +286,197 @@ async function enrichDispatchNames(rows: any[]): Promise<any[]> {
   }));
 }
 
+function normalizeCourtNomKey(nom: string): string {
+  return nom
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[—–-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findInfrastructureByNom(
+  infras: { id: string; nom: string }[],
+  nom: string
+): { id: string; nom: string } | null {
+  const key = normalizeCourtNomKey(nom);
+  if (!key) return null;
+  const exact = infras.find((i) => normalizeCourtNomKey(i.nom) === key);
+  if (exact) return exact;
+  const courtNum = key.match(/court\s*(\d+)/);
+  if (courtNum?.[1]) {
+    const num = courtNum[1];
+    const byNum = infras.find((i) => {
+      const k = normalizeCourtNomKey(i.nom);
+      return new RegExp(`court\\s*0*${num}\\b`).test(k);
+    });
+    if (byNum) return byNum;
+  }
+  return (
+    infras.find((i) => {
+      const k = normalizeCourtNomKey(i.nom);
+      return k.includes(key) || key.includes(k);
+    }) ?? null
+  );
+}
+
+/** Résout un besoin terrain vers l’id `infrastructures` (source des réservations V2). */
+export async function resolveInfrastructureIdForBesoin(
+  supabase: SupabaseClient,
+  besoin: TerrainBesoin
+): Promise<{ id: string | null; label: string }> {
+  const normalizeType = (t?: string) => {
+    const v = (t ?? "").toLowerCase();
+    if (v.includes("terrain") || v.includes("court")) return "court-tennis";
+    if (v.includes("fitness") || v.includes("physique")) return "salle-fitness";
+    if (v.includes("natation") || v.includes("piscine")) return "piscine";
+    if (v.includes("gym")) return "gymnase";
+    return v || "court-tennis";
+  };
+  const normalizeSurface = (s?: string) => {
+    const v = (s ?? "").toLowerCase();
+    if (v.includes("terre")) return "terre-battue";
+    if (v.includes("dur") || v.includes("hard")) return "dur";
+    if (v.includes("eau")) return "eau";
+    if (v.includes("indoor") || v.includes("interieur") || v.includes("intérieur")) return "intérieur";
+    return s ?? "autre";
+  };
+
+  const { data: allInfra } = await supabase
+    .from("infrastructures")
+    .select("id, nom, type, surface, capacite, actif")
+    .eq("actif", true);
+  const infras = (allInfra ?? []) as {
+    id: string;
+    nom: string;
+    type?: string;
+    surface?: string;
+    capacite?: number;
+  }[];
+
+  const direct = infras.find((i) => i.id === besoin.terrainId);
+  if (direct) return { id: direct.id, label: direct.nom };
+
+  const nomCandidates: string[] = [];
+  if (besoin.terrainNom?.trim()) nomCandidates.push(besoin.terrainNom.trim());
+
+  const { data: terrainRow } = await supabase
+    .from("terrains")
+    .select("id, nom, type, surface, capacite")
+    .eq("id", besoin.terrainId)
+    .maybeSingle();
+
+  if (terrainRow?.nom) nomCandidates.push(String(terrainRow.nom));
+
+  for (const nom of nomCandidates) {
+    const match = findInfrastructureByNom(infras, nom);
+    if (match) return { id: match.id, label: match.nom };
+  }
+
+  const createNom =
+    nomCandidates[0] ??
+    (terrainRow?.nom ? String(terrainRow.nom) : null) ??
+    `Court ${besoin.terrainId.slice(0, 8)}`;
+
+  const { data: created, error: createErr } = await supabase
+    .from("infrastructures")
+    .insert({
+      nom: createNom,
+      type: normalizeType(besoin.terrainType ?? terrainRow?.type),
+      surface: normalizeSurface(besoin.terrainSurface ?? terrainRow?.surface),
+      capacite: besoin.terrainCapacite ?? terrainRow?.capacite ?? 4,
+      actif: true,
+      statut: "disponible",
+    })
+    .select("id, nom")
+    .single();
+
+  if (createErr) {
+    console.warn("[resolveInfrastructureIdForBesoin]", createErr.message, besoin.terrainId);
+  }
+  if (created?.id) {
+    return { id: created.id as string, label: String(created.nom ?? createNom) };
+  }
+
+  return { id: null, label: nomCandidates[0] ?? besoin.terrainId };
+}
+
+function mergeTerrainBesoin(a: TerrainBesoin, b: TerrainBesoin): TerrainBesoin {
+  const jours = [...new Set([...(a.jours ?? []), ...(b.jours ?? [])])].sort();
+  const creneaux = [...new Set([...(a.creneaux ?? []), ...(b.creneaux ?? [])])] as Creneau[];
+  return {
+    ...a,
+    ...b,
+    jours: jours.length ? jours : b.jours ?? a.jours,
+    creneaux: creneaux.length ? creneaux : (["journee"] as Creneau[]),
+    mode: b.mode ?? a.mode,
+    joueurIds: b.joueurIds?.length ? b.joueurIds : a.joueurIds,
+  };
+}
+
+/** Corrige les ids terrain → infrastructure avant réservation. */
+export async function normalizeTerrainBesoinsForReservation(
+  supabase: SupabaseClient,
+  besoins: TerrainBesoin[]
+): Promise<{
+  besoins: TerrainBesoin[];
+  unresolved: { terrainId: string; label: string }[];
+}> {
+  const out: TerrainBesoin[] = [];
+  const unresolved: { terrainId: string; label: string }[] = [];
+  const indexByInfra = new Map<string, number>();
+
+  for (const raw of besoins) {
+    const { id, label } = await resolveInfrastructureIdForBesoin(supabase, raw);
+    if (!id) {
+      unresolved.push({ terrainId: raw.terrainId, label: label || raw.terrainNom || raw.terrainId });
+      continue;
+    }
+    const normalized: TerrainBesoin = {
+      ...raw,
+      terrainId: id,
+      terrainNom: label,
+    };
+    const existingIdx = indexByInfra.get(id);
+    if (existingIdx === undefined) {
+      indexByInfra.set(id, out.length);
+      out.push(normalized);
+    } else {
+      out[existingIdx] = mergeTerrainBesoin(out[existingIdx]!, normalized);
+    }
+  }
+  return { besoins: out, unresolved };
+}
+
+export function buildNotesWithTerrainsBesoins(
+  notes: string | null | undefined,
+  besoins: TerrainBesoin[]
+): string {
+  const stripped = stripTerrainsBesoinsFromNotes(notes);
+  if (!besoins.length) return stripped;
+  const meta = `[TERRAINS_BESOINS:${JSON.stringify(besoins)}]`;
+  return [stripped, meta].filter(Boolean).join(" ").trim();
+}
+
+export function formatTerrainReservationConflict(code: string): string {
+  if (code.endsWith("/introuvable")) {
+    const label = code.replace(/\/introuvable$/, "");
+    return `${label} : court non relié aux infrastructures (nom ou droits d’écriture)`;
+  }
+  const parts = code.split("/");
+  if (parts.length >= 3 && parts[parts.length - 1] === "insert_error") {
+    return `Impossible d’enregistrer ${parts[1]} (${parts[2]})`;
+  }
+  if (parts.length >= 3) {
+    return `Créneau occupé : ${parts[1]} ${parts[2]}`;
+  }
+  return code;
+}
+
 /* ─── LISTER TOUS LES TERRAINS ─── */
 export const getTerrains = async () => {
   const supabase = await getTerrainsSupabaseClient();
-  const { data, error } = await supabase
-    .from("terrains")
-    .select("*")
-    .eq("actif", true)
-    .order("ordre");
-  if (!error && (data?.length ?? 0) > 0) return data ?? [];
-
-  // Fallback compatibilité : utiliser la table historique "infrastructures"
-  // quand "terrains" n'est pas encore alimentée/migrée.
-  const { data: infra, error: infraErr } = await supabase
-    .from("infrastructures")
-    .select("id, nom, type, surface, capacite, actif")
-    .eq("actif", true)
-    .order("nom");
-  if (infraErr) throw asError(infraErr, "Erreur lecture infrastructures");
   const normalizeType = (t?: string) => {
     const v = (t ?? "").toLowerCase();
     if (v.includes("terrain") || v.includes("court")) return "court-tennis";
@@ -332,7 +505,14 @@ export const getTerrains = async () => {
     return n;
   };
 
-  return (infra ?? []).map((i: any, idx: number) => {
+  const { data: infra, error: infraErr } = await supabase
+    .from("infrastructures")
+    .select("id, nom, type, surface, capacite, actif")
+    .eq("actif", true)
+    .order("nom");
+  if (infraErr) throw asError(infraErr, "Erreur lecture infrastructures");
+
+  const fromInfra = (infra ?? []).map((i: any, idx: number) => {
     const surface = normalizeSurface(i.surface);
     return {
       id: i.id,
@@ -344,6 +524,15 @@ export const getTerrains = async () => {
       ordre: idx + 1,
     };
   });
+  if (fromInfra.length > 0) return fromInfra;
+
+  const { data, error } = await supabase
+    .from("terrains")
+    .select("*")
+    .eq("actif", true)
+    .order("ordre");
+  if (!error && (data?.length ?? 0) > 0) return data ?? [];
+  return fromInfra;
 };
 
 /* ─── OCCUPATION GLOBALE ─── */
@@ -718,44 +907,8 @@ export const reserverTerrains = async (stage: any): Promise<{
   // Rubrique Réservations V2 lit `reservations_infrastructure` — toujours persister ici en priorité.
   const useLegacyReservations = true;
   const ensureLegacyInfrastructureId = async (besoin: TerrainBesoin): Promise<string | null> => {
-    // 1) ID déjà valide côté infrastructures
-    const { data: infraById } = await supabase
-      .from("infrastructures")
-      .select("id")
-      .eq("id", besoin.terrainId)
-      .maybeSingle();
-    if (infraById?.id) return infraById.id as string;
-
-    // 2) Résolution via table terrains + nom
-    const { data: terrainRow } = await supabase
-      .from("terrains")
-      .select("id, nom, type, surface, capacite")
-      .eq("id", besoin.terrainId)
-      .maybeSingle();
-    const terrainNom = besoin.terrainNom ?? terrainRow?.nom ?? null;
-    if (terrainNom) {
-      const { data: infraByName } = await supabase
-        .from("infrastructures")
-        .select("id")
-        .eq("nom", terrainNom)
-        .maybeSingle();
-      if (infraByName?.id) return infraByName.id as string;
-    }
-
-    // 3) Créer l'infrastructure manquante et retourner son id
-    const { data: created } = await supabase
-      .from("infrastructures")
-      .insert({
-        nom: terrainNom ?? `Terrain ${besoin.terrainId.slice(0, 8)}`,
-        type: normalizeType(besoin.terrainType ?? terrainRow?.type),
-        surface: normalizeSurface(besoin.terrainSurface ?? terrainRow?.surface),
-        capacite: besoin.terrainCapacite ?? terrainRow?.capacite ?? 4,
-        actif: true,
-        statut: "disponible",
-      })
-      .select("id")
-      .single();
-    return (created?.id as string | undefined) ?? null;
+    const { id } = await resolveInfrastructureIdForBesoin(supabase, besoin);
+    return id;
   };
   const saveLegacyDispatch = async (
     reservationId: string,
@@ -792,7 +945,8 @@ export const reserverTerrains = async (stage: any): Promise<{
       ? await ensureLegacyInfrastructureId(besoin)
       : await ensureTerrainExists(besoin);
     if (!terrainIdToUse) {
-      conflits.push(`${besoin.terrainId}/introuvable`);
+      const label = besoin.terrainNom?.trim() || besoin.terrainId;
+      conflits.push(`${label}/introuvable`);
       continue;
     }
     const creneauxEffectifs: Creneau[] =
@@ -1416,10 +1570,17 @@ export async function ensureStageTerrainReservations(
     date_fin: string;
     notes?: string | null;
     terrains?: boolean | null;
-  }
-): Promise<{ ok: string[]; conflits: string[]; skipped?: boolean }> {
+  },
+  options?: { supabase?: SupabaseClient }
+): Promise<{
+  ok: string[];
+  conflits: string[];
+  skipped?: boolean;
+  notesRewritten?: string;
+  unresolved?: { terrainId: string; label: string }[];
+}> {
+  const supabase = options?.supabase ?? (await getTerrainsSupabaseClient());
   let besoins = parseTerrainsBesoinsFromNotes(stage.notes);
-  const supabase = await getTerrainsSupabaseClient();
 
   if (!besoins?.length) {
     besoins = await inferTerrainsBesoinsFromInfrastructure(supabase, stage.id);
@@ -1429,11 +1590,29 @@ export async function ensureStageTerrainReservations(
     return { ok: [], conflits: [], skipped: true };
   }
 
-  const normalized = besoins.map((b) => ({
+  const withDefaults = besoins.map((b) => ({
     ...b,
     creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
     mode: b.mode ?? "stage",
   }));
+
+  const { besoins: normalized, unresolved } = await normalizeTerrainBesoinsForReservation(
+    supabase,
+    withDefaults
+  );
+
+  const conflitsFromUnresolved = unresolved.map((u) => `${u.label}/introuvable`);
+
+  if (!normalized.length) {
+    return {
+      ok: [],
+      conflits: conflitsFromUnresolved,
+      unresolved,
+      notesRewritten: buildNotesWithTerrainsBesoins(stage.notes, []),
+    };
+  }
+
+  const notesRewritten = buildNotesWithTerrainsBesoins(stage.notes, normalized);
 
   await upgradePartialCreneauxToJournee(supabase, stage, normalized);
 
@@ -1445,7 +1624,12 @@ export async function ensureStageTerrainReservations(
     besoins: { terrains: normalized },
   });
 
-  return { ok, conflits };
+  return {
+    ok,
+    conflits: [...conflitsFromUnresolved, ...conflits],
+    unresolved: unresolved.length ? unresolved : undefined,
+    notesRewritten,
+  };
 }
 
 /** Recrée les réservations terrain depuis les métadonnées `[TERRAINS_BESOINS:…]` du stage. */
@@ -1510,14 +1694,20 @@ export async function resyncAllStageTerrainsFromNotes(
     if (!shouldSync) continue;
 
     processed++;
-    const { ok, skipped } = await ensureStageTerrainReservations({
-      id: s.id,
-      stage_action: s.stage_action,
-      date_debut: s.date_debut,
-      date_fin: s.date_fin,
-      notes: s.notes,
-      terrains: s.terrains,
-    });
+    const { ok, skipped, notesRewritten } = await ensureStageTerrainReservations(
+      {
+        id: s.id,
+        stage_action: s.stage_action,
+        date_debut: s.date_debut,
+        date_fin: s.date_fin,
+        notes: s.notes,
+        terrains: s.terrains,
+      },
+      { supabase }
+    );
+    if (notesRewritten && notesRewritten !== (s.notes ?? "").trim()) {
+      await supabase.from("stages_programme").update({ notes: notesRewritten }).eq("id", s.id);
+    }
     if (!skipped && ok.length > 0) synced++;
   }
   return { synced, processed, planningUpserted };

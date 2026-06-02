@@ -3,6 +3,7 @@
 import {
   cleanupDuplicateMatinWhenJourneeExists,
   ensureStageTerrainReservations,
+  formatTerrainReservationConflict,
   resyncAllStageTerrainsFromNotes,
   syncReservationsFromPlanning,
 } from "@/lib/data/terrains";
@@ -57,23 +58,30 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
 
   await syncReservationsFromPlanning(supabase, { stageId });
 
-  const { ok, conflits } = await ensureStageTerrainReservations({
-    id: stage.id,
-    stage_action: stage.stage_action,
-    date_debut: stage.date_debut,
-    date_fin: stage.date_fin,
-    notes: stage.notes,
-    terrains: stage.terrains,
-  });
+  const { ok, conflits, notesRewritten } = await ensureStageTerrainReservations(
+    {
+      id: stage.id,
+      stage_action: stage.stage_action,
+      date_debut: stage.date_debut,
+      date_fin: stage.date_fin,
+      notes: stage.notes,
+      terrains: stage.terrains,
+    },
+    { supabase }
+  );
 
-  await updateStageServer(stageId, { terrains: true });
+  const stagePatch: { terrains: boolean; notes?: string } = { terrains: true };
+  if (notesRewritten && notesRewritten !== (stage.notes ?? "").trim()) {
+    stagePatch.notes = notesRewritten;
+  }
+  await updateStageServer(stageId, stagePatch);
   const cleaned = await cleanupDuplicateMatinWhenJourneeExists();
   revalidateStageReservationPaths(stageId);
 
   return {
     ok: true,
     synced: ok.length,
-    conflits,
+    conflits: conflits.map(formatTerrainReservationConflict),
     cleaned,
     error: conflits.length > 0 ? `${conflits.length} conflit(s) terrain` : undefined,
   };
