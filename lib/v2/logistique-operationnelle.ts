@@ -142,7 +142,7 @@ export function calcFacturationClub(
   const joursStage = countDaysInclusive(input.stage.date_debut, input.stage.date_fin);
   const heuresTerrains = input.planning.length * 4;
   const montantTerrains = input.stage.terrains
-    ? computeTerrainsPrevuMad(joursStage, true)
+    ? computeTerrainsPrevuMad(joursStage, true, tarifs)
     : heuresTerrains * 150;
 
   return {

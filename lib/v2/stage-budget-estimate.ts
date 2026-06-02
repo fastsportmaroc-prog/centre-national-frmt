@@ -40,7 +40,7 @@ export function computeStageBudgetEstimateMad(input: {
   const restauration = input.restauration
     ? computeRestaurationStagePrevuMad(input.restauration, tarifs)
     : 0;
-  const terrains = computeTerrainsPrevuMad(jours, input.terrainsActif);
+  const terrains = computeTerrainsPrevuMad(jours, input.terrainsActif, tarifs);
 
   return {
     hebergement,

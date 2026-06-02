@@ -499,4 +499,6 @@ export type TarifsBudgetSettings = {
   prix_diner_mad: number;
   prix_chambre_single_mad: number;
   prix_chambre_double_mad: number;
+  /** Tarif forfait par jour de stage avec terrains réservés. */
+  prix_terrain_jour_mad: number;
 };

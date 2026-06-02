@@ -41,9 +41,12 @@ export function computeRestaurationStagePrevuMad(
   return computeRestaurationPrevuMad(totals.pdj, totals.dej, totals.diner, tarifs);
 }
 
-/** Estimation terrains (pas encore paramétrable). */
-export const TARIF_TERRAIN_JOUR_MAD = 800;
-
-export function computeTerrainsPrevuMad(jours: number, actif: boolean): number {
-  return actif ? Math.max(0, jours) * TARIF_TERRAIN_JOUR_MAD : 0;
+/** Estimation terrains : jours du stage × tarif/jour (Paramètres). */
+export function computeTerrainsPrevuMad(
+  jours: number,
+  actif: boolean,
+  tarifs: TarifsBudgetSettings = BUDGET_TARIFS_DEFAULTS
+): number {
+  if (!actif) return 0;
+  return Math.max(0, jours) * Math.max(0, tarifs.prix_terrain_jour_mad);
 }

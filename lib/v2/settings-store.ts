@@ -15,6 +15,7 @@ export const BUDGET_TARIFS_DEFAULTS: TarifsBudgetSettings = {
   prix_diner_mad: 140,
   prix_chambre_single_mad: 600,
   prix_chambre_double_mad: 850,
+  prix_terrain_jour_mad: 0,
 };
 
 export const TARIFS_BUDGET_CHANGED_EVENT = "frmt-v2:tarifs-budget-changed";

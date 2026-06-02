@@ -39,8 +39,8 @@ export function ParametresV2Client() {
         <Card className="space-y-4 p-4">
           <h2 className="font-semibold">Tarifs budget prévisionnel</h2>
           <p className="text-sm text-muted">
-            Tarifs Centre National (hébergement et restauration), indépendants du budget voyages /
-            compétitions.
+            Tarifs Centre National (hébergement, restauration et terrains), indépendants du budget
+            voyages / compétitions.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -111,6 +111,24 @@ export function ParametresV2Client() {
                   })
                 }
               />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Terrain / jour de stage (MAD)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                step="0.01"
+                value={tarifsBudget.prix_terrain_jour_mad}
+                onChange={(e) =>
+                  setTarifsBudget({
+                    ...tarifsBudget,
+                    prix_terrain_jour_mad: Number(e.target.value) || 0,
+                  })
+                }
+              />
+              <p className="mt-1 text-xs text-muted">
+                Appliqué à chaque jour du stage lorsque l&apos;onglet Terrains est actif (Budget).
+              </p>
             </div>
           </div>
           <Button type="button" onClick={handleSaveBudget}>

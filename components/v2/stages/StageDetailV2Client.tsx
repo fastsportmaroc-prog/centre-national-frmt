@@ -1084,7 +1084,8 @@ export function StageDetailV2Client({ id }: { id: string }) {
                 {tarifsBudget.prix_dejeuner_mad.toLocaleString("fr-FR")} MAD, Dîner:{" "}
                 {tarifsBudget.prix_diner_mad.toLocaleString("fr-FR")} MAD, Single:{" "}
                 {tarifsBudget.prix_chambre_single_mad.toLocaleString("fr-FR")} MAD, Double:{" "}
-                {tarifsBudget.prix_chambre_double_mad.toLocaleString("fr-FR")} MAD.
+                {tarifsBudget.prix_chambre_double_mad.toLocaleString("fr-FR")} MAD, Terrain/jour:{" "}
+                {tarifsBudget.prix_terrain_jour_mad.toLocaleString("fr-FR")} MAD.
               </p>
               <dl className="grid max-w-md gap-2 text-sm">
                 <div className="flex justify-between border-b border-[var(--border)] py-2">
