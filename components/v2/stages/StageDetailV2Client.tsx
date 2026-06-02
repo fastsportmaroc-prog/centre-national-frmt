@@ -14,6 +14,8 @@ import { StageHebergementSection } from "@/components/v2/stages/StageHebergement
 import { StageKinesitherapieSection } from "@/components/v2/stages/StageKinesitherapieSection";
 import { StageParticipantsAssign } from "@/components/v2/stages/StageParticipantsAssign";
 import { getStageHebergementAction } from "@/lib/actions/stage-hebergement-actions";
+import { getStageRepasPrevusCountAction } from "@/lib/actions/stage-logistique-participants-actions";
+import { RestaurationTab } from "@/components/v2/stages/tabs/RestaurationTab";
 import { getStageDetailV2Action } from "@/lib/actions/stage-detail-actions";
 import { getStageParticipantsAction } from "@/lib/actions/stage-participants-actions";
 import {
@@ -401,6 +403,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
 
       const eauTag = `[EAU:${restMeals.eau ? "oui" : "non"}]`;
       const remarques = `${restNotes.trim()} ${eauTag}`.trim();
+      const accurateRepas = await getStageRepasPrevusCountAction(stage.id).catch(() => 0);
       const payload = {
         stage_id: stage.id,
         petit_dejeuner: restMeals.pdj,
@@ -409,7 +412,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
         date_debut: restDates.debut || stage.date_debut,
         date_fin: restDates.fin || stage.date_fin,
         nb_personnes: restPersons,
-        total_repas: totalRepasCalc,
+        total_repas: accurateRepas > 0 ? accurateRepas : totalRepasCalc,
         remarques,
         statut: restauration?.statut ?? "prevu",
       };
@@ -694,19 +697,20 @@ export function StageDetailV2Client({ id }: { id: string }) {
               />
             )}
 
-            {tab === "restauration" && (
-              <div className="space-y-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={restaurationActive}
-                    onChange={(e) => setRestaurationActive(e.target.checked)}
-                  />
-                  Restauration active pour ce stage
-                </label>
-
-                {restaurationActive ? (
-                  <>
+            {tab === "restauration" && stage && (
+              <RestaurationTab
+                stageId={stage.id}
+                stageDateDebut={stage.date_debut}
+                stageDateFin={stage.date_fin}
+                active={restaurationActive}
+                onActiveChange={setRestaurationActive}
+                disabled={!canManageParticipants}
+                toast={toast}
+                legacyFooter={
+                  <div className="space-y-3 border-t border-[var(--border)] pt-4">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-muted)]">
+                      Fiche restauration (synthèse & facturation)
+                    </p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
                         <Label>Date début restauration</Label>
@@ -725,74 +729,36 @@ export function StageDetailV2Client({ id }: { id: string }) {
                         />
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-4">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={restMeals.pdj}
-                          onChange={(e) => setRestMeals((m) => ({ ...m, pdj: e.target.checked }))}
-                        />
-                        Petit-déjeuner
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={restMeals.dej}
-                          onChange={(e) => setRestMeals((m) => ({ ...m, dej: e.target.checked }))}
-                        />
-                        Déjeuner
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={restMeals.din}
-                          onChange={(e) => setRestMeals((m) => ({ ...m, din: e.target.checked }))}
-                        />
-                        Dîner
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={restMeals.eau}
-                          onChange={(e) => setRestMeals((m) => ({ ...m, eau: e.target.checked }))}
-                        />
-                        Eau incluse
-                      </label>
-                    </div>
-
-                    <div className="rounded-md border border-[var(--border)] bg-[var(--bg-main)] p-3">
-                      <p>
-                        {restPersons} personne(s) · {mealCountPerPerson} repas/jour · {restDays} jour(s)
-                      </p>
-                      <p className="font-medium">
-                        Total repas: {totalRepasCalc}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Calcul demandé: 1 repas par personne pour chaque option cochée (PDJ/Déj/Dîner).
-                      </p>
-                    </div>
-
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={restMeals.eau}
+                        onChange={(e) => setRestMeals((m) => ({ ...m, eau: e.target.checked }))}
+                      />
+                      Eau incluse
+                    </label>
                     <div>
-                      <Label>Remarques restauration</Label>
+                      <Label>Remarques</Label>
                       <Input
                         value={restNotes}
                         onChange={(e) => setRestNotes(e.target.value)}
-                        placeholder="Ex: allergie, régime spécial..."
+                        placeholder="Allergies, régimes…"
                       />
                     </div>
-
-                    <Button onClick={() => void saveRestaurationAndFacture()} disabled={savingRestauration}>
-                      {savingRestauration ? "Enregistrement..." : "Enregistrer restauration"}
-                    </Button>
-                    <Link href={`/v2/restauration?stage=${stage.id}`}>
-                      <Button variant="secondary">Ouvrir rubrique Restauration</Button>
-                    </Link>
-                  </>
-                ) : (
-                  <p className="text-muted">Restauration non configurée</p>
-                )}
-              </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => void saveRestaurationAndFacture()}
+                        disabled={savingRestauration}
+                      >
+                        {savingRestauration ? "Enregistrement…" : "Enregistrer fiche restauration"}
+                      </Button>
+                      <Link href={`/v2/restauration?stage=${stage.id}`}>
+                        <Button variant="secondary">Rubrique Restauration</Button>
+                      </Link>
+                    </div>
+                  </div>
+                }
+              />
             )}
 
             {tab === "terrains" && (

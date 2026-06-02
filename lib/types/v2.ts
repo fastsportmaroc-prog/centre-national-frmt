@@ -43,6 +43,43 @@ export type HebergementParticipantDates = {
   note?: string;
 };
 
+export type StageLogistiqueParticipantType = "joueur" | "coach";
+
+export type HebergementParticipantRow = {
+  id?: string;
+  stage_id: string;
+  participant_id: string;
+  participant_type: StageLogistiqueParticipantType;
+  heberge: boolean;
+  date_arrivee: string;
+  date_depart: string;
+  chambre_id?: string | null;
+  statut: "confirmé" | "en attente" | "annulé";
+  nom?: string;
+  prenom?: string;
+  meta?: string;
+  chambre_nom?: string;
+};
+
+export type JourRepasStage = {
+  date: string;
+  petit_dejeuner: boolean;
+  dejeuner: boolean;
+  diner: boolean;
+};
+
+export type ParticipantMealOverride = {
+  id?: string;
+  participant_id: string;
+  participant_type: StageLogistiqueParticipantType;
+  date: string;
+  petit_dejeuner: boolean | null;
+  dejeuner: boolean | null;
+  diner: boolean | null;
+  nom?: string;
+  prenom?: string;
+};
+
 export type HebergementStageV2 = {
   id: string;
   stage_id: string;

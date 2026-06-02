@@ -16,7 +16,7 @@ import {
   totalChambresFromForm,
 } from "@/lib/v2/stage-hebergement-form";
 import { countNightsHebergement } from "@/lib/v2/stage-calculations";
-import { StageHebergementParticipantsDates } from "@/components/v2/stages/StageHebergementParticipantsDates";
+import { HebergementParticipantsTab } from "@/components/v2/stages/tabs/HebergementParticipantsTab";
 import type {
   EntraineurV2,
   HebergementStageV2,
@@ -297,26 +297,13 @@ export function StageHebergementSection({
               </div>
 
               <div className="rounded-lg border border-dashed border-[var(--border)] p-3">
-                <Toggle
-                  label="Dates d'hébergement différentes par participant (arrivée tardive / départ anticipé)"
-                  checked={form.dates_participants_actif}
-                  onChange={(dates_participants_actif) =>
-                    setForm({ ...form, dates_participants_actif })
-                  }
+                <HebergementParticipantsTab
+                  stageId={stage.id}
+                  stageDateDebut={form.date_debut}
+                  stageDateFin={form.date_fin}
+                  disabled={!canManage}
+                  toast={toast}
                 />
-                {form.dates_participants_actif && (
-                  <div className="mt-3">
-                    <StageHebergementParticipantsDates
-                      form={form}
-                      joueurs={joueurs}
-                      coachs={coachs}
-                      disabled={!canManage}
-                      onChange={(participants_dates) =>
-                        setForm({ ...form, participants_dates })
-                      }
-                    />
-                  </div>
-                )}
               </div>
 
               <div>
