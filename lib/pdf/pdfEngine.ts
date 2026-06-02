@@ -33,6 +33,23 @@ export class FRMTPdfEngine {
   pageNumber = 1;
   documentTitle: string;
 
+  /** Dimensions réelles de la page (portrait ou paysage). */
+  private pageLayout() {
+    const pageW = this.doc.internal.pageSize.getWidth();
+    const pageH = this.doc.internal.pageSize.getHeight();
+    const { marginLeft, marginRight, marginTop, marginBottom, ...sizes } = PDF_SIZES;
+    return {
+      ...sizes,
+      pageW,
+      pageH,
+      marginLeft,
+      marginRight,
+      marginTop,
+      marginBottom,
+      contentW: pageW - marginLeft - marginRight,
+    };
+  }
+
   constructor(title: string, orientation: "portrait" | "landscape" = "portrait") {
     this.documentTitle = title;
     this.doc = new jsPDF({
@@ -56,7 +73,7 @@ export class FRMTPdfEngine {
     documentType: string;
     logoBase64?: string;
   }) {
-    const { marginLeft, marginRight, contentW, pageW } = PDF_SIZES;
+    const { marginLeft, marginRight, contentW, pageW } = this.pageLayout();
     const doc = this.doc;
 
     setFillHex(doc, PDF_COLORS.primary);
@@ -122,7 +139,7 @@ export class FRMTPdfEngine {
   }
 
   drawFooter(pageNum: number, totalPages: number) {
-    const { pageW, pageH, marginLeft, marginRight } = PDF_SIZES;
+    const { pageW, pageH, marginLeft, marginRight } = this.pageLayout();
     const doc = this.doc;
     const y = pageH - 12;
 
@@ -151,7 +168,7 @@ export class FRMTPdfEngine {
 
   sectionTitle(title: string, icon?: string) {
     this.checkPageBreak(14);
-    const { marginLeft, contentW } = PDF_SIZES;
+    const { marginLeft, contentW } = this.pageLayout();
     const doc = this.doc;
 
     setFillHex(doc, PDF_COLORS.tableHeader);
@@ -168,7 +185,7 @@ export class FRMTPdfEngine {
   }
 
   infoGrid(items: Array<{ label: string; value: string }>, columns = 2) {
-    const { marginLeft, contentW, fontSmall, fontBody } = PDF_SIZES;
+    const { marginLeft, contentW, fontSmall, fontBody } = this.pageLayout();
     const doc = this.doc;
     const colW = contentW / columns;
     const rowH = 7;
@@ -213,12 +230,16 @@ export class FRMTPdfEngine {
     statusColIndex?: number;
   }) {
     const { marginLeft, contentW, tableHeaderH, tableRowH, fontSmall, fontBody, tablePadX } =
-      PDF_SIZES;
+      this.pageLayout();
     const doc = this.doc;
     const headers = params.headers;
     const totalCols = headers.length;
     const defaultColW = contentW / totalCols;
-    const colWidths = params.colWidths ?? headers.map(() => defaultColW);
+    let colWidths = params.colWidths ?? headers.map(() => defaultColW);
+    const widthSum = colWidths.reduce((acc, w) => acc + w, 0);
+    if (widthSum > 0 && Math.abs(widthSum - contentW) > 0.01) {
+      colWidths = colWidths.map((w) => (w / widthSum) * contentW);
+    }
 
     this.checkPageBreak(tableHeaderH + 2);
     setFillHex(doc, params.headerBg ?? PDF_COLORS.tableHeader);
@@ -290,7 +311,7 @@ export class FRMTPdfEngine {
 
   kpiRow(items: Array<{ label: string; value: string; color?: string }>) {
     this.checkPageBreak(18);
-    const { marginLeft, contentW } = PDF_SIZES;
+    const { marginLeft, contentW } = this.pageLayout();
     const doc = this.doc;
     const itemW = contentW / items.length;
 
@@ -320,7 +341,7 @@ export class FRMTPdfEngine {
 
   paragraph(text: string) {
     this.checkPageBreak(12);
-    const { marginLeft, contentW, fontBody } = PDF_SIZES;
+    const { marginLeft, contentW, fontBody } = this.pageLayout();
     const doc = this.doc;
     doc.setFont(PDF_FONTS.body, "normal");
     doc.setFontSize(fontBody);
@@ -331,7 +352,7 @@ export class FRMTPdfEngine {
   }
 
   checkPageBreak(neededHeight: number) {
-    const { pageH, marginBottom, marginTop } = PDF_SIZES;
+    const { pageH, marginBottom, marginTop } = this.pageLayout();
     if (this.currentY + neededHeight > pageH - marginBottom) {
       const total = this.doc.getNumberOfPages();
       this.drawFooter(this.pageNumber, total);
@@ -343,7 +364,7 @@ export class FRMTPdfEngine {
   }
 
   drawCompactHeader() {
-    const { pageW, marginLeft } = PDF_SIZES;
+    const { pageW, marginLeft } = this.pageLayout();
     setFillHex(this.doc, PDF_COLORS.primary);
     this.doc.rect(0, 0, pageW, 2, "F");
     this.doc.setFont(PDF_FONTS.body, "italic");

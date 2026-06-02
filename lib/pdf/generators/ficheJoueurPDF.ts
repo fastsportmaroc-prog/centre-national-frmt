@@ -17,7 +17,7 @@ export async function generateFicheJoueurPDF(
   filtres?: string
 ): Promise<void> {
   const logo = await loadPdfLogoBase64();
-  const engine = new FRMTPdfEngine("Liste des joueurs");
+  const engine = new FRMTPdfEngine("Liste des joueurs", "landscape");
   engine.drawHeader({
     documentType: "FICHE JOUEURS",
     stageName: "Effectif national",
@@ -34,6 +34,7 @@ export async function generateFicheJoueurPDF(
     safePdfCell(row["Catégorie"] ?? row.Categorie ?? row.categorie),
     safePdfCell(row["Né le"] ?? row.naissance),
     safePdfCell(row["Âge"] ?? row.Age ?? row.age ?? ageFromBirthdate(String(row.naissance ?? ""))),
+    safePdfCell(row.Classement ?? row.classement ?? "—"),
     safePdfCell(row.Club ?? row.club),
     formatStatutPdf(String(row.Statut ?? row.statut ?? "actif")),
   ]);
@@ -45,9 +46,9 @@ export async function generateFicheJoueurPDF(
 
   engine.sectionTitle("Liste des joueurs");
   engine.table({
-    headers: ["#", "Nom", "Prénom", "Sexe", "Cat.", "Né le", "Âge", "Club", "Statut"],
-    colWidths: [10, 28, 28, 14, 18, 24, 12, 38, 20],
-    statusColIndex: 8,
+    headers: ["#", "Nom", "Prénom", "Sexe", "Cat.", "Né le", "Âge", "Cl.", "Club", "Statut"],
+    colWidths: [10, 36, 36, 12, 22, 24, 12, 22, 58, 24],
+    statusColIndex: 9,
     rows,
   });
 

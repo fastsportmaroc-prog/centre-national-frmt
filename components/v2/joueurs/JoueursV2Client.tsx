@@ -519,6 +519,7 @@ export function JoueursV2Client() {
         Catégorie: getJoueurDisplayCategorie(j),
         "Né le": j.date_naissance ?? "—",
         Âge: String(calcAge(j.date_naissance) ?? "—"),
+        Classement: j.classement ?? "—",
         Club: (j as { club?: string }).club ?? "—",
         Statut: j.statut ?? "actif",
       })),
@@ -738,14 +739,16 @@ export function JoueursV2Client() {
           </div>
         ) : (
           <Card className="overflow-hidden border border-border/80">
-            <div className="flex items-center justify-between border-b border-border bg-surface-elevated/80 px-4 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-elevated/80 px-4 py-2">
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
                 Annuaire — {filtered.length} joueur{filtered.length !== 1 ? "s" : ""}
               </p>
-              <p className="text-xs text-muted">Cliquez sur un nom pour ouvrir la fiche</p>
+              <p className="text-xs text-muted">
+                Cliquez sur un nom pour ouvrir la fiche · faites défiler horizontalement si besoin
+              </p>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[72rem] text-sm">
               <thead className="sticky top-0 z-10 bg-surface-elevated shadow-sm">
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                   <th className="p-3 w-10">
@@ -761,17 +764,17 @@ export function JoueursV2Client() {
                     )}
                   </th>
                   <th className="p-3 w-12" />
-                  <th className="p-3">Nom</th>
-                  <th className="p-3">Prénom</th>
-                  <th className="p-3">Sexe</th>
-                  <th className="p-3">Catégorie</th>
-                  <th className="p-3">Âge</th>
-                  <th className="p-3">Classement</th>
-                  <th className="p-3">Club</th>
-                  <th className="p-3 text-center">Stages</th>
-                  <th className="p-3">Dossier</th>
-                  <th className="p-3">Statut</th>
-                  <th className="p-3 w-24" />
+                  <th className="p-3 whitespace-nowrap">Nom</th>
+                  <th className="p-3 whitespace-nowrap">Prénom</th>
+                  <th className="p-3 whitespace-nowrap">Sexe</th>
+                  <th className="p-3 whitespace-nowrap">Catégorie</th>
+                  <th className="p-3 whitespace-nowrap">Âge</th>
+                  <th className="p-3 whitespace-nowrap">Classement</th>
+                  <th className="p-3 whitespace-nowrap min-w-[8rem]">Club</th>
+                  <th className="p-3 text-center whitespace-nowrap">Stages</th>
+                  <th className="p-3 whitespace-nowrap">Dossier</th>
+                  <th className="p-3 whitespace-nowrap min-w-[7rem]">Statut</th>
+                  <th className="p-3 w-24 shrink-0" />
                 </tr>
               </thead>
               <tbody>
@@ -802,12 +805,12 @@ export function JoueursV2Client() {
                         size="sm"
                       />
                     </td>
-                    <td className="p-3">
+                    <td className="p-3 whitespace-nowrap">
                       <Link href={`/v2/joueurs/${j.id}`} className="font-medium hover:text-frmt-green">
                         {j.nom}
                       </Link>
                     </td>
-                    <td className="p-3">{j.prenom}</td>
+                    <td className="p-3 whitespace-nowrap">{j.prenom}</td>
                     <td className="p-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${sexeBadgeClass(j.sexe)}`}
@@ -817,8 +820,10 @@ export function JoueursV2Client() {
                     </td>
                     <td className="p-3">{getJoueurDisplayCategorie(j)}</td>
                     <td className="p-3">{calcAge(j.date_naissance) ?? "—"}</td>
-                    <td className="p-3">{j.classement ?? "—"}</td>
-                    <td className="p-3">{j.club ?? "—"}</td>
+                    <td className="p-3 whitespace-nowrap tabular-nums">{j.classement ?? "—"}</td>
+                    <td className="p-3 max-w-[12rem] truncate" title={j.club ?? undefined}>
+                      {j.club ?? "—"}
+                    </td>
                     <td className="p-3 text-center tabular-nums">
                       <span className="inline-flex min-w-[1.5rem] justify-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300">
                         {stageCounts[j.id] ?? 0}
@@ -834,11 +839,11 @@ export function JoueursV2Client() {
                         <span className="text-xs text-amber-300">À compléter</span>
                       )}
                     </td>
-                    <td className="p-3">
+                    <td className="p-3 whitespace-nowrap">
                       {canManageJoueurs ? (
                         <Select
                           value={inlineEdits[j.id]?.statut ?? (j.statut ?? "actif")}
-                          className="h-8 text-xs"
+                          className="h-8 min-w-[6.5rem] text-xs"
                           disabled={!!savingInline[j.id]}
                           onChange={(e) => {
                             const next = e.target.value;
