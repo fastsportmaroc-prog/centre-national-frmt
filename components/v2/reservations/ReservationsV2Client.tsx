@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRole } from "@/lib/hooks/useRole";
-import { format, startOfMonth, endOfMonth } from "date-fns";
-import { fr } from "date-fns/locale";
-import { FileDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { FileDown, Plus } from "lucide-react";
 import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,10 +14,8 @@ import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import { exportReservationsPDF } from "@/lib/pdf/pdf-exports";
 import { syncPlanningAfterReservationChangeAction } from "@/lib/actions/reservation-planning-sync";
-import {
-  fullReconcileReservationsAction,
-  loadReservationsPageAction,
-} from "@/lib/actions/reservations-page-actions";
+import { loadReservationsPlannerAction } from "@/lib/actions/reservations-planner-actions";
+import { fullReconcileReservationsAction } from "@/lib/actions/reservations-page-actions";
 import {
   createReservationInfrastructure,
   deleteReservationInfrastructure,
@@ -27,23 +24,35 @@ import {
   updateReservationInfrastructure,
 } from "@/lib/supabase/queries";
 import type { CreneauReservationV2, InfrastructureV2, ReservationEnrichedV2 } from "@/lib/types/v2";
+import type { PlanningSlotEnriched } from "@/lib/v2/reservations-planner-types";
+import {
+  analyzePlannerConflicts,
+  conflictKindLabel,
+} from "@/lib/v2/reservations-planning-conflicts";
+import {
+  daysInPlannerRange,
+  resolvePlannerRange,
+  shiftPlannerPivot,
+  type PlannerPeriodMode,
+  type PlannerViewMode,
+} from "@/lib/v2/reservations-planner";
 import {
   CRENEAU_OPTIONS,
   buildReservationDateTimes,
   conflictStageNames,
   dedupeReservationsForDisplay,
-  detectConflicts,
   formatDateHeader,
-  getCreneauInfoForReservation,
-  infraLine,
-  loadRangeForReservations,
-  matchPeriode,
   normalizeStatut,
   parseReservationDate,
   resolveCreneauType,
   type CreneauType,
-  type PeriodeFilter,
 } from "@/lib/v2/reservations-utils";
+import { ReservationCard } from "@/components/v2/reservations/ReservationCard";
+import { ReservationsConflictPanel } from "@/components/v2/reservations/ReservationsConflictPanel";
+import { ReservationsMonthCalendar } from "@/components/v2/reservations/ReservationsMonthCalendar";
+import { ReservationsPlannerToolbar } from "@/components/v2/reservations/ReservationsPlannerToolbar";
+import { ReservationsWeekGrid } from "@/components/v2/reservations/ReservationsWeekGrid";
+import { ReservationsYearOverview } from "@/components/v2/reservations/ReservationsYearOverview";
 import { cn } from "@/lib/utils/cn";
 
 type ManualForm = {
@@ -62,26 +71,30 @@ type EditForm = {
   notes: string;
 };
 
-const PERIODE_OPTIONS: { value: PeriodeFilter; label: string }[] = [
-  { value: "week", label: "Cette semaine" },
-  { value: "month", label: "Ce mois" },
-  { value: "next_month", label: "Mois prochain" },
-  { value: "all", label: "Tout" },
-];
-
-function stageLine(r: ReservationEnrichedV2): string {
-  return r.stage_nom ? `📋 ${r.stage_nom}` : "📋 —";
+function reservationConflictLabel(
+  r: ReservationEnrichedV2,
+  all: ReservationEnrichedV2[],
+  terrainIds: Set<string>,
+  plannerMessages: Map<string, string>
+): string {
+  if (plannerMessages.has(r.id)) return plannerMessages.get(r.id)!;
+  if (terrainIds.has(r.id)) return conflictStageNames(r, all, terrainIds);
+  return "";
 }
 
 export function ReservationsV2Client() {
   const { toast } = useToast();
   const { isAdmin } = useRole();
   const [items, setItems] = useState<ReservationEnrichedV2[]>([]);
+  const [planning, setPlanning] = useState<PlanningSlotEnriched[]>([]);
   const [stages, setStages] = useState<Awaited<ReturnType<typeof getStages>>>([]);
   const [infrastructures, setInfrastructures] = useState<InfrastructureV2[]>([]);
   const [stageFilter, setStageFilter] = useState("all");
   const [creneauFilter, setCreneauFilter] = useState<CreneauType | "all">("all");
-  const [periodeFilter, setPeriodeFilter] = useState<PeriodeFilter>("month");
+  const [periodMode, setPeriodMode] = useState<PlannerPeriodMode>("month");
+  const [viewMode, setViewMode] = useState<PlannerViewMode>("list");
+  const [pivotDate, setPivotDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [listDayFilter, setListDayFilter] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState<ManualForm>({
     infrastructure_id: "",
@@ -95,12 +108,17 @@ export function ReservationsV2Client() {
   const [deleteRow, setDeleteRow] = useState<ReservationEnrichedV2 | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  const plannerRange = useMemo(
+    () => resolvePlannerRange(periodMode, pivotDate),
+    [periodMode, pivotDate]
+  );
+
   const load = useCallback(async () => {
-    const range = loadRangeForReservations(periodeFilter);
-    const [{ reservations: r }, s, i] = await Promise.all([
-      loadReservationsPageAction({
-        dateDebut: range.dateDebut,
-        dateFin: range.dateFin,
+    const [{ reservations: r, planning: p }, s, i] = await Promise.all([
+      loadReservationsPlannerAction({
+        dateDebut: plannerRange?.dateDebut,
+        dateFin: plannerRange?.dateFin,
         syncBeforeLoad: true,
       }),
       getStages(),
@@ -109,6 +127,7 @@ export function ReservationsV2Client() {
     setItems(
       dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
     );
+    setPlanning(p);
     setStages(s);
     setInfrastructures(i);
     if (i[0]) {
@@ -116,7 +135,7 @@ export function ReservationsV2Client() {
         f.infrastructure_id ? f : { ...f, infrastructure_id: i[0]!.id }
       );
     }
-  }, [periodeFilter]);
+  }, [plannerRange?.dateDebut, plannerRange?.dateFin]);
 
   useEffect(() => {
     void load();
@@ -130,16 +149,17 @@ export function ReservationsV2Client() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations_infrastructure" },
-        () => {
-          void load();
-        }
+        () => void load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "planning" },
+        () => void load()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "stages_programme" },
-        () => {
-          void load();
-        }
+        () => void load()
       )
       .subscribe();
     return () => {
@@ -147,29 +167,85 @@ export function ReservationsV2Client() {
     };
   }, [load]);
 
-  const conflictIds = useMemo(() => detectConflicts(items), [items]);
+  const plannerAnalysis = useMemo(
+    () => analyzePlannerConflicts(items, planning),
+    [items, planning]
+  );
+
+  const highlightReservationIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of plannerAnalysis.conflicts) {
+      if (c.kind === "terrain_overlap" || c.kind === "terrain_programme") {
+        for (const id of c.reservation_ids) ids.add(id);
+      }
+    }
+    return ids;
+  }, [plannerAnalysis.conflicts]);
+
+  const reservationConflictMessages = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of plannerAnalysis.conflicts) {
+      for (const id of c.reservation_ids) {
+        if (c.kind === "terrain_overlap" || c.kind === "terrain_programme") {
+          map.set(id, conflictKindLabel(c.kind));
+        } else if (!map.has(id)) {
+          map.set(id, conflictKindLabel(c.kind));
+        }
+      }
+    }
+    return map;
+  }, [plannerAnalysis.conflicts]);
+
+  const conflictDates = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of plannerAnalysis.conflicts) {
+      if (c.kind === "terrain_overlap" || c.kind === "terrain_programme") {
+        s.add(c.date);
+      }
+    }
+    return s;
+  }, [plannerAnalysis.conflicts]);
+
+  const conflictMonths = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of plannerAnalysis.conflicts) {
+      if (c.kind === "terrain_overlap" || c.kind === "terrain_programme") {
+        s.add(c.date.slice(0, 7));
+      }
+    }
+    return s;
+  }, [plannerAnalysis.conflicts]);
 
   const filtered = useMemo(() => {
     return items.filter((r) => {
       if (stageFilter !== "all" && r.stage_id !== stageFilter) return false;
       if (creneauFilter !== "all" && resolveCreneauType(r) !== creneauFilter) return false;
-      if (!matchPeriode(r.date_debut, periodeFilter)) return false;
+      if (listDayFilter) {
+        const key = format(parseReservationDate(r.date_debut), "yyyy-MM-dd");
+        if (key !== listDayFilter) return false;
+      }
       return true;
     });
-  }, [items, stageFilter, creneauFilter, periodeFilter]);
+  }, [items, stageFilter, creneauFilter, listDayFilter]);
+
+  const criticalCount = useMemo(
+    () =>
+      plannerAnalysis.conflicts.filter(
+        (c) => c.kind === "terrain_overlap" || c.kind === "terrain_programme"
+      ).length,
+    [plannerAnalysis.conflicts]
+  );
 
   const kpis = useMemo(() => {
-    const now = new Date();
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
-    const ceMois = items.filter((r) => {
-      const d = parseReservationDate(r.date_debut);
-      return d >= monthStart && d <= monthEnd;
-    }).length;
     const courts = new Set(filtered.map((r) => r.infrastructure_id)).size;
-    const conflitsInView = [...conflictIds].filter((id) => filtered.some((r) => r.id === id)).length;
-    return { ceMois, courts, conflits: conflitsInView };
-  }, [items, filtered, conflictIds]);
+    const planningSlots = planning.length;
+    return {
+      reservations: filtered.length,
+      courts,
+      conflits: criticalCount,
+      planningSlots,
+    };
+  }, [filtered, criticalCount, planning.length]);
 
   const groupedByDate = useMemo(() => {
     const map = new Map<string, ReservationEnrichedV2[]>();
@@ -181,17 +257,22 @@ export function ReservationsV2Client() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [filtered]);
 
+  const gridDays = useMemo(
+    () => daysInPlannerRange(plannerRange, pivotDate, periodMode),
+    [plannerRange, pivotDate, periodMode]
+  );
+
   function filterSubtitle(): string {
     const parts: string[] = [];
+    if (plannerRange?.label) parts.push(plannerRange.label);
     if (stageFilter !== "all") {
       parts.push(stages.find((s) => s.id === stageFilter)?.stage_action ?? "Stage");
     }
     if (creneauFilter !== "all") {
       parts.push(CRENEAU_OPTIONS.find((c) => c.value === creneauFilter)?.label ?? creneauFilter);
     }
-    const p = PERIODE_OPTIONS.find((o) => o.value === periodeFilter)?.label;
-    if (p && periodeFilter !== "all") parts.push(p);
-    return parts.length ? `Filtré par : ${parts.join(" — ")}` : "";
+    if (listDayFilter) parts.push(listDayFilter);
+    return parts.length ? `Filtré : ${parts.join(" — ")}` : "";
   }
 
   function exportPdf() {
@@ -282,21 +363,7 @@ export function ReservationsV2Client() {
     setSyncing(true);
     try {
       const result = await fullReconcileReservationsAction();
-      const range = loadRangeForReservations(periodeFilter);
-      const [{ reservations: r }, s, i] = await Promise.all([
-        loadReservationsPageAction({
-          dateDebut: range.dateDebut,
-          dateFin: range.dateFin,
-          syncBeforeLoad: false,
-        }),
-        getStages(),
-        getInfrastructures(),
-      ]);
-      setItems(
-        dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
-      );
-      setStages(s);
-      setInfrastructures(i);
+      await load();
       const parts: string[] = [];
       if (result.planningUpserted > 0) {
         parts.push(`${result.planningUpserted} depuis le planning`);
@@ -315,11 +382,29 @@ export function ReservationsV2Client() {
     }
   }
 
+  function handlePeriodChange(mode: PlannerPeriodMode) {
+    setPeriodMode(mode);
+    setListDayFilter(null);
+    if (mode === "week") setViewMode("week");
+    else if (mode === "year") setViewMode("year");
+    else if (mode === "month") setViewMode((v) => (v === "year" ? "month" : v));
+  }
+
+  function handleMonthFromYear(monthKey: string) {
+    setPivotDate(`${monthKey}-01`);
+    setPeriodMode("month");
+    setViewMode("month");
+    setListDayFilter(null);
+  }
+
+  const rangeLabel = plannerRange?.label ?? "Toutes les périodes";
+  const yearNum = parseInt(pivotDate.slice(0, 4), 10) || new Date().getFullYear();
+
   return (
     <>
       <V2PageHeader
         title="Réservations"
-        description="Planning terrains — créneaux Matin, Après-midi, Journée complète"
+        description="Terrains, planning et conflits — semaine, mois ou année"
         actions={
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
@@ -345,14 +430,20 @@ export function ReservationsV2Client() {
       />
 
       <main className="space-y-4 p-4 sm:p-6">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Card className="p-4 text-center">
-            <div className="text-3xl font-bold text-frmt-green">{kpis.ceMois}</div>
-            <div className="mt-1 text-sm text-muted">Réservations ce mois</div>
+            <div className="text-3xl font-bold text-frmt-green">{kpis.reservations}</div>
+            <div className="mt-1 text-sm text-muted">
+              Réservations {plannerRange ? "sur la période" : "chargées"}
+            </div>
           </Card>
           <Card className="p-4 text-center">
             <div className="text-3xl font-bold">{kpis.courts}</div>
             <div className="mt-1 text-sm text-muted">Courts utilisés</div>
+          </Card>
+          <Card className="p-4 text-center">
+            <div className="text-3xl font-bold text-sky-400">{kpis.planningSlots}</div>
+            <div className="mt-1 text-sm text-muted">Séances planning</div>
           </Card>
           <Card
             className={cn(
@@ -363,90 +454,141 @@ export function ReservationsV2Client() {
             <div className={cn("text-3xl font-bold", kpis.conflits > 0 && "text-red-500")}>
               {kpis.conflits}
             </div>
-            <div className="mt-1 text-sm text-muted">Conflits détectés</div>
+            <div className="mt-1 text-sm text-muted">Conflits terrain ↔ programme</div>
           </Card>
         </div>
 
-        <Card className="flex flex-wrap items-center gap-2 p-3">
-          <select
-            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-          >
-            <option value="all">Tous les stages</option>
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.stage_action}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
-            value={creneauFilter}
-            onChange={(e) => setCreneauFilter(e.target.value as CreneauType | "all")}
-          >
-            <option value="all">Tous créneaux</option>
-            {CRENEAU_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
-            value={periodeFilter}
-            onChange={(e) => setPeriodeFilter(e.target.value as PeriodeFilter)}
-          >
-            {PERIODE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Card>
+        <ReservationsPlannerToolbar
+          periodMode={periodMode}
+          viewMode={viewMode}
+          pivotDate={pivotDate}
+          rangeLabel={rangeLabel}
+          stageFilter={stageFilter}
+          creneauFilter={creneauFilter}
+          stages={stages}
+          onPeriodChange={handlePeriodChange}
+          onViewChange={setViewMode}
+          onPivotChange={(iso) => {
+            setPivotDate(iso);
+            setListDayFilter(null);
+          }}
+          onShiftPivot={(dir) => {
+            setPivotDate(shiftPlannerPivot(pivotDate, periodMode, dir));
+            setListDayFilter(null);
+          }}
+          onStageFilter={setStageFilter}
+          onCreneauFilter={setCreneauFilter}
+        />
 
-        {filtered.length === 0 && (
-          <Card className="border-dashed p-8 text-center text-sm text-muted">
-            Aucune réservation pour ces filtres.
-            <br />
-            Essayez le filtre <strong>Tout</strong> ou cliquez <strong>Sync stages</strong> en haut à droite.
-          </Card>
+        <ReservationsConflictPanel
+          reservations={items}
+          planning={planning}
+          onSelectDate={(d) => {
+            setListDayFilter(d);
+            setViewMode("list");
+          }}
+        />
+
+        {listDayFilter && (
+          <div className="flex items-center gap-2 text-sm">
+            <span>Filtre jour : {listDayFilter}</span>
+            <button
+              type="button"
+              className="text-frmt-green hover:underline"
+              onClick={() => setListDayFilter(null)}
+            >
+              Effacer
+            </button>
+          </div>
         )}
 
-        <div className="space-y-6">
-          {groupedByDate.map(([dateKey, rows]) => {
-            const weekend = [0, 6].includes(parseReservationDate(dateKey).getDay());
-            return (
-              <section key={dateKey}>
-                <div
-                  className={cn(
-                    "mb-3 border-b border-border pb-1 text-sm font-bold capitalize",
-                    weekend && "text-frmt-green"
-                  )}
-                >
-                  {formatDateHeader(dateKey)}
-                </div>
-                <div
-                  className={cn(
-                    "grid gap-3 md:grid-cols-2 xl:grid-cols-3",
-                    weekend && "rounded-lg bg-surface-elevated/40 p-2"
-                  )}
-                >
-                  {rows.map((r) => (
-                    <ReservationCard
-                      key={r.id}
-                      r={r}
-                      conflict={conflictIds.has(r.id)}
-                      conflictLabel={conflictStageNames(r, items, conflictIds)}
-                      onEdit={() => openEdit(r)}
-                      onDelete={() => setDeleteRow(r)}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        {viewMode === "week" && (
+          <ReservationsWeekGrid
+            days={periodMode === "week" ? gridDays : gridDays.slice(0, 7)}
+            infrastructures={infrastructures}
+            reservations={filtered}
+            planning={planning}
+            highlightReservationIds={highlightReservationIds}
+          />
+        )}
+
+        {viewMode === "month" && plannerRange && periodMode === "month" && (
+          <ReservationsMonthCalendar
+            range={plannerRange}
+            reservations={filtered}
+            conflictDates={conflictDates}
+            onDayClick={(d) => {
+              setListDayFilter(d);
+              setViewMode("list");
+            }}
+          />
+        )}
+
+        {viewMode === "year" && (
+          <ReservationsYearOverview
+            year={yearNum}
+            reservations={filtered}
+            conflictMonths={conflictMonths}
+            onMonthClick={handleMonthFromYear}
+          />
+        )}
+
+        {viewMode === "list" && (
+          <>
+            {filtered.length === 0 && (
+              <Card className="border-dashed p-8 text-center text-sm text-muted">
+                Aucune réservation pour ces filtres.
+                <br />
+                Changez la période, le mois, ou cliquez <strong>Sync tous les stages</strong>.
+              </Card>
+            )}
+
+            <div className="space-y-6">
+              {groupedByDate.map(([dateKey, rows]) => {
+                const weekend = [0, 6].includes(parseReservationDate(dateKey).getDay());
+                return (
+                  <section key={dateKey}>
+                    <div
+                      className={cn(
+                        "mb-3 border-b border-border pb-1 text-sm font-bold capitalize",
+                        weekend && "text-frmt-green"
+                      )}
+                    >
+                      {formatDateHeader(dateKey)}
+                    </div>
+                    <div
+                      className={cn(
+                        "grid gap-3 md:grid-cols-2 xl:grid-cols-3",
+                        weekend && "rounded-lg bg-surface-elevated/40 p-2"
+                      )}
+                    >
+                      {rows.map((r) => {
+                        const conflict =
+                          highlightReservationIds.has(r.id) ||
+                          reservationConflictMessages.has(r.id);
+                        return (
+                          <ReservationCard
+                            key={r.id}
+                            r={r}
+                            conflict={conflict}
+                            conflictLabel={reservationConflictLabel(
+                              r,
+                              items,
+                              plannerAnalysis.terrainConflictIds,
+                              reservationConflictMessages
+                            )}
+                            onEdit={() => openEdit(r)}
+                            onDelete={() => setDeleteRow(r)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        )}
       </main>
 
       <Modal
@@ -630,63 +772,5 @@ export function ReservationsV2Client() {
         onConfirm={() => void handleDelete()}
       />
     </>
-  );
-}
-
-function ReservationCard({
-  r,
-  conflict,
-  conflictLabel,
-  onEdit,
-  onDelete,
-}: {
-  r: ReservationEnrichedV2;
-  conflict: boolean;
-  conflictLabel: string;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const c = getCreneauInfoForReservation(r);
-
-  return (
-    <Card
-      className={cn(
-        "relative p-4",
-        conflict && "border-red-500 ring-1 ring-red-500/50"
-      )}
-    >
-      {conflict && (
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-[#7b1a1a] bg-[#2d0d0d] px-3 py-1.5 text-[11px] font-medium text-[#fc8181]">
-          <span aria-hidden>⚠</span>
-          Conflit réel — même terrain, même horaire, stages différents
-          {conflictLabel ? ` (${conflictLabel})` : ""}
-        </div>
-      )}
-      <p className="text-sm font-medium capitalize">📅 {formatDateHeader(r.date_debut)}</p>
-      <hr className="my-2 border-border/60" />
-      <p className="text-sm">{infraLine(r)}</p>
-      <p className="mt-1 text-sm">
-        {c.emoji} {c.label} &nbsp; {c.heureDebut} → {c.heureFin}
-      </p>
-      <p className="mt-1 text-sm text-muted">{stageLine(r)}</p>
-      <div className="absolute bottom-2 right-2 flex gap-1 opacity-70 hover:opacity-100">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded p-1 text-muted hover:bg-surface-elevated hover:text-foreground"
-          aria-label="Modifier"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded p-1 text-muted hover:bg-red-500/10 hover:text-red-500"
-          aria-label="Supprimer"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </Card>
   );
 }
