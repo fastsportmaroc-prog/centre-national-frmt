@@ -292,6 +292,7 @@ function normalizeCourtNomKey(nom: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[—–-]/g, " ")
+    .replace(/\s+(terre battue|surface dure|surface dur|hard court)\s*$/i, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -495,16 +496,6 @@ export const getTerrains = async () => {
     return s ?? "autre";
   };
 
-  const normalizeNom = (nom?: string, surface?: string) => {
-    const n = (nom ?? "").trim();
-    const match = n.match(/court\s*([0-9]+)/i);
-    const num = match?.[1];
-    const surf = normalizeSurface(surface);
-    if (num && surf === "terre-battue") return `Court ${num} — Terre Battue`;
-    if (num && surf === "dur") return `Court ${num} — Surface Dure`;
-    return n;
-  };
-
   const { data: infra, error: infraErr } = await supabase
     .from("infrastructures")
     .select("id, nom, type, surface, capacite, actif")
@@ -516,7 +507,7 @@ export const getTerrains = async () => {
     const surface = normalizeSurface(i.surface);
     return {
       id: i.id,
-      nom: normalizeNom(i.nom, i.surface),
+      nom: String(i.nom ?? "").trim() || `Court ${idx + 1}`,
       type: normalizeType(i.type),
       surface,
       capacite: i.capacite ?? 0,

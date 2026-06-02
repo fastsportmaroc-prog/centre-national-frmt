@@ -852,7 +852,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
                     </p>
                     <p>
                       <span className="text-muted">Terrain choisi :</span>{" "}
-                      {terrains.find((t) => t.id === terrainId)?.nom ?? "—"}
+                      {(() => {
+                        const t = terrains.find((x) => x.id === terrainId);
+                        if (!t) return "—";
+                        const surf = t.surface?.replace(/-/g, " ");
+                        return surf && surf !== "autre" ? `${t.nom} (${surf})` : t.nom;
+                      })()}
                     </p>
                   </div>
                   <div className="mt-3 rounded-md border border-border bg-[var(--bg-main)] p-2">
