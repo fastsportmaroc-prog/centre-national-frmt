@@ -16,6 +16,8 @@ import {
   totalChambresFromForm,
 } from "@/lib/v2/stage-hebergement-form";
 import { countNightsHebergement } from "@/lib/v2/stage-calculations";
+import { computeHebergementPrevuMad } from "@/lib/v2/budget-centre-calcul";
+import { useTarifsBudget } from "@/lib/v2/use-tarifs-budget";
 import { HebergementParticipantsTab } from "@/components/v2/stages/tabs/HebergementParticipantsTab";
 import type {
   EntraineurV2,
@@ -75,6 +77,7 @@ export function StageHebergementSection({
   onSaved,
   toast,
 }: Props) {
+  const tarifsBudget = useTarifsBudget();
   const [form, setForm] = useState<StageHebergementForm>(() =>
     hebergementToForm(stage, hebergement, joueurs, coachs, nbJoueurs, nbCoachs)
   );
@@ -111,6 +114,13 @@ export function StageHebergementSection({
   );
 
   const totalNuitees = totalChambres * nbNuits;
+  const budgetHebergementMad = useMemo(
+    () =>
+      form.actif ?
+        computeHebergementPrevuMad(form.nb_chambres_joueurs, form.nb_chambres_coachs, nbNuits, tarifsBudget)
+      : 0,
+    [form.actif, form.nb_chambres_joueurs, form.nb_chambres_coachs, nbNuits, tarifsBudget]
+  );
 
   async function handleSave() {
     setSaving(true);
@@ -294,7 +304,19 @@ export function StageHebergementSection({
                   Total : <strong className="text-[var(--text-primary)]">{totalChambres}</strong> chambre
                   {totalChambres !== 1 ? "s" : ""}
                 </span>
+                <span className="text-[var(--text-muted)]">
+                  Coût estimé :{" "}
+                  <strong className="text-[var(--text-primary)]">
+                    {budgetHebergementMad.toLocaleString("fr-FR")} MAD
+                  </strong>
+                </span>
               </div>
+
+              <p className="text-xs text-[var(--text-muted)]">
+                Calcul auto selon Paramètres:{" "}
+                <strong>{tarifsBudget.prix_chambre_single_mad.toLocaleString("fr-FR")} MAD</strong> (single) et{" "}
+                <strong>{tarifsBudget.prix_chambre_double_mad.toLocaleString("fr-FR")} MAD</strong> (double).
+              </p>
 
               <div className="rounded-lg border border-dashed border-[var(--border)] p-3">
                 <HebergementParticipantsTab

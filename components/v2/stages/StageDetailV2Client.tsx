@@ -53,6 +53,7 @@ import { getCategoryStyle } from "@/lib/v2/category-colors";
 import { computeStageBudgetEstimateMad } from "@/lib/v2/stage-budget-estimate";
 import { countDaysInclusive, countNightsHebergement } from "@/lib/v2/stage-calculations";
 import { useTarifsBudget } from "@/lib/v2/use-tarifs-budget";
+import { computeRestaurationPrevuMad } from "@/lib/v2/budget-centre-calcul";
 import type {
   EntraineurV2,
   HebergementStageV2,
@@ -255,6 +256,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
   const restPersons = joueurs.length + coachs.length;
   const mealCountPerPerson = Number(restMeals.pdj) + Number(restMeals.dej) + Number(restMeals.din);
   const totalRepasCalc = restaurationActive ? restPersons * mealCountPerPerson * restDays : 0;
+  const restaurationEstimateMad = computeRestaurationPrevuMad(
+    restMeals.pdj ? restPersons * restDays : 0,
+    restMeals.dej ? restPersons * restDays : 0,
+    restMeals.din ? restPersons * restDays : 0,
+    tarifsBudget
+  );
 
   const budget = useMemo(() => {
     if (!stage) {
@@ -767,6 +774,17 @@ export function StageDetailV2Client({ id }: { id: string }) {
                       />
                       Eau incluse
                     </label>
+                    <div className="rounded-md border border-[var(--border)] bg-[var(--bg-elevated)]/40 p-3 text-sm">
+                      <p>
+                        Coût estimé (Paramètres) :{" "}
+                        <strong>{restaurationEstimateMad.toLocaleString("fr-FR")} MAD</strong>
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Tarifs utilisés — PDJ: {tarifsBudget.prix_petit_dejeuner_mad.toLocaleString("fr-FR")} MAD, Déj:{" "}
+                        {tarifsBudget.prix_dejeuner_mad.toLocaleString("fr-FR")} MAD, Dîner:{" "}
+                        {tarifsBudget.prix_diner_mad.toLocaleString("fr-FR")} MAD.
+                      </p>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => void saveRestaurationAndFacture()}
@@ -1060,6 +1078,13 @@ export function StageDetailV2Client({ id }: { id: string }) {
                   </Link>{" "}
                   et les onglets Hébergement / Restauration / Terrains de ce stage.
                 </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Tarifs actifs — PDJ: {tarifsBudget.prix_petit_dejeuner_mad.toLocaleString("fr-FR")} MAD, Déj:{" "}
+                {tarifsBudget.prix_dejeuner_mad.toLocaleString("fr-FR")} MAD, Dîner:{" "}
+                {tarifsBudget.prix_diner_mad.toLocaleString("fr-FR")} MAD, Single:{" "}
+                {tarifsBudget.prix_chambre_single_mad.toLocaleString("fr-FR")} MAD, Double:{" "}
+                {tarifsBudget.prix_chambre_double_mad.toLocaleString("fr-FR")} MAD.
+              </p>
               <dl className="grid max-w-md gap-2 text-sm">
                 <div className="flex justify-between border-b border-[var(--border)] py-2">
                   <dt>Hébergement</dt>
