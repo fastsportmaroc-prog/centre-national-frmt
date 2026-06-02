@@ -35,19 +35,20 @@ function ServiceBadge({
   ok,
   label,
   icon,
-  compact,
+  wide,
 }: {
   ok: boolean;
   label: string;
   icon: string;
-  compact?: boolean;
+  /** Libellé long — pleine largeur, police réduite */
+  wide?: boolean;
 }) {
   return (
     <span
       className={cn(
         "stage-card-badge",
         ok ? "stage-card-badge--on" : "stage-card-badge--off",
-        compact && "stage-card-badge--compact"
+        wide && "stage-card-badge--wide"
       )}
       title={label}
     >
@@ -118,7 +119,12 @@ export function StageDashboardCard({
           <ServiceBadge ok={stage.has_hebergement} label="Hébergement" icon="🏨" />
           <ServiceBadge ok={stage.has_restauration} label="Resto" icon="🍽️" />
           <ServiceBadge ok={stage.has_terrains} label="Terrains" icon="🎾" />
-          <ServiceBadge ok={stage.has_fos_agri} label="Procédure administrative" icon="📄" />
+          <ServiceBadge
+            ok={stage.has_fos_agri}
+            label="Procédure administrative"
+            icon="📄"
+            wide
+          />
         </div>
 
         <div className="stage-card-progress-wrap">

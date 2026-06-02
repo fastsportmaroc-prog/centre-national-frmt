@@ -747,15 +747,9 @@ body {
 
 .stage-card-badges {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 2px;
-}
-
-@media (min-width: 768px) {
-  .stage-card-badges {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }
 
 /* Badges logistique (Hébergement / Resto / Terrains) — alignés sous Joueurs / Coachs / Total */
@@ -859,13 +853,22 @@ body {
   color: #fc8181;
 }
 
-.stage-card-badge--compact {
+/* Procédure administrative — 2e ligne pleine largeur */
+.stage-card-badges > .stage-card-badge--wide {
+  grid-column: 1 / -1;
   white-space: normal;
   text-align: center;
   line-height: 1.15;
   font-size: 9px;
-  padding: 4px 6px;
-  min-height: 34px;
+  font-weight: 600;
+  padding: 4px 8px;
+  min-height: 26px;
+  gap: 4px;
+}
+
+.stage-card-badges > .stage-card-badge--wide span[aria-hidden] {
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
 .stage-card-progress-wrap {
