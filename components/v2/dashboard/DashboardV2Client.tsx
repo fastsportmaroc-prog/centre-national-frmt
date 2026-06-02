@@ -260,7 +260,6 @@ export function DashboardV2Client() {
                               date_fin: s.date_fin,
                               lieu: s.lieu,
                               statut: String(s.statut),
-                              notes: s.notes,
                             })
                           }
                         />

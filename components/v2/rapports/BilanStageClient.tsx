@@ -68,7 +68,6 @@ export function BilanStageClient({ stageId }: { stageId: string }) {
         ["Coût restauration", `${finance.montantRestauration.toLocaleString("fr-FR")} MAD`],
         ["Coût terrains", `${finance.montantTerrains.toLocaleString("fr-FR")} MAD`],
         ["TOTAL", `${finance.montantTotal.toLocaleString("fr-FR")} MAD`],
-        ["Recommandations", recommandations || "—"],
       ],
       `bilan-stage-${stage.id}.pdf`
     );
