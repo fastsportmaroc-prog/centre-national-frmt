@@ -46,7 +46,7 @@ export function ReservationsV2Client() {
   const [stages, setStages] = useState<Awaited<ReturnType<typeof getStages>>>([]);
   const [stageFilter, setStageFilter] = useState("all");
   const [creneauFilter, setCreneauFilter] = useState<CreneauType | "all">("all");
-  const [periodMode, setPeriodMode] = useState<PlannerPeriodMode>("month");
+  const [periodMode, setPeriodMode] = useState<PlannerPeriodMode>("all");
   const [viewMode, setViewMode] = useState<PlannerViewMode>("list");
   const [pivotDate, setPivotDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [syncing, setSyncing] = useState(false);
@@ -61,7 +61,7 @@ export function ReservationsV2Client() {
       loadReservationsPageAction({
         dateDebut: plannerRange?.dateDebut,
         dateFin: plannerRange?.dateFin,
-        syncBeforeLoad: true,
+        syncBeforeLoad: false,
       }),
       getStages(),
     ]);
@@ -137,11 +137,26 @@ export function ReservationsV2Client() {
     return parts.length ? `Filtré : ${parts.join(" — ")}` : "";
   }
 
+  const loadWithSync = useCallback(async () => {
+    const [{ reservations: r }, s] = await Promise.all([
+      loadReservationsPageAction({
+        dateDebut: plannerRange?.dateDebut,
+        dateFin: plannerRange?.dateFin,
+        syncBeforeLoad: true,
+      }),
+      getStages(),
+    ]);
+    setItems(
+      dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
+    );
+    setStages(s);
+  }, [plannerRange?.dateDebut, plannerRange?.dateFin]);
+
   async function forceSyncAndReload() {
     setSyncing(true);
     try {
       const result = await fullReconcileReservationsAction();
-      await load();
+      await loadWithSync();
       toast(
         `${result.processed} stage(s) traité(s), ${result.synced} aligné(s), ${result.cleaned} doublon(s) retiré(s)`,
         "success"
@@ -181,6 +196,20 @@ export function ReservationsV2Client() {
       />
 
       <main className="space-y-4 p-4 sm:p-6">
+        {periodMode !== "all" && plannerRange && (
+          <Card className="border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+            Affichage limité à la période : <strong>{plannerRange.label}</strong>. Cliquez{" "}
+            <button
+              type="button"
+              className="font-semibold text-frmt-green underline"
+              onClick={() => setPeriodMode("all")}
+            >
+              Tout
+            </button>{" "}
+            pour voir toutes les réservations de tous les stages.
+          </Card>
+        )}
+
         <Card className="border-frmt-green/30 bg-frmt-green/5 p-3 text-sm">
           <p>
             <strong>Principe :</strong> chaque réservation affichée ici provient d&apos;un stage dont

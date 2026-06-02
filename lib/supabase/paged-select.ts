@@ -53,3 +53,20 @@ export function applyReservationDateRangeOverlap<
   if (d1) q = q.lte("date_debut", `${d1}T23:59:59`);
   return q;
 }
+
+/**
+ * Filtre par jour de début (créneaux journaliers terrain).
+ * Évite d'exclure des lignes dont date_fin est absente ou incohérente.
+ */
+export function applyReservationDateRangeByStartDay<
+  Q extends {
+    gte(column: string, value: string): Q;
+    lte(column: string, value: string): Q;
+  },
+>(q: Q, dateDebut?: string, dateFin?: string): Q {
+  const d0 = dateDebut?.slice(0, 10);
+  const d1 = dateFin?.slice(0, 10);
+  if (d0) q = q.gte("date_debut", `${d0}T00:00:00`);
+  if (d1) q = q.lte("date_debut", `${d1}T23:59:59`);
+  return q;
+}

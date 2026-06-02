@@ -8,10 +8,10 @@ import { CRENEAU_OPTIONS, type CreneauType } from "@/lib/v2/reservations-utils";
 import { cn } from "@/lib/utils/cn";
 
 const PERIOD_OPTIONS: { value: PlannerPeriodMode; label: string }[] = [
-  { value: "week", label: "Semaine" },
-  { value: "month", label: "Mois" },
-  { value: "year", label: "Année" },
   { value: "all", label: "Tout" },
+  { value: "month", label: "Mois" },
+  { value: "week", label: "Semaine" },
+  { value: "year", label: "Année" },
 ];
 
 const VIEW_OPTIONS: { value: PlannerViewMode; label: string }[] = [

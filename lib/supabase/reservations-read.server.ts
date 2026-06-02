@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import {
-  applyReservationDateRangeOverlap,
+  applyReservationDateRangeByStartDay,
   fetchAllPages,
 } from "@/lib/supabase/paged-select";
 import type {
@@ -60,7 +60,7 @@ async function fetchInfraReservations(
       .from("reservations_infrastructure")
       .select("*")
       .order("date_debut", { ascending: true });
-    q = applyReservationDateRangeOverlap(q, options?.dateDebut, options?.dateFin);
+    q = applyReservationDateRangeByStartDay(q, options?.dateDebut, options?.dateFin);
     return q.range(from, to).then(({ data, error }) => ({
       data: data as ReservationInfraV2[] | null,
       error,
