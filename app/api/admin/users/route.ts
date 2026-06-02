@@ -17,20 +17,18 @@ export async function GET() {
   }
 
   const admin = createSupabaseAdminClient();
-  if (!admin) {
-    return NextResponse.json(
-      {
-        error:
-          "Configuration manquante: SUPABASE_SERVICE_ROLE_KEY est requis pour gérer les utilisateurs.",
-      },
-      { status: 503 }
-    );
+  if (admin) {
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, email, nom, prenom, full_name, role, entraineur_id, actif, created_at")
+      .order("created_at", { ascending: false });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ users: data ?? [] });
   }
 
-  const { data, error } = await admin
-    .from("profiles")
-    .select("id, email, nom, prenom, full_name, role, entraineur_id, actif, created_at")
-    .order("created_at", { ascending: false });
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ users: [] });
+  const { data, error } = await supabase.rpc("admin_list_profiles");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ users: data ?? [] });
 }
@@ -46,23 +44,31 @@ export async function PATCH(request: Request) {
     actif?: boolean;
   };
   const admin = createSupabaseAdminClient();
-  if (!admin) {
-    return NextResponse.json(
-      {
-        error:
-          "Configuration manquante: SUPABASE_SERVICE_ROLE_KEY est requis pour mettre à jour les utilisateurs.",
-      },
-      { status: 503 }
-    );
+  if (admin) {
+    const { error } = await admin
+      .from("profiles")
+      .update({
+        role: body.role,
+        entraineur_id: body.entraineur_id,
+        actif: body.actif,
+      })
+      .eq("id", body.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
-  const { error } = await admin
-    .from("profiles")
-    .update({
-      role: body.role,
-      entraineur_id: body.entraineur_id,
-      actif: body.actif,
-    })
-    .eq("id", body.id);
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ error: "Supabase indisponible" }, { status: 503 });
+
+  const patch: Record<string, unknown> = {};
+  if (body.role !== undefined) patch.role = body.role;
+  if (body.entraineur_id !== undefined) patch.entraineur_id = body.entraineur_id;
+  if (body.actif !== undefined) patch.actif = body.actif;
+
+  const { error } = await supabase.rpc("admin_update_profile_access", {
+    p_id: body.id,
+    p_patch: patch,
+  });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
