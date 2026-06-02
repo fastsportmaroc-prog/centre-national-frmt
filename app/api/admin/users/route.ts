@@ -17,10 +17,17 @@ export async function GET() {
   }
 
   const admin = createSupabaseAdminClient();
-  const supabase = admin ?? (await createSupabaseServerClient());
-  if (!supabase) return NextResponse.json({ users: [] });
+  if (!admin) {
+    return NextResponse.json(
+      {
+        error:
+          "Configuration manquante: SUPABASE_SERVICE_ROLE_KEY est requis pour gérer les utilisateurs.",
+      },
+      { status: 503 }
+    );
+  }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("profiles")
     .select("id, email, nom, prenom, full_name, role, entraineur_id, actif, created_at")
     .order("created_at", { ascending: false });
@@ -38,9 +45,17 @@ export async function PATCH(request: Request) {
     entraineur_id?: string | null;
     actif?: boolean;
   };
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return NextResponse.json({ error: "Supabase indisponible" }, { status: 503 });
-  const { error } = await supabase
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      {
+        error:
+          "Configuration manquante: SUPABASE_SERVICE_ROLE_KEY est requis pour mettre à jour les utilisateurs.",
+      },
+      { status: 503 }
+    );
+  }
+  const { error } = await admin
     .from("profiles")
     .update({
       role: body.role,
