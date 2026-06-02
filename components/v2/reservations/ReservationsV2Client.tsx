@@ -187,10 +187,16 @@ export function ReservationsV2Client() {
                 {syncing ? "Synchronisation…" : "Rafraîchir depuis les stages"}
               </Button>
             )}
-            <Button variant="secondary" size="sm" onClick={() => exportReservationsPDF(filtered, filterSubtitle())}>
-              <FileDown className="mr-1 h-3.5 w-3.5" />
-              Imprimer / PDF
-            </Button>
+            {viewMode !== "table" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => exportReservationsPDF(filtered, filterSubtitle())}
+              >
+                <FileDown className="mr-1 h-3.5 w-3.5" />
+                Imprimer / PDF
+              </Button>
+            )}
           </div>
         }
       />
@@ -274,7 +280,11 @@ export function ReservationsV2Client() {
         )}
 
         {viewMode === "table" && filtered.length > 0 && (
-          <ReservationsTableView rows={filtered} conflictIds={conflictIds} />
+          <ReservationsTableView
+            rows={filtered}
+            conflictIds={conflictIds}
+            subtitle={filterSubtitle() || rangeLabel}
+          />
         )}
 
         {viewMode === "list" && (

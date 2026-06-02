@@ -42,6 +42,8 @@ import { generateFicheStagePDF, type FicheStagePdfInput } from "@/lib/pdf/genera
 import { generateFicheJoueurPDF } from "@/lib/pdf/generators/ficheJoueurPDF";
 import { generateFicheEntraineurPDF } from "@/lib/pdf/generators/ficheEntraineurPDF";
 import { generateReservationsPDF } from "@/lib/pdf/generators/reservationsPDF";
+import { generateReservationsCourtMatrixPDF } from "@/lib/pdf/generators/reservationsCourtMatrixPDF";
+import type { TableGroupBy, TableReservationSection } from "@/lib/v2/reservations-table-filters";
 import { generateBilletsPDF } from "@/lib/pdf/generators/billetsPDF";
 import { generatePlanningPDF } from "@/lib/pdf/generators/planningPDF";
 import { generateRapportHebergementPDF } from "@/lib/pdf/generators/rapportHebergementPDF";
@@ -81,6 +83,13 @@ export function exportReservationsPDF(
   subtitle?: string
 ) {
   return generateReservationsPDF(reservations, subtitle);
+}
+
+export function exportReservationsCourtMatrixPDF(
+  sections: TableReservationSection[],
+  options?: { subtitle?: string; groupBy?: TableGroupBy }
+) {
+  return generateReservationsCourtMatrixPDF(sections, options);
 }
 
 export function exportBilletsPdf(
