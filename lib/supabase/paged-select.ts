@@ -39,3 +39,17 @@ export function applyReservationDateRange<
   if (d1) q = q.lte("date_debut", `${d1}T23:59:59`);
   return q;
 }
+
+/** Chevauchement de période : inclut toute réservation qui tombe dans [dateDebut, dateFin]. */
+export function applyReservationDateRangeOverlap<
+  Q extends {
+    gte(column: string, value: string): Q;
+    lte(column: string, value: string): Q;
+  },
+>(q: Q, dateDebut?: string, dateFin?: string): Q {
+  const d0 = dateDebut?.slice(0, 10);
+  const d1 = dateFin?.slice(0, 10);
+  if (d0) q = q.gte("date_fin", `${d0}T00:00:00`);
+  if (d1) q = q.lte("date_debut", `${d1}T23:59:59`);
+  return q;
+}

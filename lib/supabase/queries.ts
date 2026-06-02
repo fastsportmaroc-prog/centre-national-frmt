@@ -161,7 +161,11 @@ async function ensureLegacyStageRow(stageId: string): Promise<boolean> {
   }
 }
 
-import { applyReservationDateRange, fetchAllPages } from "@/lib/supabase/paged-select";
+import {
+  applyReservationDateRange,
+  applyReservationDateRangeOverlap,
+  fetchAllPages,
+} from "@/lib/supabase/paged-select";
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null };
 
@@ -739,7 +743,7 @@ export async function getReservationsInfrastructure(options?: {
         .from("reservations_infrastructure")
         .select("*")
         .order("date_debut", { ascending: true });
-      q = applyReservationDateRange(q, options?.dateDebut, options?.dateFin);
+      q = applyReservationDateRangeOverlap(q, options?.dateDebut, options?.dateFin);
       return q.range(from, to);
     },
     (msg) => warn("reservations_infrastructure select", msg)
@@ -769,6 +773,8 @@ export async function getStageIdsWithTerrainReservations(): Promise<Set<string>>
 export async function getReservationsEnriched(options?: {
   dateDebut?: string;
   dateFin?: string;
+  /** Affichage brut depuis infra uniquement (pas de fusion calendrier / masquage créneaux). */
+  infraOnly?: boolean;
 }): Promise<ReservationEnrichedV2[]> {
   const [reservations, stages, infrastructures, entraineurs, stageCoachLinks] = await Promise.all([
     getReservationsInfrastructure(options),
@@ -803,6 +809,10 @@ export async function getReservationsEnriched(options?: {
       groupe: stage?.categorie ?? null,
     };
   });
+
+  if (options?.infraOnly) {
+    return infraEnriched.sort((a, b) => a.date_debut.localeCompare(b.date_debut));
+  }
 
   const year = new Date().getFullYear();
   const calDebut = options?.dateDebut ?? `${year - 1}-01-01`;

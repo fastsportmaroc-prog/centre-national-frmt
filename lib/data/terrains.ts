@@ -1240,6 +1240,105 @@ export async function cleanupDuplicateMatinWhenJourneeExists(): Promise<number> 
   return cleaned;
 }
 
+function creneauFromPlanningHours(
+  heureDebut?: string | null,
+  heureFin?: string | null
+): Creneau {
+  const debut = (heureDebut ?? "").slice(0, 5);
+  const fin = (heureFin ?? "").slice(0, 5);
+  if (debut === "09:00" && fin === "13:00") return "matin";
+  if (debut >= "14:00" && fin <= "18:00") return "apres-midi";
+  if (fin <= "13:00" && debut < "13:00") return "matin";
+  return "journee";
+}
+
+function creneauToStored(c: Creneau): "matin" | "apres_midi" | "journee" {
+  return c === "apres-midi" ? "apres_midi" : c;
+}
+
+function creneauToLegacyHours(c: Creneau): { debut: string; fin: string } {
+  if (c === "matin") return { debut: "09:00:00", fin: "13:00:00" };
+  if (c === "apres-midi") return { debut: "14:00:00", fin: "18:00:00" };
+  return { debut: "09:00:00", fin: "18:00:00" };
+}
+
+/**
+ * Crée ou met à jour `reservations_infrastructure` depuis le planning (séances avec court).
+ * Source fiable quand les stages ont été créés via Planning / formulaire terrains.
+ */
+export async function syncReservationsFromPlanning(
+  supabase?: SupabaseClient,
+  options?: { stageId?: string }
+): Promise<{ upserted: number; skipped: number }> {
+  const client = supabase ?? (await getTerrainsSupabaseClient());
+  let q = client
+    .from("planning")
+    .select("stage_id, date, heure_debut, heure_fin, infrastructure_id, coach_id, statut")
+    .not("infrastructure_id", "is", null)
+    .not("stage_id", "is", null);
+  if (options?.stageId) q = q.eq("stage_id", options.stageId);
+  const { data: seances, error } = await q;
+  if (error) return { upserted: 0, skipped: 0 };
+
+  let upserted = 0;
+  let skipped = 0;
+
+  for (const row of seances ?? []) {
+    const stageId = String(row.stage_id ?? "");
+    const infraId = String(row.infrastructure_id ?? "");
+    const jour = String(row.date ?? "").slice(0, 10);
+    if (!jour || !infraId || !stageId) {
+      skipped++;
+      continue;
+    }
+
+    const creneau = creneauFromPlanningHours(row.heure_debut, row.heure_fin);
+    const stored = creneauToStored(creneau);
+    const { debut, fin } = creneauToLegacyHours(creneau);
+    const dateDebut = `${jour}T${debut}`;
+    const dateFin = `${jour}T${fin}`;
+
+    const { data: existing } = await client
+      .from("reservations_infrastructure")
+      .select("id")
+      .eq("stage_id", stageId)
+      .eq("infrastructure_id", infraId)
+      .eq("creneau", stored)
+      .gte("date_debut", `${jour}T00:00:00`)
+      .lte("date_debut", `${jour}T23:59:59`)
+      .maybeSingle();
+
+    const payload = {
+      stage_id: stageId,
+      infrastructure_id: infraId,
+      entraineur_id: (row.coach_id as string | null) ?? null,
+      date_debut: dateDebut,
+      date_fin: dateFin,
+      creneau: stored,
+      heure_debut: debut.slice(0, 5),
+      heure_fin: fin.slice(0, 5),
+      statut: "confirmee",
+      notes: "[AUTO:planning]",
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing?.id) {
+      const { error: upErr } = await client
+        .from("reservations_infrastructure")
+        .update(payload)
+        .eq("id", existing.id);
+      if (!upErr) upserted++;
+      else skipped++;
+    } else {
+      const { error: insErr } = await client.from("reservations_infrastructure").insert(payload);
+      if (!insErr) upserted++;
+      else skipped++;
+    }
+  }
+
+  return { upserted, skipped };
+}
+
 /** Déduit les besoins terrain depuis les lignes `reservations_infrastructure` existantes. */
 async function inferTerrainsBesoinsFromInfrastructure(
   supabase: SupabaseClient,
@@ -1382,11 +1481,15 @@ export async function resyncStageTerrainsFromNotes(
 }
 
 /** Alignement automatique Stages → Réservations (notes, flag terrains, ou lignes infra). */
-export async function resyncAllStageTerrainsFromNotes(): Promise<{
+export async function resyncAllStageTerrainsFromNotes(
+  supabaseOverride?: SupabaseClient
+): Promise<{
   synced: number;
   processed: number;
+  planningUpserted: number;
 }> {
-  const supabase = await getTerrainsSupabaseClient();
+  const supabase = supabaseOverride ?? (await getTerrainsSupabaseClient());
+  const { upserted: planningUpserted } = await syncReservationsFromPlanning(supabase);
   const { data: stages } = await supabase
     .from("stages_programme")
     .select("id, stage_action, date_debut, date_fin, notes, statut, terrains")
@@ -1417,7 +1520,7 @@ export async function resyncAllStageTerrainsFromNotes(): Promise<{
     });
     if (!skipped && ok.length > 0) synced++;
   }
-  return { synced, processed };
+  return { synced, processed, planningUpserted };
 }
 
 /* ─── SUPPRIMER RÉSERVATIONS D'UN STAGE ─── */

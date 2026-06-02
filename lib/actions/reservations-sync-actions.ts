@@ -4,6 +4,7 @@ import {
   cleanupDuplicateMatinWhenJourneeExists,
   ensureStageTerrainReservations,
   resyncAllStageTerrainsFromNotes,
+  syncReservationsFromPlanning,
 } from "@/lib/data/terrains";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import { updateStageServer } from "@/lib/supabase/stage-write.server";
@@ -53,6 +54,8 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
   if (error || !stage) {
     return { ok: false, synced: 0, conflits: [], cleaned: 0, error: "Stage introuvable" };
   }
+
+  await syncReservationsFromPlanning(supabase, { stageId });
 
   const { ok, conflits } = await ensureStageTerrainReservations({
     id: stage.id,

@@ -15,12 +15,14 @@ import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import { exportReservationsPDF } from "@/lib/pdf/pdf-exports";
 import { syncPlanningAfterReservationChangeAction } from "@/lib/actions/reservation-planning-sync";
-import { reconcileStageTerrainReservationsAction } from "@/lib/actions/reservations-sync-actions";
+import {
+  fullReconcileReservationsAction,
+  loadReservationsPageAction,
+} from "@/lib/actions/reservations-page-actions";
 import {
   createReservationInfrastructure,
   deleteReservationInfrastructure,
   getInfrastructures,
-  getReservationsEnriched,
   getStages,
   updateReservationInfrastructure,
 } from "@/lib/supabase/queries";
@@ -95,8 +97,12 @@ export function ReservationsV2Client() {
   const [syncing, setSyncing] = useState(false);
   const load = useCallback(async () => {
     const range = loadRangeForReservations(periodeFilter);
-    const [r, s, i] = await Promise.all([
-      getReservationsEnriched(range),
+    const [{ reservations: r }, s, i] = await Promise.all([
+      loadReservationsPageAction({
+        dateDebut: range.dateDebut,
+        dateFin: range.dateFin,
+        syncBeforeLoad: true,
+      }),
       getStages(),
       getInfrastructures(),
     ]);
@@ -275,19 +281,26 @@ export function ReservationsV2Client() {
   async function forceSyncAndReload() {
     setSyncing(true);
     try {
-      const result = await reconcileStageTerrainReservationsAction();
+      const result = await fullReconcileReservationsAction();
       const range = loadRangeForReservations(periodeFilter);
-      const [r, s, i] = await Promise.all([
-        getReservationsEnriched(range),
+      const [{ reservations: r }, s, i] = await Promise.all([
+        loadReservationsPageAction({
+          dateDebut: range.dateDebut,
+          dateFin: range.dateFin,
+          syncBeforeLoad: false,
+        }),
         getStages(),
         getInfrastructures(),
       ]);
       setItems(
-      dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
-    );
+        dedupeReservationsForDisplay(r).filter((x) => normalizeStatut(x.statut) !== "annule")
+      );
       setStages(s);
       setInfrastructures(i);
       const parts: string[] = [];
+      if (result.planningUpserted > 0) {
+        parts.push(`${result.planningUpserted} depuis le planning`);
+      }
       if (result.processed > 0) parts.push(`${result.processed} stage(s) traité(s)`);
       if (result.synced > 0) parts.push(`${result.synced} avec réservations mises à jour`);
       if (result.cleaned > 0) parts.push(`${result.cleaned} doublon(s) supprimé(s)`);
