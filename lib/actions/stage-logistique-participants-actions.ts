@@ -6,6 +6,8 @@ import { resolveEffectiveAppRole } from "@/lib/auth/passeports-access";
 import {
   bulkUpsertHebergementParticipantsServer,
   countRepasPrevusStage,
+  createExternalHebergementParticipantServer,
+  deleteHebergementParticipantServer,
   deleteParticipantMealOverrideServer,
   hebergementRowsToParticipantDates,
   loadStageHebergementParticipants,
@@ -67,6 +69,52 @@ export async function bulkSaveHebergementParticipantsAction(
   if (res.ok) {
     await syncHebergementLegacyFromRows(stageId);
     revalidatePath(`/v2/stages/${stageId}`);
+  }
+  return res;
+}
+
+export async function addExternalHebergementParticipantAction(input: {
+  stageId: string;
+  nom: string;
+  prenom?: string;
+  dateArrivee: string;
+  dateDepart: string;
+  chambreId?: string | null;
+}) {
+  const user = await getAuthUserFromServer();
+  if (!user) return { ok: false, error: "Non authentifié" };
+  if (!canManage(resolveEffectiveAppRole(user))) {
+    return { ok: false, error: "Droits insuffisants" };
+  }
+  if (!input.nom.trim()) return { ok: false, error: "Nom obligatoire" };
+  const res = await createExternalHebergementParticipantServer(input);
+  if (res.ok) {
+    await syncHebergementLegacyFromRows(input.stageId);
+    revalidatePath(`/v2/stages/${input.stageId}`);
+  }
+  return res;
+}
+
+export async function removeHebergementParticipantAction(input: {
+  stageId: string;
+  participantType: HebergementParticipantRow["participant_type"];
+  participantId: string | null;
+  rowId?: string;
+}) {
+  const user = await getAuthUserFromServer();
+  if (!user) return { ok: false, error: "Non authentifié" };
+  if (!canManage(resolveEffectiveAppRole(user))) {
+    return { ok: false, error: "Droits insuffisants" };
+  }
+  const res = await deleteHebergementParticipantServer(
+    input.stageId,
+    input.participantType,
+    input.participantId,
+    input.rowId
+  );
+  if (res.ok) {
+    await syncHebergementLegacyFromRows(input.stageId);
+    revalidatePath(`/v2/stages/${input.stageId}`);
   }
   return res;
 }

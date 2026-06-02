@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
+  addExternalHebergementParticipantAction,
   bulkSaveHebergementParticipantsAction,
   getInterneChambresAction,
   getStageHebergementParticipantsAction,
+  removeHebergementParticipantAction,
   saveHebergementParticipantAction,
 } from "@/lib/actions/stage-logistique-participants-actions";
 import type { HebergementParticipantRow, InterneChambreV2 } from "@/lib/types/v2";
@@ -38,6 +41,7 @@ function ParticipantTable({
   saveState,
   onUpdate,
   onToggleHeberge,
+  onRemoveReservation,
 }: {
   title: string;
   rows: HebergementParticipantRow[];
@@ -48,6 +52,7 @@ function ParticipantTable({
   saveState: Record<string, SaveState>;
   onUpdate: (p: HebergementParticipantRow, patch: Partial<HebergementParticipantRow>) => void;
   onToggleHeberge: (p: HebergementParticipantRow) => void;
+  onRemoveReservation: (p: HebergementParticipantRow) => void;
 }) {
   if (rows.length === 0) return null;
 
@@ -70,7 +75,7 @@ function ParticipantTable({
           </thead>
           <tbody>
             {rows.map((p) => {
-              const key = `${p.participant_type}:${p.participant_id}`;
+              const key = p.id ?? `${p.participant_type}:${p.participant_id ?? ""}`;
               const st = saveState[key] ?? "idle";
               const early = p.date_arrivee < stageDebut;
               const late = p.date_depart > stageFin;
@@ -186,9 +191,22 @@ function ParticipantTable({
                     </select>
                   </td>
                   <td className="px-3 py-2 text-center text-xs">
-                    {st === "saving" && <span title="Enregistrement">💾</span>}
-                    {st === "saved" && <span className="text-frmt-green" title="Enregistré">✓</span>}
-                    {st === "error" && <span className="text-red-400" title="Erreur">!</span>}
+                    <div className="flex items-center justify-center gap-1">
+                      {st === "saving" && <span title="Enregistrement">💾</span>}
+                      {st === "saved" && <span className="text-frmt-green" title="Enregistré">✓</span>}
+                      {st === "error" && <span className="text-red-400" title="Erreur">!</span>}
+                      {!disabled && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveReservation(p)}
+                          className="rounded p-1 text-red-400 hover:bg-red-500/10"
+                          title="Supprimer cette réservation d'hébergement"
+                          aria-label="Supprimer réservation hébergement"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -212,6 +230,12 @@ export function HebergementParticipantsTab({
   const [loading, setLoading] = useState(true);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
+  const [extNom, setExtNom] = useState("");
+  const [extPrenom, setExtPrenom] = useState("");
+  const [extArrivee, setExtArrivee] = useState(stageDateDebut);
+  const [extDepart, setExtDepart] = useState(stageDateFin);
+  const [extChambreId, setExtChambreId] = useState("");
+  const [extBusy, setExtBusy] = useState(false);
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const load = useCallback(async () => {
@@ -240,9 +264,10 @@ export function HebergementParticipantsTab({
 
   const joueurs = participants.filter((p) => p.participant_type === "joueur");
   const coachs = participants.filter((p) => p.participant_type === "coach");
+  const externes = participants.filter((p) => p.participant_type === "hors_participant");
 
   function scheduleSave(updated: HebergementParticipantRow) {
-    const key = `${updated.participant_type}:${updated.participant_id}`;
+    const key = updated.id ?? `${updated.participant_type}:${updated.participant_id ?? ""}`;
     const prev = timers.current.get(key);
     if (prev) clearTimeout(prev);
     setSaveState((s) => ({ ...s, [key]: "saving" }));
@@ -275,6 +300,35 @@ export function HebergementParticipantsTab({
     scheduleSave(next);
   }
 
+  async function removeReservation(p: HebergementParticipantRow) {
+    if (p.participant_type !== "hors_participant") {
+      patchParticipant(p, {
+        heberge: false,
+        statut: "annulé",
+        chambre_id: null,
+      });
+      toast("Participant retiré de l'hébergement", "success");
+      return;
+    }
+    const res = await removeHebergementParticipantAction({
+      stageId: stageId,
+      participantType: p.participant_type,
+      participantId: p.participant_id,
+      rowId: p.id,
+    });
+    if (!res.ok) {
+      toast(res.error ?? "Erreur suppression", "error");
+      return;
+    }
+    setParticipants((list) =>
+      list.filter((row) => {
+        if (p.id && row.id) return row.id !== p.id;
+        return true;
+      })
+    );
+    toast("Hors participant supprimé de l'hébergement", "success");
+  }
+
   function toggleHeberge(p: HebergementParticipantRow) {
     patchParticipant(p, {
       heberge: !p.heberge,
@@ -292,6 +346,38 @@ export function HebergementParticipantsTab({
     setBulkBusy(false);
     if (res.ok) toast("Hébergement participants enregistré", "success");
     else toast(res.error ?? "Erreur", "error");
+  }
+
+  async function addExternalParticipant() {
+    if (!extNom.trim()) {
+      toast("Nom obligatoire", "error");
+      return;
+    }
+    if (!extArrivee || !extDepart || extArrivee > extDepart) {
+      toast("Dates invalides", "error");
+      return;
+    }
+    setExtBusy(true);
+    const res = await addExternalHebergementParticipantAction({
+      stageId,
+      nom: extNom.trim(),
+      prenom: extPrenom.trim() || undefined,
+      dateArrivee: extArrivee,
+      dateDepart: extDepart,
+      chambreId: extChambreId || null,
+    });
+    setExtBusy(false);
+    if (!res.ok) {
+      toast(res.error ?? "Erreur ajout hors participant", "error");
+      return;
+    }
+    setExtNom("");
+    setExtPrenom("");
+    setExtArrivee(stageDateDebut);
+    setExtDepart(stageDateFin);
+    setExtChambreId("");
+    await load();
+    toast("Hors participant ajouté à l'hébergement", "success");
   }
 
   if (loading) {
@@ -383,6 +469,57 @@ export function HebergementParticipantsTab({
         </div>
       )}
 
+      {!disabled && (
+        <div className="space-y-2 rounded-lg border border-dashed border-[var(--border)] p-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Ajouter un hors participant (hébergement uniquement)
+          </h4>
+          <div className="grid gap-2 sm:grid-cols-6">
+            <Input
+              placeholder="Nom"
+              value={extNom}
+              onChange={(e) => setExtNom(e.target.value)}
+              className="sm:col-span-2"
+            />
+            <Input
+              placeholder="Prénom"
+              value={extPrenom}
+              onChange={(e) => setExtPrenom(e.target.value)}
+              className="sm:col-span-2"
+            />
+            <Input
+              type="date"
+              value={extArrivee}
+              onChange={(e) => setExtArrivee(e.target.value)}
+            />
+            <Input
+              type="date"
+              value={extDepart}
+              onChange={(e) => setExtDepart(e.target.value)}
+            />
+            <select
+              value={extChambreId}
+              onChange={(e) => setExtChambreId(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--bg-main)] px-2 py-1.5 text-xs sm:col-span-2"
+            >
+              <option value="">— Chambre (optionnel) —</option>
+              {chambres.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Ch. {c.numero}
+                  {c.batiment ? ` · ${c.batiment}` : ""} ({c.type})
+                </option>
+              ))}
+            </select>
+            <div className="sm:col-span-2">
+              <Button size="sm" disabled={extBusy} onClick={() => void addExternalParticipant()}>
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {extBusy ? "Ajout..." : "Ajouter"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ParticipantTable
         title="Joueurs"
         rows={joueurs}
@@ -393,6 +530,7 @@ export function HebergementParticipantsTab({
         saveState={saveState}
         onUpdate={patchParticipant}
         onToggleHeberge={toggleHeberge}
+        onRemoveReservation={removeReservation}
       />
 
       <ParticipantTable
@@ -405,6 +543,20 @@ export function HebergementParticipantsTab({
         saveState={saveState}
         onUpdate={patchParticipant}
         onToggleHeberge={toggleHeberge}
+        onRemoveReservation={removeReservation}
+      />
+
+      <ParticipantTable
+        title="Hors participants"
+        rows={externes}
+        stageDebut={stageDateDebut}
+        stageFin={stageDateFin}
+        chambres={chambres}
+        disabled={disabled}
+        saveState={saveState}
+        onUpdate={patchParticipant}
+        onToggleHeberge={toggleHeberge}
+        onRemoveReservation={removeReservation}
       />
     </div>
   );

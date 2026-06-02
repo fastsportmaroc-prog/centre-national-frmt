@@ -59,8 +59,8 @@ export type StageLogistiqueParticipantType = "joueur" | "coach";
 export type HebergementParticipantRow = {
   id?: string;
   stage_id: string;
-  participant_id: string;
-  participant_type: StageLogistiqueParticipantType;
+  participant_id: string | null;
+  participant_type: StageLogistiqueParticipantType | "hors_participant";
   heberge: boolean;
   date_arrivee: string;
   date_depart: string;

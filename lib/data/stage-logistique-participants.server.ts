@@ -29,6 +29,10 @@ function normalizeStatut(s: string | null | undefined): HebergementParticipantRo
   return "confirmé";
 }
 
+function rowKey(participantType: string, participantId: string | null | undefined): string {
+  return `${participantType}:${participantId ?? ""}`;
+}
+
 export async function loadStageHebergementParticipants(
   stageId: string
 ): Promise<{ participants: HebergementParticipantRow[]; stageDates: { debut: string; fin: string } }> {
@@ -49,16 +53,18 @@ export async function loadStageHebergementParticipants(
     ((chambres ?? []) as InterneChambreV2[]).map((c) => [c.id, c])
   );
   const byKey = new Map(
-    (rows ?? []).map((r) => [
-      `${r.participant_type}:${r.participant_id}`,
-      r as Record<string, unknown>,
-    ])
+    (rows ?? [])
+      .filter((r) => r.participant_id)
+      .map((r) => [
+        rowKey(String(r.participant_type), String(r.participant_id)),
+        r as Record<string, unknown>,
+      ])
   );
 
   const participants: HebergementParticipantRow[] = [];
 
   for (const j of joueurs) {
-    const key = `joueur:${j.id}`;
+    const key = rowKey("joueur", j.id);
     const ex = byKey.get(key);
     const chId = (ex?.chambre_id as string | null) ?? null;
     const ch = chId ? chambreById.get(chId) : undefined;
@@ -80,7 +86,7 @@ export async function loadStageHebergementParticipants(
   }
 
   for (const c of coachs) {
-    const key = `coach:${c.id}`;
+    const key = rowKey("coach", c.id);
     const ex = byKey.get(key);
     const chId = (ex?.chambre_id as string | null) ?? null;
     const ch = chId ? chambreById.get(chId) : undefined;
@@ -97,6 +103,27 @@ export async function loadStageHebergementParticipants(
       nom: c.nom,
       prenom: c.prenom,
       meta: "Coach",
+      chambre_nom: ch ? `Ch. ${ch.numero ?? "?"}${ch.batiment ? ` · ${ch.batiment}` : ""}` : undefined,
+    });
+  }
+
+  for (const ex of rows ?? []) {
+    if (ex.participant_type !== "hors_participant") continue;
+    const chId = (ex.chambre_id as string | null) ?? null;
+    const ch = chId ? chambreById.get(chId) : undefined;
+    participants.push({
+      id: ex.id as string,
+      stage_id: stageId,
+      participant_id: null,
+      participant_type: "hors_participant",
+      heberge: ex.heberge !== false,
+      date_arrivee: String(ex.date_arrivee ?? debut).slice(0, 10),
+      date_depart: String(ex.date_depart ?? fin).slice(0, 10),
+      chambre_id: chId,
+      statut: normalizeStatut(ex.statut as string),
+      nom: String(ex.external_nom ?? "").trim() || "Sans nom",
+      prenom: String(ex.external_prenom ?? "").trim(),
+      meta: "Hors participant",
       chambre_nom: ch ? `Ch. ${ch.numero ?? "?"}${ch.batiment ? ` · ${ch.batiment}` : ""}` : undefined,
     });
   }
@@ -126,16 +153,64 @@ export async function upsertHebergementParticipantServer(
     date_depart: row.date_depart,
     chambre_id: row.heberge ? row.chambre_id || null : null,
     statut: row.heberge ? row.statut : "annulé",
+    external_nom: row.participant_type === "hors_participant" ? (row.nom ?? "").trim() : null,
+    external_prenom: row.participant_type === "hors_participant" ? (row.prenom ?? "").trim() : null,
     updated_at: new Date().toISOString(),
   };
-
-  const { error } = await supabase
-    .from("stage_hebergement_participants")
-    .upsert(payload, { onConflict: "stage_id,participant_id,participant_type" });
+  const table = supabase.from("stage_hebergement_participants");
+  const { error } = row.id
+    ? await table.upsert({ ...payload, id: row.id }, { onConflict: "id" })
+    : await table.upsert(payload, { onConflict: "stage_id,participant_id,participant_type" });
 
   if (error?.message?.includes("does not exist")) {
     return { ok: false, error: "Table stage_hebergement_participants absente — exécutez la migration 050." };
   }
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function createExternalHebergementParticipantServer(input: {
+  stageId: string;
+  nom: string;
+  prenom?: string;
+  dateArrivee: string;
+  dateDepart: string;
+  chambreId?: string | null;
+  statut?: HebergementParticipantRow["statut"];
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await getSupabaseServerDataClient();
+  const { error } = await supabase.from("stage_hebergement_participants").insert({
+    stage_id: input.stageId,
+    participant_id: null,
+    participant_type: "hors_participant",
+    heberge: true,
+    date_arrivee: input.dateArrivee,
+    date_depart: input.dateDepart,
+    chambre_id: input.chambreId ?? null,
+    statut: input.statut ?? "confirmé",
+    external_nom: input.nom.trim(),
+    external_prenom: (input.prenom ?? "").trim() || null,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteHebergementParticipantServer(
+  stageId: string,
+  participantType: HebergementParticipantRow["participant_type"],
+  participantId: string | null,
+  rowId?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await getSupabaseServerDataClient();
+  let q = supabase.from("stage_hebergement_participants").delete().eq("stage_id", stageId);
+  if (rowId) {
+    q = q.eq("id", rowId);
+  } else {
+    q = q.eq("participant_type", participantType);
+    if (participantId) q = q.eq("participant_id", participantId);
+  }
+  const { error } = await q;
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
@@ -156,16 +231,18 @@ export function hebergementRowsToParticipantDates(
   defaultDebut: string,
   defaultFin: string
 ): HebergementParticipantDates[] {
-  return rows.map((r) => ({
-    personne_id: r.participant_id,
-    personne_type: fromDbCoachType(r.participant_type),
-    date_debut: r.date_arrivee,
-    date_fin: r.date_depart,
-    dates_personnalisees:
-      !r.heberge ||
-      r.date_arrivee !== defaultDebut ||
-      r.date_depart !== defaultFin,
-  }));
+  return rows
+    .filter((r) => r.participant_type !== "hors_participant" && Boolean(r.participant_id))
+    .map((r) => ({
+      personne_id: r.participant_id!,
+      personne_type: fromDbCoachType(r.participant_type),
+      date_debut: r.date_arrivee,
+      date_fin: r.date_depart,
+      dates_personnalisees:
+        !r.heberge ||
+        r.date_arrivee !== defaultDebut ||
+        r.date_depart !== defaultFin,
+    }));
 }
 
 export async function loadStageRestaurationDetail(stageId: string): Promise<{
