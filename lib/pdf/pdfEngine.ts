@@ -102,7 +102,7 @@ export class FRMTPdfEngine {
     doc.setFontSize(8);
     setTextHex(doc, PDF_COLORS.textSecondary);
     doc.text(PDF_FEDERATION_LABEL, textX, 16);
-    doc.text("Centre National d'Excellence — CNE V2", textX, 20);
+    doc.text("Centre National", textX, 20);
 
     doc.setFont(PDF_FONTS.heading, "bold");
     doc.setFontSize(9);
@@ -156,7 +156,7 @@ export class FRMTPdfEngine {
     doc.setFont(PDF_FONTS.body, "normal");
     doc.setFontSize(7);
     setTextHex(doc, PDF_COLORS.textMuted);
-    doc.text("FRMT — Centre National d'Excellence", marginLeft, y + 2);
+    doc.text("FRMT — Centre National", marginLeft, y + 2);
 
     const confText = "Document confidentiel — Usage interne";
     const confW = doc.getTextWidth(confText);

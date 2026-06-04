@@ -61,7 +61,7 @@ export const PDF_SIZES = {
 export const PDF_FEDERATION_LABEL = "Fédération Royale Marocaine de Tennis";
 
 export const PDF_META = {
-  creator: "FRMT Centre National — CNE V2",
+  creator: "FRMT — Centre National",
   author: PDF_FEDERATION_LABEL,
   subject: "Document officiel FRMT",
 } as const;
