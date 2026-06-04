@@ -414,8 +414,16 @@ export function StagesV2Client() {
       date_fin: stage.date_fin,
       lieu: stage.lieu,
       statut: String(stage.statut),
-      joueurs: j.map((x) => `${x.prenom} ${x.nom}`),
-      coachs: e.map((x) => `${x.prenom} ${x.nom}`),
+      joueurs: j.map((x) => ({
+        nom: x.nom,
+        prenom: x.prenom,
+        categorie: x.categorie ?? x.categorie_age ?? undefined,
+      })),
+      coachs: e.map((x) => ({
+        nom: x.nom,
+        prenom: x.prenom,
+        type: x.specialite ? `Coach (${x.specialite})` : "Coach",
+      })),
       hebergement: buildHebergementPdfRows(Boolean(stage.hebergement), h),
       restauration: buildRestaurationPdfRows({
         stageIncluded: Boolean(stage.restauration) || stage.has_restauration,

@@ -9,6 +9,7 @@ import {
   safePdfCell,
 } from "@/lib/pdf/pdf-format";
 import { loadPdfLogoBase64 } from "@/lib/pdf/load-pdf-logo";
+import { resolveEffectiveStageStatut } from "@/lib/v2/stage-effective-statut";
 
 export type FicheStagePdfInput = {
   stage_action: string;
@@ -31,6 +32,46 @@ function daysBetween(debut: string, fin: string): number {
   const b = new Date(`${fin.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
   return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000) + 1);
+}
+
+type ParticipantRowInput =
+  | { nom: string; prenom: string; type?: string; categorie?: string }
+  | string;
+
+function participantToRow(
+  index: number,
+  p: ParticipantRowInput,
+  role: "Joueur" | "Coach"
+): (string | number)[] {
+  if (typeof p === "string") {
+    const parts = p.trim().split(/\s+/);
+    const prenom = parts[0] ?? "";
+    const nom = parts.slice(1).join(" ") || prenom;
+    return [String(index), nom, prenom, role, role === "Joueur" ? "—" : "Encadrant", "—"];
+  }
+  return [
+    String(index),
+    p.nom,
+    p.prenom,
+    p.type ?? role,
+    role === "Joueur" ? (p.categorie ?? "—") : "Encadrant",
+    "—",
+  ];
+}
+
+function buildParticipantsTableRows(
+  joueurs?: ParticipantRowInput[],
+  coachs?: ParticipantRowInput[]
+): (string | number)[][] {
+  const rows: (string | number)[][] = [];
+  let n = 1;
+  for (const j of joueurs ?? []) {
+    rows.push(participantToRow(n++, j, "Joueur"));
+  }
+  for (const c of coachs ?? []) {
+    rows.push(participantToRow(n++, c, "Coach"));
+  }
+  return rows;
 }
 
 function tableColWidths(keys: string[]): number[] {
@@ -64,23 +105,14 @@ function tableFromRows(rows: Record<string, string>[] | undefined, title: string
 export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<void> {
   const logo = await loadPdfLogoBase64();
   const jours = daysBetween(stage.date_debut, stage.date_fin);
-  const participants =
-    stage.joueurs?.map((j, i) => {
-      if (typeof j === "string") {
-        const parts = j.split(" ");
-        return [String(i + 1), parts.slice(1).join(" ") || j, parts[0] ?? "", "Joueur", "—", "—"];
-      }
-      return [
-        String(i + 1),
-        j.nom,
-        j.prenom,
-        j.type ?? "Joueur",
-        j.categorie ?? "—",
-        "—",
-      ];
-    }) ?? [];
+  const statutEffectif = resolveEffectiveStageStatut({
+    statut: stage.statut,
+    date_debut: stage.date_debut,
+    date_fin: stage.date_fin,
+  });
+  const participants = buildParticipantsTableRows(stage.joueurs, stage.coachs);
 
-  const nbJoueurs = participants.length;
+  const nbJoueurs = stage.joueurs?.length ?? 0;
   const nbCoachs = stage.coachs?.length ?? 0;
 
   const engine = new FRMTPdfEngine(`Fiche Stage — ${stage.stage_action}`);
@@ -112,10 +144,10 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
     { label: "Lieu", value: safePdfCell(stage.lieu) },
   ]);
 
-  engine.sectionTitle("Participants");
+  engine.sectionTitle(`Participants (${nbJoueurs} joueur${nbJoueurs !== 1 ? "s" : ""}, ${nbCoachs} coach${nbCoachs !== 1 ? "s" : ""})`);
   engine.table({
-    headers: ["#", "Nom", "Prénom", "Type", "Catégorie", "Statut"],
-    colWidths: [10, 38, 35, 25, 28, 46],
+    headers: ["#", "Nom", "Prénom", "Rôle", "Catégorie", "Statut"],
+    colWidths: [10, 38, 35, 22, 30, 47],
     wrapText: true,
     rows:
       participants.length ?

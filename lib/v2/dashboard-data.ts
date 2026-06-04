@@ -16,6 +16,7 @@ import {
 import type { StageProgrammeV2 } from "@/lib/types/v2";
 import { billetPrixEnMad } from "@/lib/v2/billets-currency";
 import { detectConflicts } from "@/lib/v2/reservations-utils";
+import { resolveEffectiveStageStatut } from "@/lib/v2/stage-effective-statut";
 import {
   hasTerrainsInNotes,
   stageHasTerrainsConfigured,
@@ -91,12 +92,6 @@ function checklistProgress(s: StageDashboardCard & { hebergement: boolean; trans
   return { done: tasks.filter(Boolean).length, total: tasks.length };
 }
 
-function effectiveStageStatut(s: StageProgrammeV2, today: string): StageProgrammeV2["statut"] {
-  // Règle métier demandée: si la date est dépassée et que ce n'est pas annulé => terminé.
-  if (s.statut !== "annule" && s.date_fin < today) return "termine";
-  return s.statut;
-}
-
 function buildLinkCountMaps(
   linksJ: Awaited<ReturnType<typeof getStageJoueursLinks>>,
   linksC: Awaited<ReturnType<typeof getStageCoachLinks>>
@@ -128,7 +123,7 @@ function enrichStage(
   const end = parseISO(s.date_fin.includes("T") ? s.date_fin : `${s.date_fin}T12:00:00`);
   const jours_duree = Math.max(1, differenceInCalendarDays(end, start) + 1);
   const jours_avant = differenceInCalendarDays(start, new Date());
-  const statut = effectiveStageStatut(s, today);
+  const statut = resolveEffectiveStageStatut(s, today);
 
   const base = {
     ...s,
@@ -202,7 +197,7 @@ export async function loadDashboardV2(): Promise<DashboardV2Data> {
 
   const stagesWithEffectiveStatut = stages.map((s) => ({
     ...s,
-    statut: effectiveStageStatut(s, today),
+    statut: resolveEffectiveStageStatut(s, today),
   }));
 
   const stagesAvenir = stagesWithEffectiveStatut
