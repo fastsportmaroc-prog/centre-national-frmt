@@ -30,9 +30,17 @@ export async function fetchProgrammationEvenements(
   const res = await fetch(`/api/programmation-joueurs${filtersToParams(filters)}`, {
     cache: "no-store",
   });
-  const json = (await res.json()) as { evenements?: ProgrammationEvenementEnriched[]; error?: string };
+  const json = (await res.json()) as {
+    evenements?: ProgrammationEvenementEnriched[];
+    error?: string;
+    migrationRequired?: boolean;
+  };
   if (!res.ok) return { evenements: [], error: json.error ?? "Erreur chargement" };
-  return { evenements: json.evenements ?? [] };
+  return {
+    evenements: json.evenements ?? [],
+    error: json.error,
+    migrationRequired: json.migrationRequired,
+  };
 }
 
 export async function fetchProgrammationEvenement(

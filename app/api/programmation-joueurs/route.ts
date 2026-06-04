@@ -15,8 +15,10 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const filters = parseProgrammationFiltersFromSearchParams(searchParams);
-  const { data, error } = await listProgrammationEvenements(filters);
-  if (error) return NextResponse.json({ error, evenements: [] }, { status: 500 });
+  const { data, error, migrationRequired } = await listProgrammationEvenements(filters);
+  if (error) {
+    return NextResponse.json({ error, evenements: [], migrationRequired: migrationRequired ?? false }, { status: migrationRequired ? 200 : 500 });
+  }
   return NextResponse.json({ evenements: data });
 }
 

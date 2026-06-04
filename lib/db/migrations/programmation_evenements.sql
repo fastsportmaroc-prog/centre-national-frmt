@@ -1,4 +1,5 @@
--- Module Programmation Joueurs (tables dédiées — sans modification des tables existantes)
+-- Module Programmation Joueurs — à exécuter dans Supabase → SQL Editor si la table est absente.
+-- Fichier source : supabase/migrations/054_programmation_joueurs.sql
 
 create table if not exists public.programmation_evenements (
   id uuid primary key default gen_random_uuid(),
@@ -65,7 +66,5 @@ alter table public.programmation_evenements enable row level security;
 drop policy if exists "programmation_evenements_all" on public.programmation_evenements;
 create policy "programmation_evenements_all" on public.programmation_evenements
   for all using (true) with check (true);
-
-comment on table public.programmation_evenements is 'Programme tournois/stages/repos par joueur — module Programmation Joueurs';
 
 notify pgrst, 'reload schema';

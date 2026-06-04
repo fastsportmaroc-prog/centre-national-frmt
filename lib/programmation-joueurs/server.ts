@@ -20,6 +20,7 @@ import {
   localUpdateProgrammation,
 } from "@/lib/local-test/programmation-joueurs-store";
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { normalizeProgrammationDbError } from "@/lib/programmation-joueurs/db-errors";
 
 const TABLE = "programmation_evenements";
 
@@ -58,7 +59,7 @@ async function enrichRows(rows: ProgrammationEvenement[]): Promise<Programmation
 
 export async function listProgrammationEvenements(
   filters?: ProgrammationFilters
-): Promise<{ data: ProgrammationEvenementEnriched[]; error?: string }> {
+): Promise<{ data: ProgrammationEvenementEnriched[]; error?: string; migrationRequired?: boolean }> {
   if (!isSupabaseConfigured()) {
     return { data: await enrichRows(localListProgrammation(filters)) };
   }
@@ -89,7 +90,10 @@ export async function listProgrammationEvenements(
       q = q.in("joueur_id", ids);
     }
     const { data, error } = await q;
-    if (error) return { data: [], error: error.message };
+    if (error) {
+      const norm = normalizeProgrammationDbError(error.message);
+      return { data: [], error: norm.error, migrationRequired: norm.migrationRequired };
+    }
     return { data: await enrichRows((data ?? []) as ProgrammationEvenement[]) };
   } catch (e) {
     return { data: [], error: e instanceof Error ? e.message : String(e) };
@@ -152,7 +156,10 @@ export async function createProgrammationEvenements(
       updated_at: new Date().toISOString(),
     }));
     const { data, error } = await supabase.from(TABLE).insert(rows).select("*");
-    if (error) return { data: [], error: error.message };
+    if (error) {
+      const norm = normalizeProgrammationDbError(error.message);
+      return { data: [], error: norm.error };
+    }
     return { data: (data ?? []) as ProgrammationEvenement[] };
   } catch (e) {
     return { data: [], error: e instanceof Error ? e.message : String(e) };

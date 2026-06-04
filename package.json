@@ -15,6 +15,7 @@
     "demarrer": "npm run dev:3001",
     "demarrer:clean": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/DEMARRER.ps1",
     "verify:supabase": "node scripts/verify-supabase-auth.mjs",
+    "migrate:programmation": "node scripts/apply-programmation-migration.mjs",
     "fix:password": "node scripts/fix-user-password.mjs",
     "repair:compte": "node scripts/repair-compte-frmt.mjs",
     "fix:admin-profile": "node scripts/promote-profile-admin.mjs",

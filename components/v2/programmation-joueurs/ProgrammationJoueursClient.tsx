@@ -81,6 +81,7 @@ export function ProgrammationJoueursClient() {
   const [formOpen, setFormOpen] = useState(false);
   const [editEv, setEditEv] = useState<ProgrammationEvenementEnriched | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [migrationRequired, setMigrationRequired] = useState(false);
 
   const range = useMemo(() => defaultRange(viewMode, filters), [viewMode, filters]);
 
@@ -123,7 +124,8 @@ export function ProgrammationJoueursClient() {
         }),
       ]);
       setJoueurs(jRes);
-      if (eRes.error) toast(eRes.error, "error");
+      setMigrationRequired(Boolean(eRes.migrationRequired));
+      if (eRes.error && !eRes.migrationRequired) toast(eRes.error, "error");
       setEvenements(eRes.evenements);
     } finally {
       setLoading(false);
@@ -224,6 +226,18 @@ export function ProgrammationJoueursClient() {
         </div>
 
         <FiltresProgrammation filters={filters} onChange={patchFilters} onReset={resetFilters} />
+
+        {migrationRequired && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <p className="font-medium">Configuration base de données requise</p>
+            <p className="mt-1 text-amber-100/90">
+              La table <code className="text-xs">programmation_evenements</code> n&apos;existe pas encore
+              sur Supabase. Ouvrez <strong>Supabase → SQL Editor</strong>, exécutez le fichier{" "}
+              <code className="text-xs">lib/db/migrations/programmation_evenements.sql</code>, puis
+              rechargez le schéma API (Settings → API → Reload). Ensuite rafraîchissez cette page.
+            </p>
+          </div>
+        )}
 
         <Card className="overflow-hidden bg-[var(--bg-card)] p-0">
           {loading ? (
