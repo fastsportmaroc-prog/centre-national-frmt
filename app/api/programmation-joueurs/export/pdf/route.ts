@@ -7,7 +7,10 @@ import {
 } from "@/lib/pdf/programmation/index.server";
 import { DEFAULT_PDF_OPTIONS } from "@/lib/pdf/programmation/types";
 import { listProgrammationEvenements } from "@/lib/programmation-joueurs/server";
-import type { ProgrammationPdfType } from "@/lib/types/programmation-joueurs";
+import type {
+  ProgrammationEvenementEnriched,
+  ProgrammationPdfType,
+} from "@/lib/types/programmation-joueurs";
 import type { ProgrammationPdfTypeLetter } from "@/lib/pdf/programmation/types";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +22,14 @@ function parseLetterType(v: string | null): ProgrammationPdfTypeLetter | null {
   return LETTER_TYPES.has(u) ? (u as ProgrammationPdfTypeLetter) : null;
 }
 
-async function loadEvents(joueurIds: string[], dateDebut: string, dateFin: string) {
+async function loadEvents(
+  joueurIds: string[],
+  dateDebut: string,
+  dateFin: string
+): Promise<{ data: ProgrammationEvenementEnriched[]; error?: string }> {
   const { data, error } = await listProgrammationEvenements({ joueurIds, dateDebut, dateFin });
-  if (error) return { error, data: null as null };
-  return { data, error: null as null };
+  if (error) return { data: [], error };
+  return { data: data ?? [] };
 }
 
 export async function POST(request: Request) {
