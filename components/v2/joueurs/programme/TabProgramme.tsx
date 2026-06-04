@@ -20,7 +20,7 @@ import {
 } from "@/lib/programmation-joueurs/client-api";
 import { FormulaireEvenement } from "@/components/v2/programmation-joueurs/FormulaireEvenement";
 import { EvenementDrawer } from "@/components/v2/programmation-joueurs/EvenementDrawer";
-import { ExportOptionsModal } from "@/components/v2/programmation-joueurs/ExportOptionsModal";
+import { ExportPdfModal } from "@/components/v2/programmation-joueurs/ExportPdfModal";
 import { StatsRapidesJoueur } from "./StatsRapidesJoueur";
 import { MiniCalendrierJoueur } from "./MiniCalendrierJoueur";
 import { ListeEvenementsJoueur } from "./ListeEvenementsJoueur";
@@ -112,15 +112,13 @@ export function TabProgramme({ joueur, allJoueurs }: Props) {
         onEdit={(ev) => { setEditEv(ev); setFormOpen(true); setDrawerEv(null); }}
       />
 
-      <ExportOptionsModal
+      <ExportPdfModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        joueurCount={1}
+        joueurs={[joueur]}
+        defaultSelectedIds={[joueur.id]}
         onConfirm={async (opts) => {
-          await exportProgrammationPdf({
-            joueurIds: [joueur.id],
-            ...opts,
-          });
+          await exportProgrammationPdf(opts);
           toast("PDF téléchargé", "success");
         }}
       />

@@ -96,6 +96,9 @@ export type ProgrammationJoueurStats = {
 
 export type ProgrammationPdfType = "mensuel" | "annuel" | "plage" | "multi";
 
+/** Types export PDF professionnel (A–E). */
+export type ProgrammationPdfTypeLetter = "A" | "B" | "C" | "D" | "E";
+
 export type CreateProgrammationPayload = ProgrammationEvenementInput & {
   /** Crée une ligne par joueur (même événement). */
   joueur_ids?: string[];

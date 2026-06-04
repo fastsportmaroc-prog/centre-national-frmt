@@ -22,6 +22,7 @@ import {
   typeColorRgb,
 } from "@/lib/programmation-joueurs/pdf-planning-theme";
 import { formatDateFR, formatPeriodePdf } from "@/lib/pdf/pdf-format";
+import { flagForPays } from "@/lib/pdf/programmation/flagEmoji";
 
 export type TimeColumn = {
   key: string;
@@ -324,7 +325,8 @@ export function drawPlanningGanttGrid(opts: PlanningGridOpts): number {
       doc.text(truncate(doc, title, bw - 2), bx + 1.5, by + bh / 2 + 1);
 
       if (bw > 35) {
-        const lieu = [ev.ville, ev.pays].filter(Boolean).join(", ");
+        const flag = flagForPays(ev.pays);
+        const lieu = [ev.ville, flag ? `${flag} ${ev.pays}` : ev.pays].filter(Boolean).join(", ");
         if (lieu) {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(4.5);

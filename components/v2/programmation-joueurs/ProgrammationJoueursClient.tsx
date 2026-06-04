@@ -35,7 +35,7 @@ import { PlanningTimeline, type PlanningViewMode } from "./PlanningTimeline";
 import { EvenementDrawer } from "./EvenementDrawer";
 import { FormulaireEvenement } from "./FormulaireEvenement";
 import { SelectionExportBar } from "./SelectionExportBar";
-import { ExportOptionsModal } from "./ExportOptionsModal";
+import { ExportPdfModal } from "./ExportPdfModal";
 import { cn } from "@/lib/utils/cn";
 import { getJoueurDisplayCategorie, matchesJoueurCategoryFilter } from "@/lib/utils/joueur";
 import { normalizeSearchText } from "@/lib/v2/global-search";
@@ -283,16 +283,14 @@ export function ProgrammationJoueursClient() {
 
       <SelectionExportBar count={selectedIds.size} onExport={() => setExportOpen(true)} />
 
-      <ExportOptionsModal
+      <ExportPdfModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        joueurCount={selectedIds.size}
+        joueurs={filteredJoueurs}
+        defaultSelectedIds={[...selectedIds]}
         onConfirm={async (opts) => {
           try {
-            await exportProgrammationPdf({
-              joueurIds: [...selectedIds],
-              ...opts,
-            });
+            await exportProgrammationPdf(opts);
             toast("PDF téléchargé", "success");
           } catch (e) {
             toast(e instanceof Error ? e.message : "Erreur PDF", "error");

@@ -5,8 +5,9 @@ import type {
   ProgrammationEvenementInput,
   ProgrammationFilters,
   ProgrammationJoueurStats,
-  ProgrammationPdfType,
+  ProgrammationPdfTypeLetter,
 } from "@/lib/types/programmation-joueurs";
+import type { ProgrammationPdfOptions } from "@/lib/pdf/programmation/types";
 
 function filtersToParams(f?: ProgrammationFilters): string {
   if (!f) return "";
@@ -105,23 +106,42 @@ export type ProgrammationPdfExportOptions = {
   joueurIds: string[];
   dateDebut: string;
   dateFin: string;
-  typePdf: ProgrammationPdfType;
+  typePdf: ProgrammationPdfTypeLetter;
+  options?: Partial<ProgrammationPdfOptions>;
+  /** @deprecated Utiliser typePdf A–E */
   includeResultats?: boolean;
   includePoints?: boolean;
   includeClassement?: boolean;
 };
 
-export async function exportProgrammationPdf(options: ProgrammationPdfExportOptions): Promise<void> {
-  const sp = new URLSearchParams();
-  options.joueurIds.forEach((id) => sp.append("joueurIds", id));
-  sp.set("dateDebut", options.dateDebut);
-  sp.set("dateFin", options.dateFin);
-  sp.set("typePdf", options.typePdf);
-  if (options.includeResultats) sp.set("includeResultats", "1");
-  if (options.includePoints) sp.set("includePoints", "1");
-  if (options.includeClassement) sp.set("includeClassement", "1");
+function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const m = /filename="([^"]+)"/i.exec(header) ?? /filename=([^;\s]+)/i.exec(header);
+  return m?.[1]?.trim() ?? null;
+}
 
-  const res = await fetch(`/api/programmation-joueurs/export/pdf?${sp.toString()}`);
+export async function exportProgrammationPdf(options: ProgrammationPdfExportOptions): Promise<void> {
+  const pdfOptions: ProgrammationPdfOptions = {
+    inclurePhoto: true,
+    inclureResultats: options.includeResultats ?? true,
+    inclurePoints: options.includePoints ?? true,
+    inclurePrizeMoney: true,
+    langue: "fr",
+    orientation: options.typePdf === "D" ? "portrait" : "auto",
+    ...options.options,
+  };
+
+  const res = await fetch("/api/programmation-joueurs/export/pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      joueurIds: options.joueurIds,
+      dateDebut: options.dateDebut,
+      dateFin: options.dateFin,
+      typePdf: options.typePdf,
+      options: pdfOptions,
+    }),
+  });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(err.error ?? "Erreur export PDF");
@@ -130,7 +150,9 @@ export async function exportProgrammationPdf(options: ProgrammationPdfExportOpti
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `programme-${options.typePdf}-${options.dateDebut}.pdf`;
+  a.download =
+    filenameFromDisposition(res.headers.get("Content-Disposition")) ??
+    `FRMT_Planning_${options.typePdf}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
 }
