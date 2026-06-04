@@ -49,3 +49,19 @@ export function getJoueurDisplayCategorie(
   const fromBirth = j.date_naissance ? categorieDepuisNaissance(j.date_naissance) : null;
   return resolveOfficialCategory(stored, fromBirth ?? fallback);
 }
+
+/** Filtre catégorie — même logique que la rubrique Joueurs (U10, Elite Pro, année de naissance…). */
+export function matchesJoueurCategoryFilter(
+  j: {
+    date_naissance?: string | null;
+    categorie_age?: string | null;
+    categorie?: string | null;
+  },
+  filterCode: string
+): boolean {
+  if (!filterCode) return true;
+  const cat = getJoueurDisplayCategorie(j);
+  if (cat === filterCode) return true;
+  const y = j.date_naissance?.slice(0, 4);
+  return y === filterCode;
+}

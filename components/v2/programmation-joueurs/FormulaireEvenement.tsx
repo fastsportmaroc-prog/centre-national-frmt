@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
@@ -16,6 +17,7 @@ import type {
   ProgrammationType,
 } from "@/lib/types/programmation-joueurs";
 import type { JoueurV2 } from "@/lib/types/v2";
+import { matchesParticipantSearch } from "@/lib/v2/global-search";
 
 type Props = {
   open: boolean;
@@ -70,8 +72,18 @@ export function FormulaireEvenement({
 }: Props) {
   const isEdit = Boolean(initial?.id);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [joueurSearch, setJoueurSearch] = useState("");
   const [form, setForm] = useState<ProgrammationEvenementInput>(emptyForm());
   const [saving, setSaving] = useState(false);
+
+  const filteredJoueurs = useMemo(() => {
+    const q = joueurSearch.trim();
+    return joueurs.filter(
+      (j) =>
+        selectedIds.includes(j.id) ||
+        matchesParticipantSearch(q, j.prenom, j.nom, j.club, j.licence, j.categorie, j.ipin)
+    );
+  }, [joueurs, joueurSearch, selectedIds]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +106,7 @@ export function FormulaireEvenement({
       setForm(emptyForm());
       setSelectedIds(defaultJoueurIds ?? []);
     }
+    setJoueurSearch("");
   }, [open, initial, defaultJoueurIds]);
 
   const isTournoi = TOURNOI_TYPES.includes(form.type);
@@ -144,18 +157,41 @@ export function FormulaireEvenement({
       <div className="space-y-4">
         {!isEdit && (
           <div>
-            <Label>Joueur(s)</Label>
-            <div className="mt-2 max-h-32 overflow-y-auto rounded border border-[var(--border)] p-2">
-              {joueurs.map((j) => (
-                <label key={j.id} className="flex items-center gap-2 py-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(j.id)}
-                    onChange={() => toggleJoueur(j.id)}
-                  />
-                  {j.prenom} {j.nom}
-                </label>
-              ))}
+            <Label>
+              Joueur(s) ({selectedIds.length} sélectionné{selectedIds.length !== 1 ? "s" : ""})
+            </Label>
+            <div className="relative mt-2">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <Input
+                className="h-8 pl-8 text-sm"
+                placeholder="Rechercher joueur (nom, club, licence…)"
+                value={joueurSearch}
+                onChange={(e) => setJoueurSearch(e.target.value)}
+              />
+            </div>
+            <div className="mt-2 max-h-48 overflow-y-auto rounded border border-[var(--border)] p-2">
+              {filteredJoueurs.length === 0 ? (
+                <p className="py-2 text-xs text-muted">Aucun joueur trouvé</p>
+              ) : (
+                filteredJoueurs.map((j) => (
+                  <label
+                    key={j.id}
+                    className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-white/5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(j.id)}
+                      onChange={() => toggleJoueur(j.id)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      {j.prenom} {j.nom}
+                      {j.club ? (
+                        <span className="ml-1 text-xs text-[var(--text-secondary)]">· {j.club}</span>
+                      ) : null}
+                    </span>
+                  </label>
+                ))
+              )}
             </div>
           </div>
         )}

@@ -37,6 +37,8 @@ import { FormulaireEvenement } from "./FormulaireEvenement";
 import { SelectionExportBar } from "./SelectionExportBar";
 import { ExportOptionsModal } from "./ExportOptionsModal";
 import { cn } from "@/lib/utils/cn";
+import { getJoueurDisplayCategorie, matchesJoueurCategoryFilter } from "@/lib/utils/joueur";
+import { normalizeSearchText } from "@/lib/v2/global-search";
 
 const VIEW_MODES: { id: PlanningViewMode; label: string }[] = [
   { id: "mensuelle", label: "Mensuelle" },
@@ -82,13 +84,40 @@ export function ProgrammationJoueursClient() {
 
   const range = useMemo(() => defaultRange(viewMode, filters), [viewMode, filters]);
 
+  const filteredJoueurs = useMemo(() => {
+    let list = [...joueurs];
+    if (filters.categorieJoueur) {
+      list = list.filter((j) => matchesJoueurCategoryFilter(j, filters.categorieJoueur!));
+    }
+    const tokens = normalizeSearchText(filters.search ?? "")
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length) {
+      const eventJoueurIds = new Set(evenements.map((e) => e.joueur_id));
+      list = list.filter((j) => {
+        const hay = normalizeSearchText(
+          `${j.prenom} ${j.nom} ${j.club ?? ""} ${getJoueurDisplayCategorie(j)} ${j.licence ?? ""}`
+        );
+        const joueurMatch = tokens.every((t) => hay.includes(t));
+        return joueurMatch || eventJoueurIds.has(j.id);
+      });
+    }
+    return list;
+  }, [joueurs, filters.categorieJoueur, filters.search, evenements]);
+
+  const filteredEvenements = useMemo(() => {
+    const joueurIds = new Set(filteredJoueurs.map((j) => j.id));
+    return evenements.filter((e) => joueurIds.has(e.joueur_id));
+  }, [evenements, filteredJoueurs]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      const { categorieJoueur: _cat, ...apiFilters } = filters;
       const [jRes, eRes] = await Promise.all([
         getJoueurs(),
         fetchProgrammationEvenements({
-          ...filters,
+          ...apiFilters,
           dateDebut: range.start,
           dateFin: range.end,
         }),
@@ -104,6 +133,13 @@ export function ProgrammationJoueursClient() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => filteredJoueurs.some((j) => j.id === id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredJoueurs]);
 
   function patchFilters(patch: Partial<ProgrammationFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -194,8 +230,8 @@ export function ProgrammationJoueursClient() {
             <p className="p-6 text-sm text-[var(--text-secondary)]">Chargement…</p>
           ) : (
             <PlanningTimeline
-              joueurs={joueurs}
-              evenements={evenements}
+              joueurs={filteredJoueurs}
+              evenements={filteredEvenements}
               viewMode={viewMode}
               rangeStart={range.start}
               rangeEnd={range.end}

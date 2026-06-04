@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
+import { useAgeCategories } from "@/lib/hooks/useAgeCategories";
 import {
   PROGRAMMATION_SURFACE_LABELS,
   PROGRAMMATION_TYPE_OPTIONS,
@@ -14,14 +15,9 @@ type Props = {
   onReset: () => void;
 };
 
-const CATEGORIE_OPTIONS = [
-  { value: "", label: "Toutes catégories" },
-  { value: "Senior", label: "Seniors" },
-  { value: "Junior", label: "Juniors" },
-  { value: "Espoir", label: "Espoirs" },
-];
-
 export function FiltresProgrammation({ filters, onChange, onReset }: Props) {
+  const { categories: ageCategories } = useAgeCategories();
+
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3">
       <div className="min-w-[140px] flex-1">
@@ -33,14 +29,15 @@ export function FiltresProgrammation({ filters, onChange, onReset }: Props) {
         />
       </div>
       <div>
-        <Label>Catégorie</Label>
+        <Label>Catégorie d&apos;âge</Label>
         <Select
           value={filters.categorieJoueur ?? ""}
           onChange={(e) => onChange({ categorieJoueur: e.target.value || undefined })}
         >
-          {CATEGORIE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          <option value="">Toutes</option>
+          {ageCategories.map((c) => (
+            <option key={c.id} value={c.code}>
+              {c.label}
             </option>
           ))}
         </Select>
