@@ -4,21 +4,20 @@ import { jsPDF } from "jspdf";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  drawCalendarProHeader,
-  drawColorLegend,
-  drawEventsAgenda,
-  drawJoueurStrip,
-  drawMonthCalendarGrid,
-  monthsInRange,
-} from "@/lib/programmation-joueurs/pdf-calendar-draw.server";
-import {
-  PDF_CALENDAR_THEME,
-  PROGRAMMATION_TYPE_SHORT,
-  typeColorRgb,
-} from "@/lib/programmation-joueurs/pdf-calendar-theme";
-import { PROGRAMMATION_TYPE_LABELS } from "@/lib/constants/programmation-joueurs";
+  buildMonthColumns,
+  buildWeekColumns,
+  computeEventKpis,
+  drawEventSwimlanes,
+  drawJoueurBanner,
+  drawKpiStrip,
+  drawPlanningGanttGrid,
+  drawPlanningHero,
+  drawPlanningLegend,
+  drawPlanningRecapTable,
+} from "@/lib/programmation-joueurs/pdf-planning-draw.server";
+import { PDF_PLANNING_THEME } from "@/lib/programmation-joueurs/pdf-planning-theme";
 import { loadPdfLogoBase64 } from "@/lib/pdf/load-pdf-logo";
-import { formatDateTablePdf, formatPeriodePdf } from "@/lib/pdf/pdf-format";
+import { formatPeriodePdf } from "@/lib/pdf/pdf-format";
 import { PDF_META, PDF_SIZES } from "@/lib/pdf/pdfDesignSystem";
 import type {
   ProgrammationEvenementEnriched,
@@ -61,234 +60,170 @@ function drawFooter(doc: jsPDF) {
   const total = doc.getNumberOfPages();
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
-    doc.setFillColor(...PDF_CALENDAR_THEME.headerSub);
-    doc.rect(0, pageH - 5, pageW, 0.4, "F");
-    doc.setFontSize(6.5);
+    doc.setFillColor(...PDF_PLANNING_THEME.accentGreen);
+    doc.rect(0, pageH - 4, pageW, 0.5, "F");
+    doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(...PDF_CALENDAR_THEME.muted);
-    doc.text(PDF_META.author, PDF_SIZES.marginLeft, pageH - 2);
-    doc.text(`Page ${i} / ${total}`, pageW - PDF_SIZES.marginRight, pageH - 2, { align: "right" });
+    doc.setTextColor(...PDF_PLANNING_THEME.muted);
+    doc.text(PDF_META.author, PDF_SIZES.marginLeft, pageH - 1.5);
+    doc.text(`Page ${i}/${total}`, pageW - PDF_SIZES.marginRight, pageH - 1.5, { align: "right" });
   }
 }
 
-function renderJoueurCalendarPages(
+function renderJoueurPlanningPage(
   doc: jsPDF,
   params: ProgrammationPdfParams,
   joueurId: string,
-  logo?: string,
-  addPageBefore = false
+  logo: string | undefined,
+  addPageBefore: boolean,
+  useMonths: boolean
 ) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const { marginLeft, marginRight } = PDF_SIZES;
   const contentW = pageW - marginLeft - marginRight;
 
+  if (addPageBefore) doc.addPage();
+
   const evs = eventsForJoueur(params.evenements, joueurId, params.dateDebut, params.dateFin);
   const sample = evs[0] ?? params.evenements.find((e) => e.joueur_id === joueurId);
   const label = sample ? joueurLabel(sample) : joueurId.slice(0, 8);
-  const months = monthsInRange(params.dateDebut, params.dateFin);
+  const kpis = computeEventKpis(evs);
 
-  if (addPageBefore) doc.addPage();
+  const title = useMonths
+    ? `Planning annuel ${parseISO(params.dateDebut.slice(0, 10)).getFullYear()}`
+    : `Planning ${format(parseISO(params.dateDebut.slice(0, 10)), "MMMM yyyy", { locale: fr })}`;
 
-  for (let mi = 0; mi < months.length; mi++) {
-    if (mi > 0) doc.addPage();
-
-    const month = months[mi]!;
-    const monthTitle = `Calendrier ${format(month, "MMMM yyyy", { locale: fr })}`;
-
-    let y = drawCalendarProHeader(doc, {
-      pageW,
-      marginLeft,
-      marginRight,
-      title: monthTitle,
-      subtitle: formatPeriodePdf(params.dateDebut, params.dateFin),
-      generatedBy: params.generatedBy ?? "Staff FRMT",
-      logo,
-    });
-
-    y = drawJoueurStrip(doc, marginLeft, y, contentW, label, {
-      categorie: sample?.joueur_categorie,
-      classement: params.includeClassement ? sample?.joueur_classement : null,
-    });
-
-    y = drawColorLegend(doc, marginLeft, y, contentW);
-    y += 2;
-
-    y = drawMonthCalendarGrid({
-      doc,
-      x: marginLeft,
-      y,
-      width: contentW,
-      month,
-      events: evs,
-      compact: false,
-      maxEventsPerDay: 4,
-    });
-
-    if (y < pageH - 55) {
-      drawEventsAgenda(doc, marginLeft, y + 2, contentW, evs, params.includeResultats);
-    }
-
-    const tournois = evs.filter((e) => e.type.includes("tournoi") || e.type.includes("cup")).length;
-    const stages = evs.filter((e) => e.type.startsWith("stage")).length;
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(7);
-    doc.setTextColor(...PDF_CALENDAR_THEME.muted);
-    doc.text(
-      `Recap periode : ${tournois} tournoi(s) · ${stages} stage(s) · ${evs.length} evenement(s)`,
-      marginLeft,
-      pageH - 8
-    );
-  }
-}
-
-/** Vue annuelle : 12 mini-calendriers sur pages paysage (3 x 4) */
-function renderAnnuelCalendar(doc: jsPDF, params: ProgrammationPdfParams, logo?: string) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const { marginLeft, marginRight } = PDF_SIZES;
-  const contentW = pageW - marginLeft - marginRight;
-
-  let started = false;
-  for (const jid of params.joueurIds) {
-    if (started) doc.addPage();
-    started = true;
-
-    const evs = eventsForJoueur(params.evenements, jid, params.dateDebut, params.dateFin);
-    const sample = evs[0] ?? params.evenements.find((e) => e.joueur_id === jid);
-    const label = sample ? joueurLabel(sample) : jid.slice(0, 8);
-    const year = parseISO(params.dateDebut.slice(0, 10)).getFullYear();
-    const months = Array.from({ length: 12 }, (_, i) => new Date(year, i, 1));
-
-    let y = drawCalendarProHeader(doc, {
-      pageW,
-      marginLeft,
-      marginRight,
-      title: `Programme annuel ${year}`,
-      subtitle: label,
-      generatedBy: params.generatedBy ?? "Staff FRMT",
-      logo,
-    });
-
-    y = drawJoueurStrip(doc, marginLeft, y, contentW, label, {
-      categorie: sample?.joueur_categorie,
-      classement: params.includeClassement ? sample?.joueur_classement : null,
-    });
-    y = drawColorLegend(doc, marginLeft, y, contentW);
-    y += 2;
-
-    const colW = contentW / 3;
-    const startY = y;
-    for (let i = 0; i < 12; i++) {
-      const col = i % 3;
-      const row = Math.floor(i / 3);
-      const mx = marginLeft + col * colW;
-      const my = startY + row * 52;
-      drawMonthCalendarGrid({
-        doc,
-        x: mx,
-        y: my,
-        width: colW - 2,
-        month: months[i]!,
-        events: evs,
-        compact: true,
-        maxEventsPerDay: 1,
-      });
-    }
-  }
-}
-
-/** Comparatif multi-joueurs : timeline hebdo coloree */
-function renderMultiCalendar(doc: jsPDF, params: ProgrammationPdfParams, logo?: string) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const { marginLeft, marginRight } = PDF_SIZES;
-  const contentW = pageW - marginLeft - marginRight;
-
-  let y = drawCalendarProHeader(doc, {
+  let y = drawPlanningHero(doc, {
     pageW,
     marginLeft,
     marginRight,
-    title: "Comparatif multi-joueurs",
+    title,
     subtitle: formatPeriodePdf(params.dateDebut, params.dateFin),
     generatedBy: params.generatedBy ?? "Staff FRMT",
     logo,
   });
 
-  y = drawColorLegend(doc, marginLeft, y, contentW);
-  y += 4;
+  y = drawKpiStrip(doc, marginLeft, y, contentW, [
+    { label: "Tournois", value: kpis.tournois, color: PDF_PLANNING_THEME.kpiBlue },
+    { label: "Stages", value: kpis.stages, color: PDF_PLANNING_THEME.kpiGreen },
+    { label: "Sem. actives", value: kpis.semaines, color: PDF_PLANNING_THEME.kpiOrange },
+    { label: "Pays", value: kpis.pays, color: PDF_PLANNING_THEME.kpiPurple },
+  ]);
 
-  const labels = params.joueurIds.map((jid) => {
-    const sample = params.evenements.find((e) => e.joueur_id === jid);
-    return sample ? joueurLabel(sample) : jid.slice(0, 8);
+  y = drawJoueurBanner(doc, marginLeft, y, contentW, label, {
+    categorie: sample?.joueur_categorie,
+    classement: params.includeClassement ? sample?.joueur_classement : null,
   });
 
-  const rowH = 10;
-  const labelW = 38;
-  const gridW = contentW - labelW;
-  const start = parseISO(params.dateDebut.slice(0, 10));
-  const end = parseISO(params.dateFin.slice(0, 10));
-  const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
-  const dayW = gridW / Math.min(totalDays, 90);
+  y = drawPlanningLegend(doc, marginLeft, y, contentW);
 
-  doc.setFillColor(...PDF_CALENDAR_THEME.weekdayBg);
-  doc.rect(marginLeft + labelW, y, gridW, 6, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6);
-  doc.setTextColor(255, 255, 255);
-  doc.text("Timeline periode", marginLeft + labelW + 2, y + 4);
+  const allCols = useMonths
+    ? buildMonthColumns(params.dateDebut, params.dateFin)
+    : buildWeekColumns(params.dateDebut, params.dateFin);
+  const rangeStart = parseISO(params.dateDebut.slice(0, 10));
+  const chunkSize = useMonths ? 12 : 16;
+  const colChunks: typeof allCols[] = [];
+  for (let i = 0; i < allCols.length; i += chunkSize) {
+    colChunks.push(allCols.slice(i, i + chunkSize));
+  }
+  if (!colChunks.length) colChunks.push([]);
 
-  y += 6;
-
-  for (let ji = 0; ji < params.joueurIds.length; ji++) {
-    const jid = params.joueurIds[ji]!;
-    const jy = y + ji * rowH;
-    doc.setFillColor(248, 250, 252);
-    doc.rect(marginLeft, jy, labelW, rowH, "F");
-    doc.setDrawColor(...PDF_CALENDAR_THEME.cellBorder);
-    doc.rect(marginLeft + labelW, jy, gridW, rowH);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text(labels[ji]!.slice(0, 22), marginLeft + 2, jy + 6);
-
-    const evs = eventsForJoueur(params.evenements, jid, params.dateDebut, params.dateFin);
-    for (const ev of evs) {
-      const d0 = parseISO(ev.date_debut.slice(0, 10));
-      const d1 = parseISO(ev.date_fin.slice(0, 10));
-      const offset = Math.max(0, Math.floor((d0.getTime() - start.getTime()) / 86400000));
-      const span = Math.max(1, Math.floor((d1.getTime() - d0.getTime()) / 86400000) + 1);
-      const [r, g, b] = typeColorRgb(ev.type);
-      doc.setFillColor(r, g, b);
-      const bx = marginLeft + labelW + offset * dayW;
-      const bw = Math.max(dayW * 0.8, span * dayW - 0.5);
-      doc.roundedRect(bx, jy + 1.5, Math.min(bw, gridW - offset * dayW), rowH - 3, 0.5, 0.5, "F");
-      doc.setFontSize(5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(PROGRAMMATION_TYPE_SHORT[ev.type], bx + 1, jy + 6);
+  for (let ci = 0; ci < colChunks.length; ci++) {
+    if (ci > 0) {
+      doc.addPage();
+      y = drawPlanningHero(doc, {
+        pageW,
+        marginLeft,
+        marginRight,
+        title: `${title} (${ci + 1}/${colChunks.length})`,
+        subtitle: formatPeriodePdf(params.dateDebut, params.dateFin),
+        generatedBy: params.generatedBy ?? "Staff FRMT",
+        logo,
+      });
+      y = drawJoueurBanner(doc, marginLeft, y, contentW, label, {
+        categorie: sample?.joueur_categorie,
+        classement: params.includeClassement ? sample?.joueur_classement : null,
+      });
+      y = drawPlanningLegend(doc, marginLeft, y, contentW);
     }
+
+    y = drawEventSwimlanes(doc, marginLeft, y, contentW, 42, colChunks[ci]!, evs, rangeStart);
   }
 
-  y += params.joueurIds.length * rowH + 8;
+  if (y < pageH - 50 && colChunks.length === 1) {
+    drawPlanningRecapTable(doc, marginLeft, y + 3, contentW, evs, params.includeResultats);
+  }
+}
+
+function renderMultiPlanning(doc: jsPDF, params: ProgrammationPdfParams, logo?: string) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const { marginLeft, marginRight } = PDF_SIZES;
+  const contentW = pageW - marginLeft - marginRight;
+
+  const allEvs = params.joueurIds.flatMap((jid) =>
+    eventsForJoueur(params.evenements, jid, params.dateDebut, params.dateFin)
+  );
+  const kpis = computeEventKpis(allEvs);
+
+  let y = drawPlanningHero(doc, {
+    pageW,
+    marginLeft,
+    marginRight,
+    title: "Planning equipe — vue comparee",
+    subtitle: formatPeriodePdf(params.dateDebut, params.dateFin),
+    generatedBy: params.generatedBy ?? "Staff FRMT",
+    logo,
+  });
+
+  y = drawKpiStrip(doc, marginLeft, y, contentW, [
+    { label: "Joueurs", value: String(params.joueurIds.length), color: PDF_PLANNING_THEME.kpiPurple },
+    { label: "Tournois", value: kpis.tournois, color: PDF_PLANNING_THEME.kpiBlue },
+    { label: "Stages", value: kpis.stages, color: PDF_PLANNING_THEME.kpiGreen },
+    { label: "Evenements", value: String(allEvs.length), color: PDF_PLANNING_THEME.kpiOrange },
+  ]);
+
+  y = drawPlanningLegend(doc, marginLeft, y, contentW);
+
+  const cols = buildWeekColumns(params.dateDebut, params.dateFin);
+  const rangeStart = parseISO(params.dateDebut.slice(0, 10));
+  const labelW = 36;
+  const rowH = 14;
+
+  const rows = params.joueurIds.map((jid) => {
+    const evs = eventsForJoueur(params.evenements, jid, params.dateDebut, params.dateFin);
+    const sample = evs[0] ?? params.evenements.find((e) => e.joueur_id === jid);
+    return {
+      id: jid,
+      label: sample ? joueurLabel(sample) : jid.slice(0, 8),
+      sub: sample?.joueur_categorie ?? undefined,
+      events: evs,
+    };
+  });
+
+  y = drawPlanningGanttGrid({
+    doc,
+    x: marginLeft,
+    y,
+    width: contentW,
+    labelWidth: labelW,
+    rowHeight: rowH,
+    cols,
+    rangeStart,
+    rows,
+  });
+
   if (y < pageH - 40) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(51, 65, 85);
-    doc.text("Synthese", marginLeft, y);
-    y += 4;
-    for (const jid of params.joueurIds) {
-      const evs = eventsForJoueur(params.evenements, jid, params.dateDebut, params.dateFin);
-      const sample = evs[0];
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
-      doc.text(
-        `${sample ? joueurLabel(sample) : jid} : ${evs.length} evt — ${[...new Set(evs.map((e) => PROGRAMMATION_TYPE_LABELS[e.type]))].slice(0, 4).join(", ")}`,
-        marginLeft,
-        y
-      );
-      y += 4;
-    }
+    drawPlanningRecapTable(doc, marginLeft, y + 4, contentW, allEvs, params.includeResultats);
+  }
+}
+
+function renderAnnuelPlanning(doc: jsPDF, params: ProgrammationPdfParams, logo?: string) {
+  let started = false;
+  for (const jid of params.joueurIds) {
+    renderJoueurPlanningPage(doc, params, jid, logo, started, true);
+    started = true;
   }
 }
 
@@ -296,27 +231,26 @@ export async function generateProgrammationPdfBuffer(
   params: ProgrammationPdfParams
 ): Promise<Uint8Array> {
   const logo = await loadPdfLogoBase64();
-  const useLandscape = true;
-  const doc = new jsPDF({ orientation: useLandscape ? "landscape" : "portrait", unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
   doc.setProperties({
-    title: "Programme joueurs FRMT",
+    title: "Planning joueurs FRMT",
     creator: PDF_META.creator,
     author: PDF_META.author,
   });
 
   switch (params.typePdf) {
     case "annuel":
-      renderAnnuelCalendar(doc, params, logo);
+      renderAnnuelPlanning(doc, params, logo);
       break;
     case "multi":
-      renderMultiCalendar(doc, params, logo);
+      renderMultiPlanning(doc, params, logo);
       break;
     case "plage":
     case "mensuel":
     default:
       for (let i = 0; i < params.joueurIds.length; i++) {
-        renderJoueurCalendarPages(doc, params, params.joueurIds[i]!, logo, i > 0);
+        renderJoueurPlanningPage(doc, params, params.joueurIds[i]!, logo, i > 0, false);
       }
       break;
   }

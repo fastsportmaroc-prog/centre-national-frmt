@@ -115,10 +115,10 @@ export function ExportOptionsModal({ open, onClose, joueurCount, onConfirm }: Pr
             value={typePdf}
             onChange={(e) => setTypePdf(e.target.value as ProgrammationPdfType)}
           >
-            <option value="mensuel">Calendrier mensuel (pro)</option>
-            <option value="annuel">Calendrier annuel 12 mois</option>
-            <option value="plage">Calendrier sur plage</option>
-            {joueurCount > 1 && <option value="multi">Timeline comparatif multi-joueurs</option>}
+            <option value="mensuel">Planning mensuel (semaines)</option>
+            <option value="annuel">Planning annuel (12 mois)</option>
+            <option value="plage">Planning sur plage</option>
+            {joueurCount > 1 && <option value="multi">Planning equipe compare</option>}
           </Select>
         </div>
         <div className="space-y-2 text-sm">
