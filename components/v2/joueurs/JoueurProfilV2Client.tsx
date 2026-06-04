@@ -8,7 +8,7 @@ import { PersonProfilePhoto } from "@/components/v2/ui/PersonProfilePhoto";
 import { photoUrlWithCacheBust } from "@/lib/storage/entraineur-photo-cache";
 import { joueurRoleLabel, resolveJoueurSexe } from "@/lib/v2/joueur-sexe-display";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
-import { getJoueurById, getStagesForJoueur, updateJoueur } from "@/lib/supabase/queries";
+import { getJoueurById, getJoueurs, getStagesForJoueur, updateJoueur } from "@/lib/supabase/queries";
 import { uploadJoueurPhoto } from "@/lib/storage/upload-photo";
 import { calcAge } from "@/lib/v2/status-styles";
 import type { JoueurV2, StageProgrammeV2 } from "@/lib/types/v2";
@@ -26,14 +26,16 @@ import { getAdminDocumentsRaw } from "@/lib/data/admin-documents";
 import { syncFichePasseportFields } from "@/lib/passeport/sync-fiche-passeport";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { TabProgramme } from "@/components/v2/joueurs/programme/TabProgramme";
 
-type ProfilTab = "infos" | "tailles" | "stages" | "planning" | "progression" | "documents" | "notes";
+type ProfilTab = "infos" | "tailles" | "stages" | "planning" | "programme" | "progression" | "documents" | "notes";
 
 const PROFIL_TABS: { id: ProfilTab; label: string }[] = [
   { id: "infos", label: "Infos" },
   { id: "tailles", label: "Tailles" },
   { id: "stages", label: "Stages" },
   { id: "planning", label: "Planning" },
+  { id: "programme", label: "Programme" },
   { id: "progression", label: "Progression" },
   { id: "documents", label: "Documents" },
   { id: "notes", label: "Notes" },
@@ -58,6 +60,7 @@ export function JoueurProfilV2Client({ id }: { id: string }) {
     numero: string | null;
     expiration: string | null;
   } | null>(null);
+  const [allJoueurs, setAllJoueurs] = useState<JoueurV2[]>([]);
 
   const load = useCallback(async () => {
     const j = await getJoueurById(id);
@@ -88,6 +91,7 @@ export function JoueurProfilV2Client({ id }: { id: string }) {
 
   useEffect(() => {
     void load();
+    void getJoueurs().then(setAllJoueurs);
   }, [load]);
 
   async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -371,6 +375,9 @@ export function JoueurProfilV2Client({ id }: { id: string }) {
               )}
               {tab === "planning" && (
                 <p className="text-sm text-muted">Planning lié aux {stages.length} stage(s) du joueur — voir page Planning.</p>
+              )}
+              {tab === "programme" && joueur && (
+                <TabProgramme joueur={joueur} allJoueurs={allJoueurs} />
               )}
               {tab === "progression" && (
                 <p className="text-sm text-muted">Classement : {joueur.classement ?? "—"} · ITF : {joueur.classement_itf ?? "—"}</p>

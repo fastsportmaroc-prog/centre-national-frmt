@@ -70,6 +70,7 @@ export const v2NavSections: V2NavSection[] = [
     separatorBefore: true,
     items: [
       { href: `${V2_PREFIX}/joueurs`, label: "Joueurs", icon: Users },
+      { href: `${V2_PREFIX}/programmation-joueurs`, label: "Programmation Joueurs", icon: CalendarDays },
       { href: `${V2_PREFIX}/entraineurs`, label: "Entraîneurs", icon: UserCog },
       { href: `${V2_PREFIX}/groupes`, label: "Groupes", icon: UsersRound },
     ],
