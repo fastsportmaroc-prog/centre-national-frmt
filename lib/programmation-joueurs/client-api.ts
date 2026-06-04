@@ -26,7 +26,11 @@ function filtersToParams(f?: ProgrammationFilters): string {
 
 export async function fetchProgrammationEvenements(
   filters?: ProgrammationFilters
-): Promise<{ evenements: ProgrammationEvenementEnriched[]; error?: string }> {
+): Promise<{
+  evenements: ProgrammationEvenementEnriched[];
+  error?: string;
+  migrationRequired?: boolean;
+}> {
   const res = await fetch(`/api/programmation-joueurs${filtersToParams(filters)}`, {
     cache: "no-store",
   });
