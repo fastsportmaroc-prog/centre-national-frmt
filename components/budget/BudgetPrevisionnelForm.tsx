@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label, Select } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { BudgetLigneCategoryField } from "@/components/budget/BudgetLigneCategoryField";
-import { BudgetLigneSaisieCells } from "@/components/budget/BudgetLigneSaisieCells";
+import { BudgetPrevisionnelLignesTable } from "@/components/budget/BudgetPrevisionnelLignesTable";
 import { defaultBudgetLigneValues } from "@/lib/constants/budget-ligne-saisie";
 import { BudgetMembresExtraSection } from "@/components/budget/BudgetMembresExtraSection";
 import { BudgetParticipantsSection } from "@/components/budget/BudgetParticipantsSection";
@@ -35,7 +34,7 @@ import {
   formatMad,
 } from "@/lib/utils/budget-previsionnel-math";
 import { newLocalId } from "@/lib/local-test/storage";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export type BudgetPrevisionnelFormProps = {
   initial?: BudgetPrevisionnel | null;
@@ -133,18 +132,23 @@ export function BudgetPrevisionnelForm({
   );
   const [statut, setStatut] = useState(initial?.statut ?? "brouillon");
   const [stageId] = useState<string | null>(initial?.stage_id ?? defaultStageId ?? null);
-  const [lignes, setLignes] = useState<Omit<BudgetPrevisionnelLine, "total_eur">[]>(
-    initial?.lignes.map((l) => ({
-      id: l.id,
-      designation: l.designation,
-      description: l.description,
-      quantite: l.quantite,
-      jours_nuits: l.jours_nuits ?? 1,
-      prix_unitaire_eur: l.prix_unitaire_eur,
-      remarques: l.remarques,
-      ordre: l.ordre,
-    })) ?? [emptyLine()]
-  );
+  const [lignes, setLignes] = useState<Omit<BudgetPrevisionnelLine, "total_eur">[]>(() => {
+    const source = initial?.lignes?.length
+      ? [...initial.lignes].sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+      : null;
+    return (
+      source?.map((l) => ({
+        id: l.id,
+        designation: l.designation,
+        description: l.description,
+        quantite: l.quantite,
+        jours_nuits: l.jours_nuits ?? 1,
+        prix_unitaire_eur: l.prix_unitaire_eur,
+        remarques: l.remarques,
+        ordre: l.ordre,
+      })) ?? [emptyLine()]
+    );
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -542,75 +546,16 @@ export function BudgetPrevisionnelForm({
               </Button>
             ))}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-xs">
-              <thead>
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="p-2">Catégorie</th>
-                  <th className="p-2">Description</th>
-                  <th className="p-2">Détail de calcul</th>
-                  <th className="p-2 text-right">Total</th>
-                  <th className="p-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.map((l, idx) => {
-                  const total = computeLignesWithTotals([l])[0]?.total_eur ?? 0;
-                  return (
-                    <tr key={l.id} className="border-b border-border/50 align-top">
-                      <td className="p-1">
-                        <BudgetLigneCategoryField
-                          value={l.designation}
-                          onChange={(designation) => {
-                            const defaults = defaultBudgetLigneValues(designation, {
-                              nombrePersonnes: totalParticipants,
-                              dateDebut,
-                              dateFin,
-                            });
-                            updateLigne(idx, {
-                              designation,
-                              quantite: defaults.quantite,
-                              jours_nuits: defaults.jours_nuits,
-                            });
-                          }}
-                        />
-                      </td>
-                      <td className="p-1">
-                        <Input
-                          value={l.description ?? ""}
-                          onChange={(e) =>
-                            updateLigne(idx, { description: e.target.value || null })
-                          }
-                        />
-                      </td>
-                      <td className="p-1">
-                        <BudgetLigneSaisieCells
-                          line={l}
-                          onChange={(patch) => updateLigne(idx, patch)}
-                        />
-                      </td>
-                      <td className="p-2 text-right font-medium whitespace-nowrap">
-                        <span className="text-[10px] text-muted">{prixLabel}</span>
-                        <br />
-                        {devise === "EUR" ? formatEur(total) : formatMad(total)}
-                      </td>
-                      <td className="p-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setLignes((prev) => prev.filter((_, i) => i !== idx))}
-                          disabled={lignes.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <BudgetPrevisionnelLignesTable
+            lignes={lignes}
+            devise={devise}
+            prixLabel={prixLabel}
+            totalParticipants={totalParticipants}
+            dateDebut={dateDebut}
+            dateFin={dateFin}
+            onChange={setLignes}
+            onUpdateLigne={updateLigne}
+          />
           <Button
             type="button"
             variant="secondary"
