@@ -1,7 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseDataClient } from "@/lib/supabase/data-client";
 import { infraRowToConflictRow } from "@/lib/terrain/conflict-adapters";
+import {
+  buildInfrastructureAliasIndex,
+  dedupeInfrastructuresByCourtNom,
+  equivalentInfrastructureIds,
+  findInfrastructureByNom,
+  toCanonicalInfrastructureId,
+  type InfrastructureAliasIndex,
+} from "@/lib/terrain/court-infrastructure";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
+import {
+  expandTerrainBesoinsForStagePeriod,
+  resolveTerrainBesoinJours,
+} from "@/lib/v2/terrain-besoin-jours";
 import { hasConflict } from "@/services/conflictDetector";
 import { getCreneauRange } from "@/services/terrain-constants";
 
@@ -286,40 +298,62 @@ async function enrichDispatchNames(rows: any[]): Promise<any[]> {
   }));
 }
 
-function normalizeCourtNomKey(nom: string): string {
-  return nom
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[—–-]/g, " ")
-    .replace(/\s+(terre battue|surface dure|surface dur|hard court)\s*$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
+async function loadInfrastructureAliasIndex(
+  supabase: SupabaseClient
+): Promise<InfrastructureAliasIndex> {
+  const { data } = await supabase
+    .from("infrastructures")
+    .select("id, nom, actif, type")
+    .eq("actif", true);
+  return buildInfrastructureAliasIndex((data ?? []) as { id: string; nom: string; actif?: boolean }[]);
 }
 
-function findInfrastructureByNom(
-  infras: { id: string; nom: string }[],
-  nom: string
-): { id: string; nom: string } | null {
-  const key = normalizeCourtNomKey(nom);
-  if (!key) return null;
-  const exact = infras.find((i) => normalizeCourtNomKey(i.nom) === key);
-  if (exact) return exact;
-  const courtNum = key.match(/court\s*(\d+)/);
-  if (courtNum?.[1]) {
-    const num = courtNum[1];
-    const byNum = infras.find((i) => {
-      const k = normalizeCourtNomKey(i.nom);
-      return new RegExp(`court\\s*0*${num}\\b`).test(k);
-    });
-    if (byNum) return byNum;
+/**
+ * Fusionne les réservations des doublons d’infrastructure (même court, ids différents).
+ * Réécrit `infrastructure_id` vers l’id canonique et supprime les doublons même stage/jour/créneau.
+ */
+export async function consolidateDuplicateInfrastructureReservations(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { data: allInfra } = await supabase.from("infrastructures").select("id, nom, actif");
+  const index = buildInfrastructureAliasIndex((allInfra ?? []) as { id: string; nom: string; actif?: boolean }[]);
+  let changed = 0;
+
+  for (const [aliasId, canonicalId] of index.aliasToCanonical) {
+    if (aliasId === canonicalId) continue;
+
+    const { data: aliasRows } = await supabase
+      .from("reservations_infrastructure")
+      .select("id, stage_id, infrastructure_id, date_debut, creneau, statut")
+      .eq("infrastructure_id", aliasId);
+
+    for (const row of aliasRows ?? []) {
+      const jour = String(row.date_debut).slice(0, 10);
+      const creneau = String(row.creneau ?? "journee");
+
+      const { data: existingOnCanonical } = await supabase
+        .from("reservations_infrastructure")
+        .select("id")
+        .eq("infrastructure_id", canonicalId)
+        .eq("creneau", creneau)
+        .gte("date_debut", `${jour}T00:00:00`)
+        .lte("date_debut", `${jour}T23:59:59`)
+        .match(row.stage_id ? { stage_id: row.stage_id } : { stage_id: null })
+        .limit(1);
+
+      if ((existingOnCanonical?.length ?? 0) > 0) {
+        await supabase.from("reservations_infrastructure").delete().eq("id", row.id);
+      } else {
+        await supabase
+          .from("reservations_infrastructure")
+          .update({ infrastructure_id: canonicalId })
+          .eq("id", row.id);
+      }
+      changed++;
+    }
   }
-  return (
-    infras.find((i) => {
-      const k = normalizeCourtNomKey(i.nom);
-      return k.includes(key) || key.includes(k);
-    }) ?? null
-  );
+
+  return changed;
 }
 
 /** Résout un besoin terrain vers l’id `infrastructures` (source des réservations V2). */
@@ -356,8 +390,23 @@ export async function resolveInfrastructureIdForBesoin(
     capacite?: number;
   }[];
 
+  const aliasIndex = buildInfrastructureAliasIndex(infras);
+
   const direct = infras.find((i) => i.id === besoin.terrainId);
-  if (direct) return { id: direct.id, label: direct.nom };
+  if (direct) {
+    const canonicalId = toCanonicalInfrastructureId(direct.id, aliasIndex);
+    const label =
+      aliasIndex.canonicalNomById.get(canonicalId) ?? direct.nom;
+    return { id: canonicalId, label };
+  }
+
+  const canonicalFromAlias = aliasIndex.aliasToCanonical.get(besoin.terrainId);
+  if (canonicalFromAlias) {
+    return {
+      id: canonicalFromAlias,
+      label: aliasIndex.canonicalNomById.get(canonicalFromAlias) ?? besoin.terrainNom ?? canonicalFromAlias,
+    };
+  }
 
   const nomCandidates: string[] = [];
   if (besoin.terrainNom?.trim()) nomCandidates.push(besoin.terrainNom.trim());
@@ -372,35 +421,16 @@ export async function resolveInfrastructureIdForBesoin(
 
   for (const nom of nomCandidates) {
     const match = findInfrastructureByNom(infras, nom);
-    if (match) return { id: match.id, label: match.nom };
+    if (match) {
+      const canonicalId = toCanonicalInfrastructureId(match.id, aliasIndex);
+      return {
+        id: canonicalId,
+        label: aliasIndex.canonicalNomById.get(canonicalId) ?? match.nom,
+      };
+    }
   }
 
-  const createNom =
-    nomCandidates[0] ??
-    (terrainRow?.nom ? String(terrainRow.nom) : null) ??
-    `Court ${besoin.terrainId.slice(0, 8)}`;
-
-  const { data: created, error: createErr } = await supabase
-    .from("infrastructures")
-    .insert({
-      nom: createNom,
-      type: normalizeType(besoin.terrainType ?? terrainRow?.type),
-      surface: normalizeSurface(besoin.terrainSurface ?? terrainRow?.surface),
-      capacite: besoin.terrainCapacite ?? terrainRow?.capacite ?? 4,
-      actif: true,
-      statut: "disponible",
-    })
-    .select("id, nom")
-    .single();
-
-  if (createErr) {
-    console.warn("[resolveInfrastructureIdForBesoin]", createErr.message, besoin.terrainId);
-  }
-  if (created?.id) {
-    return { id: created.id as string, label: String(created.nom ?? createNom) };
-  }
-
-  return { id: null, label: nomCandidates[0] ?? besoin.terrainId };
+  return { id: null, label: nomCandidates[0] ?? besoin.terrainNom ?? besoin.terrainId };
 }
 
 function mergeTerrainBesoin(a: TerrainBesoin, b: TerrainBesoin): TerrainBesoin {
@@ -470,7 +500,18 @@ export function formatTerrainReservationConflict(code: string): string {
     return `Impossible d’enregistrer ${parts[1]} (${parts[2]})`;
   }
   if (parts.length >= 3) {
-    return `Créneau occupé : ${parts[1]} ${parts[2]}`;
+    const court = parts[1]!;
+    const jour = parts[2]!;
+    const creneau = parts[3] ?? "";
+    const creneauLabel =
+      creneau === "matin"
+        ? "matin"
+        : creneau === "apres-midi" || creneau === "apres_midi"
+          ? "après-midi"
+          : creneau === "journee"
+            ? "journée"
+            : creneau;
+    return `Créneau occupé : ${court} le ${jour}${creneauLabel ? ` (${creneauLabel})` : ""}`;
   }
   return code;
 }
@@ -503,18 +544,24 @@ export const getTerrains = async () => {
     .order("nom");
   if (infraErr) throw asError(infraErr, "Erreur lecture infrastructures");
 
-  const fromInfra = (infra ?? []).map((i: any, idx: number) => {
-    const surface = normalizeSurface(i.surface);
-    return {
-      id: i.id,
-      nom: String(i.nom ?? "").trim() || `Court ${idx + 1}`,
-      type: normalizeType(i.type),
-      surface,
-      capacite: i.capacite ?? 0,
-      actif: i.actif ?? true,
-      ordre: idx + 1,
-    };
-  });
+  const aliasIndex = buildInfrastructureAliasIndex(
+    (infra ?? []).map((i: any) => ({ id: i.id, nom: String(i.nom ?? ""), actif: i.actif }))
+  );
+  const fromInfra = dedupeInfrastructuresByCourtNom(
+    (infra ?? []).map((i: any, idx: number) => {
+      const surface = normalizeSurface(i.surface);
+      return {
+        id: i.id,
+        nom: String(i.nom ?? "").trim() || `Court ${idx + 1}`,
+        type: normalizeType(i.type),
+        surface,
+        capacite: i.capacite ?? 0,
+        actif: i.actif ?? true,
+        ordre: idx + 1,
+      };
+    }),
+    aliasIndex
+  );
   if (fromInfra.length > 0) return fromInfra;
 
   const { data, error } = await supabase
@@ -698,16 +745,24 @@ async function fetchInfraConflictCandidates(
   supabase: SupabaseClient,
   infrastructureId: string,
   jour: string,
-  excludeStageId?: string
+  excludeStageId?: string,
+  aliasIndex?: InfrastructureAliasIndex
 ) {
+  const index = aliasIndex ?? (await loadInfrastructureAliasIndex(supabase));
+  const infraIds = equivalentInfrastructureIds(infrastructureId, index);
   const { data } = await supabase
     .from("reservations_infrastructure")
     .select("id, stage_id, infrastructure_id, date_debut, creneau, heure_debut, heure_fin, statut")
-    .eq("infrastructure_id", infrastructureId)
+    .in("infrastructure_id", infraIds)
     .gte("date_debut", `${jour}T00:00:00`)
     .lte("date_debut", `${jour}T23:59:59`);
+  const canonicalId = toCanonicalInfrastructureId(infrastructureId, index);
   return (data ?? [])
-    .map((row) => infraRowToConflictRow(row))
+    .map((row) => {
+      const mapped = infraRowToConflictRow(row);
+      if (!mapped) return null;
+      return { ...mapped, terrain_id: canonicalId };
+    })
     .filter((row): row is NonNullable<typeof row> => row !== null)
     .filter((row) => !excludeStageId || row.stage_id !== excludeStageId);
 }
@@ -721,18 +776,22 @@ async function hasInfraTimeConflict(
     creneau: Creneau;
     heure_debut: string;
     heure_fin: string;
-  }
+  },
+  aliasIndex?: InfrastructureAliasIndex
 ): Promise<boolean> {
+  const index = aliasIndex ?? (await loadInfrastructureAliasIndex(supabase));
+  const canonicalId = toCanonicalInfrastructureId(params.infrastructure_id, index);
   const others = await fetchInfraConflictCandidates(
     supabase,
     params.infrastructure_id,
     params.jour,
-    params.stage_id
+    params.stage_id,
+    index
   );
   return hasConflict(
     {
       stage_id: params.stage_id,
-      terrain_id: params.infrastructure_id,
+      terrain_id: canonicalId,
       date: params.jour,
       creneau: params.creneau,
       heure_debut: params.heure_debut,
@@ -931,6 +990,12 @@ export const reserverTerrains = async (stage: any): Promise<{
     await supabase.from("terrain_dispatch").upsert(minimal, { onConflict: "reservation_id,joueur_id" });
   };
 
+  const aliasIndex = await loadInfrastructureAliasIndex(supabase);
+  const infraLabel = (id: string, fallback?: string) =>
+    aliasIndex.canonicalNomById.get(toCanonicalInfrastructureId(id, aliasIndex)) ??
+    fallback ??
+    id;
+
   for (const besoin of (stage.besoins?.terrains ?? []) as TerrainBesoin[]) {
     const terrainIdToUse = useLegacyReservations
       ? await ensureLegacyInfrastructureId(besoin)
@@ -964,10 +1029,7 @@ export const reserverTerrains = async (stage: any): Promise<{
       }
     };
     for (const creneau of creneauxEffectifs) {
-      const joursCibles: string[] =
-        besoin.jours?.length && Array.isArray(besoin.jours)
-          ? [...new Set(besoin.jours.map((d) => String(d).slice(0, 10)).filter((d) => d.length > 0))]
-          : eachDay(stage.dateDebut, stage.dateFin);
+      const joursCibles = resolveTerrainBesoinJours(besoin, stage.dateDebut, stage.dateFin);
       for (const jour of joursCibles) {
         await clearPartialCreneaux(jour, creneau);
         if (useLegacyReservations) {
@@ -980,16 +1042,20 @@ export const reserverTerrains = async (stage: any): Promise<{
             (besoin.mode === "dispatch" ? `[DISPATCH_N:${dispatchCountValue}]` : "");
           const notesPayload = [besoin.notes?.trim(), encodedMeta].filter(Boolean).join(" ").trim();
           // 1) Conflit réel = chevauchement horaire avec un AUTRE stage (pas le même)
-          const realConflict = await hasInfraTimeConflict(supabase, {
-            infrastructure_id: terrainIdToUse,
-            stage_id: stage.id,
-            jour,
-            creneau,
-            heure_debut: debut.slice(0, 5),
-            heure_fin: fin.slice(0, 5),
-          });
+          const realConflict = await hasInfraTimeConflict(
+            supabase,
+            {
+              infrastructure_id: terrainIdToUse,
+              stage_id: stage.id,
+              jour,
+              creneau,
+              heure_debut: debut.slice(0, 5),
+              heure_fin: fin.slice(0, 5),
+            },
+            aliasIndex
+          );
           if (realConflict) {
-            conflits.push(`${terrainIdToUse}/${jour}/${creneau}`);
+            conflits.push(`${infraLabel(terrainIdToUse, besoin.terrainNom)}/${jour}/${creneau}`);
             continue;
           }
 
@@ -1109,7 +1175,7 @@ export const reserverTerrains = async (stage: any): Promise<{
               ok.push(`${terrainIdToUse}/${jour}/${creneau}`);
               continue;
             }
-            conflits.push(`${terrainIdToUse}/${jour}/${creneau}/insert_error`);
+            conflits.push(`${infraLabel(terrainIdToUse, besoin.terrainNom)}/${jour}/${creneau}/insert_error`);
             continue;
           }
           let insertedReservationId =
@@ -1524,10 +1590,7 @@ async function upgradePartialCreneauxToJournee(
   for (const besoin of normalized) {
     if (!besoin.creneaux?.includes("journee")) continue;
     const infraId = besoin.terrainId;
-    const days =
-      besoin.jours?.length ?
-        besoin.jours.map((d) => d.slice(0, 10))
-      : eachDayOfStage(stage.date_debut, stage.date_fin);
+    const days = resolveTerrainBesoinJours(besoin, stage.date_debut, stage.date_fin);
     for (const jour of days) {
       await supabase
         .from("reservations_infrastructure")
@@ -1571,6 +1634,7 @@ export async function ensureStageTerrainReservations(
   unresolved?: { terrainId: string; label: string }[];
 }> {
   const supabase = options?.supabase ?? (await getTerrainsSupabaseClient());
+  await consolidateDuplicateInfrastructureReservations(supabase);
   let besoins = parseTerrainsBesoinsFromNotes(stage.notes);
 
   if (!besoins?.length) {
@@ -1581,15 +1645,25 @@ export async function ensureStageTerrainReservations(
     return { ok: [], conflits: [], skipped: true };
   }
 
-  const withDefaults = besoins.map((b) => ({
-    ...b,
-    creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
-    mode: b.mode ?? "stage",
-  }));
+  const withDefaults = expandTerrainBesoinsForStagePeriod(
+    besoins.map((b) => ({
+      ...b,
+      creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
+      mode: b.mode ?? "stage",
+    })),
+    stage.date_debut,
+    stage.date_fin
+  );
 
   const { besoins: normalized, unresolved } = await normalizeTerrainBesoinsForReservation(
     supabase,
     withDefaults
+  );
+
+  const normalizedExpanded = expandTerrainBesoinsForStagePeriod(
+    normalized,
+    stage.date_debut,
+    stage.date_fin
   );
 
   const conflitsFromUnresolved = unresolved.map((u) => `${u.label}/introuvable`);
@@ -1603,16 +1677,16 @@ export async function ensureStageTerrainReservations(
     };
   }
 
-  const notesRewritten = buildNotesWithTerrainsBesoins(stage.notes, normalized);
+  const notesRewritten = buildNotesWithTerrainsBesoins(stage.notes, normalizedExpanded);
 
-  await upgradePartialCreneauxToJournee(supabase, stage, normalized);
+  await upgradePartialCreneauxToJournee(supabase, stage, normalizedExpanded);
 
   const { ok, conflits } = await reserverTerrains({
     id: stage.id,
     nom: stage.nom ?? stage.stage_action ?? "Stage",
     dateDebut: stage.date_debut,
     dateFin: stage.date_fin,
-    besoins: { terrains: normalized },
+    besoins: { terrains: normalizedExpanded },
   });
 
   return {
@@ -1642,11 +1716,15 @@ export async function resyncStageTerrainsFromNotes(
   }
 
   if (options?.reserve === false) {
-    const normalized = besoins.map((b) => ({
-      ...b,
-      creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
-      mode: b.mode ?? "stage",
-    }));
+    const normalized = expandTerrainBesoinsForStagePeriod(
+      besoins.map((b) => ({
+        ...b,
+        creneaux: b.creneaux?.length ? b.creneaux : (["journee"] as Creneau[]),
+        mode: b.mode ?? "stage",
+      })),
+      stage.date_debut,
+      stage.date_fin
+    );
     const supabase = await getTerrainsSupabaseClient();
     await upgradePartialCreneauxToJournee(supabase, stage, normalized);
     return { ok: [], conflits: [] };
@@ -1664,6 +1742,7 @@ export async function resyncAllStageTerrainsFromNotes(
   planningUpserted: number;
 }> {
   const supabase = supabaseOverride ?? (await getTerrainsSupabaseClient());
+  await consolidateDuplicateInfrastructureReservations(supabase);
   const { upserted: planningUpserted } = await syncReservationsFromPlanning(supabase);
   const { data: stages } = await supabase
     .from("stages_programme")

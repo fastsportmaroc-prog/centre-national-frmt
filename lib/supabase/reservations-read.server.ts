@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCalendrierPeriode } from "@/lib/data/terrains";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
 import {
   applyReservationDateRangeByStartDay,
@@ -14,6 +15,12 @@ import type {
   StageCoachV2,
   StageProgrammeV2,
 } from "@/lib/types/v2";
+import {
+  finalizeReservationsFromStageBesoins,
+  mapCalendrierTerrainRow,
+  mergeReservationSources,
+  normalizeStageLinkedCourtReservations,
+} from "@/lib/v2/terrain-reservation-map";
 
 const STAGES = "stages_programme";
 
@@ -88,7 +95,53 @@ export async function loadReservationsPageServer(options?: {
   const entraineurs = (coachRes.data ?? []) as EntraineurV2[];
   const stageCoachLinks = (linksRes.data ?? []) as StageCoachV2[];
 
-  return enrichRows(reservations, stages, infrastructures, entraineurs, stageCoachLinks).sort(
-    (a, b) => a.date_debut.localeCompare(b.date_debut)
+  const year = new Date().getFullYear();
+  const calDebut = options?.dateDebut?.slice(0, 10) ?? `${year - 1}-01-01`;
+  const calFin = options?.dateFin?.slice(0, 10) ?? `${year + 2}-12-31`;
+  const rangeStart = options?.dateDebut?.slice(0, 10);
+  const rangeEnd = options?.dateFin?.slice(0, 10);
+  const inSelectedRange = (dateIso: string): boolean => {
+    const day = dateIso.slice(0, 10);
+    if (rangeStart && day < rangeStart) return false;
+    if (rangeEnd && day > rangeEnd) return false;
+    return true;
+  };
+
+  const infraEnriched = enrichRows(
+    reservations,
+    stages,
+    infrastructures,
+    entraineurs,
+    stageCoachLinks
   );
+
+  const terrainRows = await getCalendrierPeriode(calDebut, calFin).catch(
+    () => [] as Record<string, unknown>[]
+  );
+  const terrainEnriched = terrainRows
+    .map((row) => mapCalendrierTerrainRow(row as Record<string, unknown>))
+    .filter((r): r is ReservationEnrichedV2 => r !== null)
+    .filter((r) => inSelectedRange(r.date_debut))
+    .map((r) => {
+      const infra = infrastructures.find((i) => i.id === r.infrastructure_id);
+      const coachId = r.stage_id ? stageCoachLinks.find((l) => l.stage_id === r.stage_id)?.coach_id : null;
+      const coach = coachId ? entraineurs.find((e) => e.id === coachId) : null;
+      return {
+        ...r,
+        court_nom: r.court_nom ?? infra?.nom ?? null,
+        court_surface: r.court_surface ?? infra?.surface ?? null,
+        infrastructure_type: infra?.type ?? null,
+        coach_nom: coach?.nom ?? null,
+        coach_prenom: coach?.prenom ?? null,
+      };
+    });
+
+  return normalizeStageLinkedCourtReservations(
+    finalizeReservationsFromStageBesoins(
+      mergeReservationSources(infraEnriched, terrainEnriched),
+      stages
+    ),
+    infrastructures,
+    stages
+  ).sort((a, b) => a.date_debut.localeCompare(b.date_debut));
 }

@@ -3,6 +3,7 @@ import type { PlanningSeanceV2, ReservationEnrichedV2, StageProgrammeV2 } from "
 import { dateOnlyString, safeEachDayInRange } from "@/lib/v2/calendar-dates";
 import { creneauHorairesFixed, resolveCreneauType, type CreneauType } from "@/lib/v2/reservations-utils";
 import { eachDayOfStage } from "@/lib/v2/stage-calculations";
+import { resolveTerrainBesoinJours } from "@/lib/v2/terrain-besoin-jours";
 import { addDays, format, startOfWeek } from "date-fns";
 
 export type PlanningCreneauSlot = "matin" | "apres_midi" | "journee";
@@ -230,10 +231,7 @@ export function buildPlanningSessionsForWeek(
       if (!isDayInPlanningWeek(day, selectedWeekStart)) continue;
 
       for (const besoin of besoins) {
-        const jours =
-          besoin.jours?.length ?
-            besoin.jours.map((d) => d.slice(0, 10))
-          : stageDays;
+        const jours = resolveTerrainBesoinJours(besoin, stage.date_debut, stage.date_fin);
         if (!jours.includes(day)) continue;
 
         const creneaux = besoin.creneaux?.length ? besoin.creneaux : (["journee"] as const);

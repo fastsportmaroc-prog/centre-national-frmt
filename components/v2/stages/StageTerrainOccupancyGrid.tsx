@@ -83,7 +83,16 @@ export function StageTerrainOccupancyGrid({
                   {format(parseISO(`${day}T12:00:00`), "EEE d MMM", { locale: fr })}
                 </td>
                 {CRENEAU_ROWS.map((c) => {
-                  const occupants = byKey.get(slotKey(day, infrastructureId, c.key)) ?? [];
+                  const occupantsRaw = byKey.get(slotKey(day, infrastructureId, c.key)) ?? [];
+                  const occupants = occupantsRaw.filter(
+                    (o, i, arr) =>
+                      arr.findIndex(
+                        (x) =>
+                          x.stage_id === o.stage_id &&
+                          x.creneau === o.creneau &&
+                          x.date === o.date
+                      ) === i
+                  );
                   const busy = occupants.length > 0;
                   const isSelected = selectedCreneau === c.key;
                   const hasConflict = occupants.some(

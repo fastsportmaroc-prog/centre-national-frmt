@@ -1,6 +1,10 @@
 "use server";
 
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
+import {
+  buildInfrastructureAliasIndex,
+  toCanonicalInfrastructureId,
+} from "@/lib/terrain/court-infrastructure";
 import { resolveCreneauType } from "@/lib/v2/reservations-utils";
 import type { CreneauType } from "@/lib/v2/reservations-utils";
 
@@ -43,16 +47,24 @@ export async function getTerrainOccupancyAction(options: {
 
   const [infraRes, stagesRes] = await Promise.all([
     infraIds.length
-      ? supabase.from("infrastructures").select("id, nom").in("id", infraIds)
+      ? supabase.from("infrastructures").select("id, nom, actif").in("id", infraIds)
       : Promise.resolve({ data: [] }),
     stageIds.length
       ? supabase.from("stages_programme").select("id, stage_action").in("id", stageIds)
       : Promise.resolve({ data: [] }),
   ]);
 
+  const { data: allInfra } = await supabase.from("infrastructures").select("id, nom, actif");
+  const aliasIndex = buildInfrastructureAliasIndex(
+    (allInfra ?? []) as { id: string; nom: string; actif?: boolean }[]
+  );
+
   const infraMap = new Map(
     ((infraRes.data ?? []) as { id: string; nom: string }[]).map((i) => [i.id, i.nom])
   );
+  for (const [id, nom] of aliasIndex.canonicalNomById) {
+    if (!infraMap.has(id)) infraMap.set(id, nom);
+  }
   const stageMap = new Map(
     ((stagesRes.data ?? []) as { id: string; stage_action: string }[]).map((s) => [
       s.id,
@@ -75,10 +87,17 @@ export async function getTerrainOccupancyAction(options: {
       heure_fin: row.heure_fin,
     });
 
+    const canonicalInfraId = toCanonicalInfrastructureId(row.infrastructure_id, aliasIndex);
+    const infraNom =
+      aliasIndex.canonicalNomById.get(canonicalInfraId) ??
+      infraMap.get(row.infrastructure_id) ??
+      infraMap.get(canonicalInfraId) ??
+      "Court";
+
     out.push({
       date,
-      infrastructure_id: row.infrastructure_id,
-      infrastructure_nom: infraMap.get(row.infrastructure_id) ?? "Court",
+      infrastructure_id: canonicalInfraId,
+      infrastructure_nom: infraNom,
       creneau,
       stage_id: row.stage_id ?? null,
       stage_nom: row.stage_id ? stageMap.get(row.stage_id) ?? "Stage" : "—",

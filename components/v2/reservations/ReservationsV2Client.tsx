@@ -37,6 +37,11 @@ import { ReservationCard } from "@/components/v2/reservations/ReservationCard";
 import { ReservationsPlannerToolbar } from "@/components/v2/reservations/ReservationsPlannerToolbar";
 import { ReservationsTableView } from "@/components/v2/reservations/ReservationsTableView";
 import { ReservationsTerrainConflictsPanel } from "@/components/v2/reservations/ReservationsTerrainConflictsPanel";
+import {
+  lifecycleFilterLabel,
+  stageMatchesLifecycleFilter,
+  type StageLifecycleFilter,
+} from "@/lib/v2/stage-lifecycle-filter";
 import { cn } from "@/lib/utils/cn";
 
 export function ReservationsV2Client() {
@@ -45,6 +50,7 @@ export function ReservationsV2Client() {
   const [items, setItems] = useState<ReservationEnrichedV2[]>([]);
   const [stages, setStages] = useState<Awaited<ReturnType<typeof getStages>>>([]);
   const [stageFilter, setStageFilter] = useState("all");
+  const [stageLifecycleFilter, setStageLifecycleFilter] = useState<StageLifecycleFilter>("all");
   const [creneauFilter, setCreneauFilter] = useState<CreneauType | "all">("all");
   const [periodMode, setPeriodMode] = useState<PlannerPeriodMode>("all");
   const [viewMode, setViewMode] = useState<PlannerViewMode>("list");
@@ -61,7 +67,7 @@ export function ReservationsV2Client() {
       loadReservationsPageAction({
         dateDebut: plannerRange?.dateDebut,
         dateFin: plannerRange?.dateFin,
-        syncBeforeLoad: false,
+        syncBeforeLoad: true,
       }),
       getStages(),
     ]);
@@ -96,6 +102,15 @@ export function ReservationsV2Client() {
     };
   }, [load]);
 
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const stageById = useMemo(() => new Map(stages.map((s) => [s.id, s])), [stages]);
+
+  const stagesForLifecycle = useMemo(
+    () => stages.filter((s) => stageMatchesLifecycleFilter(s, stageLifecycleFilter, today)),
+    [stages, stageLifecycleFilter, today]
+  );
+
   const conflictIds = useMemo(
     () => conflictIdSet(detectConflicts(items.map(reservationToConflictRow))),
     [items]
@@ -103,11 +118,28 @@ export function ReservationsV2Client() {
 
   const filtered = useMemo(() => {
     return items.filter((r) => {
+      if (!r.stage_id) {
+        if (stageLifecycleFilter !== "all" || stageFilter !== "all") return false;
+      } else {
+        const stage = stageById.get(r.stage_id);
+        if (!stage) {
+          if (stageLifecycleFilter !== "all") return false;
+        } else if (!stageMatchesLifecycleFilter(stage, stageLifecycleFilter, today)) {
+          return false;
+        }
+      }
       if (stageFilter !== "all" && r.stage_id !== stageFilter) return false;
       if (creneauFilter !== "all" && resolveCreneauType(r) !== creneauFilter) return false;
       return true;
     });
-  }, [items, stageFilter, creneauFilter]);
+  }, [items, stageFilter, stageLifecycleFilter, creneauFilter, stageById, today]);
+
+  useEffect(() => {
+    if (stageFilter === "all") return;
+    if (!stagesForLifecycle.some((s) => s.id === stageFilter)) {
+      setStageFilter("all");
+    }
+  }, [stageFilter, stagesForLifecycle]);
 
   const kpis = useMemo(() => {
     const courts = new Set(filtered.map((r) => r.infrastructure_id)).size;
@@ -259,13 +291,15 @@ export function ReservationsV2Client() {
           pivotDate={pivotDate}
           rangeLabel={rangeLabel}
           stageFilter={stageFilter}
+          stageLifecycleFilter={stageLifecycleFilter}
           creneauFilter={creneauFilter}
-          stages={stages}
+          stages={stagesForLifecycle}
           onPeriodChange={setPeriodMode}
           onViewChange={setViewMode}
           onPivotChange={setPivotDate}
           onShiftPivot={(dir) => setPivotDate(shiftPlannerPivot(pivotDate, periodMode, dir))}
           onStageFilter={setStageFilter}
+          onStageLifecycleFilter={handleStageLifecycleFilter}
           onCreneauFilter={setCreneauFilter}
         />
 

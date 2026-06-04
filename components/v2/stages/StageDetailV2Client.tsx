@@ -485,7 +485,7 @@ export function StageDetailV2Client({ id }: { id: string }) {
         terrainType: selectedTerrain?.type,
         terrainSurface: selectedTerrain?.surface,
         terrainCapacite: selectedTerrain?.capacite,
-        jours: terrainJours,
+        jours: terrainMode === "stage" ? stageDays : terrainJours,
         creneaux: creneauxEffectifs,
         mode: terrainMode,
         joueurIds: terrainMode === "dispatch" ? dispatchJoueurIds : [],

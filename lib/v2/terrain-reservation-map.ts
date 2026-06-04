@@ -1,5 +1,6 @@
 import type { ReservationEnrichedV2 } from "@/lib/types/v2";
 import { parseTerrainsBesoinsFromNotes, type TerrainBesoin } from "@/lib/data/terrains";
+import { courtNomsMatch } from "@/lib/terrain/court-infrastructure";
 import { dateOnlyString } from "@/lib/v2/calendar-dates";
 import {
   creneauHorairesFixed,
@@ -124,7 +125,7 @@ function reservationMatchesBesoin(
 ): boolean {
   if (besoin.jours?.length && !besoin.jours.some((j) => j.slice(0, 10) === day)) return false;
   if (r.infrastructure_id === besoin.terrainId) return true;
-  if (besoin.terrainNom && r.court_nom && r.court_nom === besoin.terrainNom) return true;
+  if (besoin.terrainNom && r.court_nom && courtNomsMatch(r.court_nom, besoin.terrainNom)) return true;
   return false;
 }
 

@@ -2,6 +2,7 @@
 
 import {
   cleanupDuplicateMatinWhenJourneeExists,
+  consolidateDuplicateInfrastructureReservations,
   ensureStageTerrainReservations,
   formatTerrainReservationConflict,
   resyncAllStageTerrainsFromNotes,
@@ -57,6 +58,8 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
   }
 
   await syncReservationsFromPlanning(supabase, { stageId });
+
+  await consolidateDuplicateInfrastructureReservations(supabase);
 
   const { ok, conflits, notesRewritten } = await ensureStageTerrainReservations(
     {

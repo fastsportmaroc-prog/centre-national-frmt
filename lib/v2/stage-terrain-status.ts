@@ -3,6 +3,7 @@ import {
   parseTerrainsBesoinsFromNotes,
   stripTerrainsBesoinsFromNotes,
 } from "@/lib/data/terrains";
+import { normalizeCourtNomKey } from "@/lib/terrain/court-infrastructure";
 
 export { stripTerrainsBesoinsFromNotes };
 
@@ -31,12 +32,18 @@ export function stageHasTerrainsConfigured(input: {
   return false;
 }
 
+function besoinMergeKey(b: TerrainBesoin): string {
+  if (b.terrainNom?.trim()) return normalizeCourtNomKey(b.terrainNom);
+  return b.terrainId;
+}
+
 export function appendTerrainBesoinToNotes(
   notes: string | null | undefined,
   besoin: TerrainBesoin
 ): string {
   const existing = parseTerrainsBesoinsFromNotes(notes) ?? [];
-  const idx = existing.findIndex((b) => b.terrainId === besoin.terrainId);
+  const key = besoinMergeKey(besoin);
+  const idx = existing.findIndex((b) => besoinMergeKey(b) === key);
   const normalized: TerrainBesoin = {
     ...besoin,
     creneaux:
@@ -45,8 +52,17 @@ export function appendTerrainBesoinToNotes(
       : (["journee"] as TerrainBesoin["creneaux"]),
     mode: besoin.mode ?? "stage",
   };
-  if (idx >= 0) existing[idx] = { ...existing[idx], ...normalized };
-  else existing.push(normalized);
+  if (idx >= 0) {
+    const prevJours = existing[idx]!.jours ?? [];
+    const nextJours = normalized.jours ?? [];
+    const mergedJours =
+      normalized.mode === "dispatch" ?
+        [...new Set([...prevJours, ...nextJours].map((d) => d.slice(0, 10)).filter(Boolean))].sort()
+      : nextJours.length ?
+        nextJours
+      : prevJours;
+    existing[idx] = { ...existing[idx], ...normalized, jours: mergedJours.length ? mergedJours : undefined };
+  } else existing.push(normalized);
   const stripped = stripTerrainsBesoinsFromNotes(notes);
   const meta = `[TERRAINS_BESOINS:${JSON.stringify(existing)}]`;
   return [stripped, meta].filter(Boolean).join(" ").trim();
