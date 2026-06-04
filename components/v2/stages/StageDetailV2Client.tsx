@@ -18,7 +18,10 @@ import { StageFosAgriSection } from "@/components/v2/stages/StageFosAgriSection"
 import { StageKinesitherapieSection } from "@/components/v2/stages/StageKinesitherapieSection";
 import { StageParticipantsAssign } from "@/components/v2/stages/StageParticipantsAssign";
 import { getStageHebergementAction } from "@/lib/actions/stage-hebergement-actions";
-import { getStageRepasPrevusCountAction } from "@/lib/actions/stage-logistique-participants-actions";
+import {
+  getStageRepasPrevusCountAction,
+  getStageRestaurationDetailAction,
+} from "@/lib/actions/stage-logistique-participants-actions";
 import { RestaurationTab } from "@/components/v2/stages/tabs/RestaurationTab";
 import { getStageDetailV2Action } from "@/lib/actions/stage-detail-actions";
 import { getStageParticipantsAction } from "@/lib/actions/stage-participants-actions";
@@ -49,6 +52,12 @@ import {
   updateRestauration,
 } from "@/lib/supabase/queries";
 import { exportStagePDF } from "@/lib/pdf/pdf-exports";
+import {
+  buildHebergementPdfRows,
+  buildRestaurationPdfRows,
+  buildTerrainsPdfRows,
+  mealsFromRestaurationJours,
+} from "@/lib/pdf/stage-fiche-pdf-data";
 import { getCategoryStyle } from "@/lib/v2/category-colors";
 import { computeStageBudgetEstimateMad } from "@/lib/v2/stage-budget-estimate";
 import { countDaysInclusive, countNightsHebergement } from "@/lib/v2/stage-calculations";
@@ -150,11 +159,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
       return;
     }
     await syncStageLinkedViewsAction(id, { revalidate: false });
-    const [participants, h, r, p] = await Promise.all([
+    const [participants, h, r, p, restDetail] = await Promise.all([
       getStageParticipantsAction(id),
       getStageHebergementAction(id),
       getRestaurationByStage(id),
       getPlanningByStage(id),
+      getStageRestaurationDetailAction(id).catch(() => null),
     ]);
     setJoueurs(participants.joueurs);
     setCoachs(participants.coachs);
@@ -164,7 +174,8 @@ export function StageDetailV2Client({ id }: { id: string }) {
     const baseFin = r?.date_fin ?? s.date_fin;
     const rawNotes = r?.remarques ?? "";
     const eauTag = /\[EAU:(oui|non)\]/i.exec(rawNotes)?.[1]?.toLowerCase() === "oui";
-    setRestaurationActive(Boolean(r));
+    const hasJoursRepas = (restDetail?.jours?.length ?? 0) > 0;
+    setRestaurationActive(Boolean(r) || Boolean(s.restauration) || hasJoursRepas);
     setRestDates({ debut: baseDebut, fin: baseFin });
     setRestMeals({
       pdj: r?.petit_dejeuner ?? true,
@@ -337,21 +348,55 @@ export function StageDetailV2Client({ id }: { id: string }) {
       notes: stage.notes,
       terrainReservationCount: terrainReservations.length,
     });
-    exportStagePDF({
-      stage_action: stage.stage_action,
-      categorie: stage.categorie,
-      date_debut: stage.date_debut,
-      date_fin: stage.date_fin,
-      lieu: stage.lieu,
-      statut: String(stage.statut),
-      joueurs: joueurs.map((x) => `${x.prenom} ${x.nom}`),
-      coachs: coachs.map((x) => `${x.prenom} ${x.nom}`),
-      hebergement: stage.hebergement ? "Oui" : "Non",
-      restauration: stage.restauration ? "Oui" : "Non",
-      terrains: terrainsOk ? "Oui" : "Non",
-      kinesitherapie: stage.kinesitherapie ? "Oui" : "Non",
-    });
-    toast("Fiche PDF générée", "info");
+    try {
+      const restDetail = await getStageRestaurationDetailAction(stage.id).catch(() => null);
+      const hasJoursRepas = (restDetail?.jours?.length ?? 0) > 0;
+      const mealsFromPlanning = hasJoursRepas
+        ? mealsFromRestaurationJours(restDetail!.jours)
+        : null;
+      await exportStagePDF({
+        stage_action: stage.stage_action,
+        categorie: stage.categorie,
+        date_debut: stage.date_debut,
+        date_fin: stage.date_fin,
+        lieu: stage.lieu,
+        statut: String(stage.statut),
+        joueurs: joueurs.map((x) => `${x.prenom} ${x.nom}`),
+        coachs: coachs.map((x) => `${x.prenom} ${x.nom}`),
+        hebergement: buildHebergementPdfRows(Boolean(stage.hebergement), hebergement),
+        restauration: buildRestaurationPdfRows({
+          stageIncluded: Boolean(stage.restauration),
+          active: restaurationActive,
+          hasJoursRepas,
+          dates: restDates,
+          meals: mealsFromPlanning
+            ? { ...restMeals, ...mealsFromPlanning }
+            : restMeals,
+          record: restauration,
+          personsCount: joueurs.length + coachs.length,
+          totalRepasEstimate: totalRepasCalc,
+        }),
+        terrains: buildTerrainsPdfRows(
+          terrainReservations.map((r) => ({
+            reservation_id: String(r.reservation_id),
+            terrain_id: r.terrain_id,
+            terrain_nom: r.terrain_nom,
+            date_debut: String(r.date_debut),
+            date_fin: String(r.date_fin),
+            creneau: r.creneau,
+            mode: r.mode,
+            nb_joueurs_dispatches: r.nb_joueurs_dispatches,
+            resa_statut: r.resa_statut,
+            stage_id: stage.id,
+          })),
+          terrainsOk
+        ),
+        kinesitherapie: stage.kinesitherapie ? "Oui" : "Non",
+      });
+      toast("Fiche PDF générée", "info");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Échec génération PDF", "error");
+    }
   }
 
   async function handleDownloadLettrePdf(l: LettreOfficielleRecord) {
@@ -454,6 +499,12 @@ export function StageDetailV2Client({ id }: { id: string }) {
             );
           }
           throw new Error(created.error);
+        }
+      }
+      if (!stage.restauration) {
+        const flagUp = await updateStageQuickAction(stage.id, { restauration: true });
+        if (flagUp.ok) {
+          setStage((prev) => (prev ? { ...prev, restauration: true } : prev));
         }
       }
       await load();

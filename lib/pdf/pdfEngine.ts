@@ -1,7 +1,13 @@
 "use client";
 
 import { jsPDF } from "jspdf";
-import { PDF_COLORS, PDF_FONTS, PDF_META, PDF_SIZES } from "@/lib/pdf/pdfDesignSystem";
+import {
+  PDF_COLORS,
+  PDF_FEDERATION_LABEL,
+  PDF_FONTS,
+  PDF_META,
+  PDF_SIZES,
+} from "@/lib/pdf/pdfDesignSystem";
 
 function hexRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -95,7 +101,7 @@ export class FRMTPdfEngine {
     doc.setFont(PDF_FONTS.body, "normal");
     doc.setFontSize(8);
     setTextHex(doc, PDF_COLORS.textSecondary);
-    doc.text("Fédération Royale Marocaine de Tennis de Table", textX, 16);
+    doc.text(PDF_FEDERATION_LABEL, textX, 16);
     doc.text("Centre National d'Excellence — CNE V2", textX, 20);
 
     doc.setFont(PDF_FONTS.heading, "bold");

@@ -28,7 +28,11 @@ function daysBetween(debut: string, fin: string): number {
 }
 
 function tableFromRows(rows: Record<string, string>[] | undefined, title: string, engine: FRMTPdfEngine) {
-  if (!rows?.length) return;
+  if (!rows?.length) {
+    engine.sectionTitle(title);
+    engine.paragraph("—");
+    return;
+  }
   const keys = Object.keys(rows[0]!);
   engine.sectionTitle(title);
   engine.table({
@@ -105,7 +109,7 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
   } else {
     tableFromRows(
       Array.isArray(stage.hebergement) ? stage.hebergement : undefined,
-      "Hébergement",
+      "Détail hébergement",
       engine
     );
   }
@@ -116,7 +120,7 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
   } else {
     tableFromRows(
       Array.isArray(stage.restauration) ? stage.restauration : undefined,
-      "Restauration",
+      "Détail restauration",
       engine
     );
   }
@@ -125,7 +129,11 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
     engine.sectionTitle("Terrains");
     engine.paragraph(stage.terrains);
   } else {
-    tableFromRows(Array.isArray(stage.terrains) ? stage.terrains : undefined, "Terrains", engine);
+    tableFromRows(
+      Array.isArray(stage.terrains) ? stage.terrains : undefined,
+      "Détail terrains",
+      engine
+    );
   }
 
   if (stage.kinesitherapie) {

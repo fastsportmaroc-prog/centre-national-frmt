@@ -57,8 +57,11 @@ export const PDF_SIZES = {
   tablePadY: 2,
 } as const;
 
+/** Libellé officiel affiché dans l'en-tête et les métadonnées PDF. */
+export const PDF_FEDERATION_LABEL = "Fédération Royale Marocaine de Tennis";
+
 export const PDF_META = {
   creator: "FRMT Centre National — CNE V2",
-  author: "Fédération Royale Marocaine de Tennis de Table",
+  author: PDF_FEDERATION_LABEL,
   subject: "Document officiel FRMT",
 } as const;

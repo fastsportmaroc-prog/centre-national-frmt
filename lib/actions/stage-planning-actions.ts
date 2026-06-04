@@ -1,7 +1,7 @@
 "use server";
 
 import { ensureStageTerrainReservations, syncReservationsFromPlanning } from "@/lib/data/terrains";
-import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
+import { getSupabaseForTerrainSync } from "@/lib/supabase/terrain-sync-client.server";
 import { syncAllStagesPlanning, syncStagePlanning } from "@/lib/v2/sync-stage-planning";
 import { getStageDetailV2Action } from "@/lib/actions/stage-detail-actions";
 import { getEntraineursByStage } from "@/lib/supabase/queries";
@@ -24,16 +24,19 @@ async function runStagePlanningSync(stageId: string): Promise<number> {
   });
 
   if (stage.terrains || stage.notes?.includes("[TERRAINS_BESOINS:")) {
-    const supabase = await getSupabaseServerDataClient();
+    const supabase = await getSupabaseForTerrainSync();
     await syncReservationsFromPlanning(supabase, { stageId: stage.id });
-    await ensureStageTerrainReservations({
-      id: stage.id,
-      stage_action: stage.stage_action,
-      date_debut: stage.date_debut,
-      date_fin: stage.date_fin,
-      notes: stage.notes,
-      terrains: stage.terrains,
-    }).catch((err) => console.warn("[syncStagePlanning] terrains:", err));
+    await ensureStageTerrainReservations(
+      {
+        id: stage.id,
+        stage_action: stage.stage_action,
+        date_debut: stage.date_debut,
+        date_fin: stage.date_fin,
+        notes: stage.notes,
+        terrains: stage.terrains,
+      },
+      { supabase }
+    ).catch((err) => console.warn("[syncStagePlanning] terrains:", err));
   }
 
   return created;

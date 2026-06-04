@@ -151,3 +151,29 @@ export function courtNomsMatch(a: string | null | undefined, b: string | null | 
   if (!a?.trim() || !b?.trim()) return false;
   return normalizeCourtNomKey(a) === normalizeCourtNomKey(b);
 }
+
+export type TerrainBesoinRef = { terrainId: string; terrainNom?: string };
+
+export function extractCourtNumber(nom: string): string | null {
+  const m = normalizeCourtNomKey(nom).match(/court\s*0*(\d+)\b/);
+  return m?.[1] ?? null;
+}
+
+/** Même court logique (nom ou numéro « Court N »). */
+export function besoinsSameCourt(a: TerrainBesoinRef, b: TerrainBesoinRef): boolean {
+  if (a.terrainNom?.trim() && b.terrainNom?.trim()) {
+    if (normalizeCourtNomKey(a.terrainNom) === normalizeCourtNomKey(b.terrainNom)) return true;
+  }
+  const numA = a.terrainNom?.trim() ? extractCourtNumber(a.terrainNom) : null;
+  const numB = b.terrainNom?.trim() ? extractCourtNumber(b.terrainNom) : null;
+  if (numA && numB && numA === numB) return true;
+  if (a.terrainId && a.terrainId === b.terrainId) return true;
+  return false;
+}
+
+export function besoinCourtKey(b: TerrainBesoinRef): string {
+  if (b.terrainNom?.trim()) return normalizeCourtNomKey(b.terrainNom);
+  const num = extractCourtNumber(b.terrainNom ?? "");
+  if (num) return `court ${num}`;
+  return `id:${b.terrainId}`;
+}

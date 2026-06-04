@@ -9,6 +9,7 @@ import {
   syncReservationsFromPlanning,
 } from "@/lib/data/terrains";
 import { getSupabaseServerDataClient } from "@/lib/supabase/data-client.server";
+import { getSupabaseForTerrainSync } from "@/lib/supabase/terrain-sync-client.server";
 import { updateStageServer } from "@/lib/supabase/stage-write.server";
 import { revalidatePath } from "next/cache";
 
@@ -29,7 +30,8 @@ export async function reconcileStageTerrainReservationsAction(): Promise<{
   synced: number;
   processed: number;
 }> {
-  const { synced, processed } = await resyncAllStageTerrainsFromNotes();
+  const supabase = await getSupabaseForTerrainSync();
+  const { synced, processed } = await resyncAllStageTerrainsFromNotes(supabase);
   const cleaned = await cleanupDuplicateMatinWhenJourneeExists();
   revalidateStageReservationPaths();
   return { cleaned, synced, processed };
@@ -46,8 +48,9 @@ export async function syncStageTerrainReservationsForStageAction(stageId: string
   cleaned: number;
   error?: string;
 }> {
-  const supabase = await getSupabaseServerDataClient();
-  const { data: stage, error } = await supabase
+  const supabase = await getSupabaseForTerrainSync();
+  const readClient = await getSupabaseServerDataClient();
+  const { data: stage, error } = await readClient
     .from("stages_programme")
     .select("id, stage_action, date_debut, date_fin, notes, terrains")
     .eq("id", stageId)

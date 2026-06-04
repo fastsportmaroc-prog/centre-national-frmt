@@ -28,6 +28,17 @@ import {
   getEntraineursByStage,
 } from "@/lib/supabase/queries";
 import { exportStagePDF, exportStagesLogistiquePDF } from "@/lib/pdf/pdf-exports";
+import {
+  buildHebergementPdfRows,
+  buildRestaurationPdfRows,
+  buildTerrainsPdfRows,
+  mealsFromRestaurationJours,
+} from "@/lib/pdf/stage-fiche-pdf-data";
+import { getStageHebergementAction } from "@/lib/actions/stage-hebergement-actions";
+import { getStageRestaurationDetailAction } from "@/lib/actions/stage-logistique-participants-actions";
+import { getRestaurationByStage } from "@/lib/supabase/queries";
+import { getReservationsStageTerrains } from "@/lib/data/terrains";
+import { stageHasTerrainsConfigured } from "@/lib/v2/stage-terrain-status";
 import { emptyStageForm } from "@/lib/v2/form-defaults";
 import { loadAllStageCards, type StageDashboardCard } from "@/lib/v2/dashboard-data";
 import { getCategoryStyle } from "@/lib/v2/category-colors";
@@ -374,10 +385,28 @@ export function StagesV2Client() {
   }
 
   async function handleExportPdf(stage: StageDashboardCard) {
-    const [j, e] = await Promise.all([
+    const [j, e, h, r, tr, restDetail] = await Promise.all([
       getJoueursByStage(stage.id),
       getEntraineursByStage(stage.id),
+      getStageHebergementAction(stage.id),
+      getRestaurationByStage(stage.id),
+      getReservationsStageTerrains(stage.id).catch(() => []),
+      getStageRestaurationDetailAction(stage.id).catch(() => null),
     ]);
+    const hasJoursRepas = (restDetail?.jours?.length ?? 0) > 0;
+    const mealsFromPlanning = hasJoursRepas
+      ? mealsFromRestaurationJours(restDetail!.jours)
+      : null;
+    const restDebut = r?.date_debut ?? stage.date_debut;
+    const restFin = r?.date_fin ?? stage.date_fin;
+    const rawNotes = r?.remarques ?? "";
+    const eauTag = /\[EAU:(oui|non)\]/i.exec(rawNotes)?.[1]?.toLowerCase() === "oui";
+    const terrainsOk = stageHasTerrainsConfigured({
+      id: stage.id,
+      terrains: stage.terrains,
+      notes: stage.notes,
+      terrainReservationCount: tr.length,
+    });
     await exportStagePDF({
       stage_action: stage.stage_action,
       categorie: stage.categorie,
@@ -387,9 +416,38 @@ export function StagesV2Client() {
       statut: String(stage.statut),
       joueurs: j.map((x) => `${x.prenom} ${x.nom}`),
       coachs: e.map((x) => `${x.prenom} ${x.nom}`),
-      hebergement: stage.hebergement ? "Oui" : "Non",
-      restauration: stage.restauration ? "Oui" : "Non",
-      terrains: stage.has_terrains ? "Oui" : "Non",
+      hebergement: buildHebergementPdfRows(Boolean(stage.hebergement), h),
+      restauration: buildRestaurationPdfRows({
+        stageIncluded: Boolean(stage.restauration) || stage.has_restauration,
+        active: stage.has_restauration || Boolean(stage.restauration),
+        hasJoursRepas,
+        dates: { debut: restDebut, fin: restFin },
+        meals: {
+          pdj: mealsFromPlanning?.pdj ?? r?.petit_dejeuner ?? true,
+          dej: mealsFromPlanning?.dej ?? r?.dejeuner ?? true,
+          din: mealsFromPlanning?.din ?? r?.diner ?? true,
+          eau: eauTag,
+        },
+        record: r,
+        personsCount: j.length + e.length,
+        totalRepasEstimate: r?.total_repas,
+      }),
+      terrains: buildTerrainsPdfRows(
+        tr.map((row) => ({
+          reservation_id: String(row.reservation_id),
+          terrain_id: row.terrain_id,
+          terrain_nom: row.terrain_nom,
+          date_debut: String(row.date_debut),
+          date_fin: String(row.date_fin),
+          creneau: row.creneau,
+          mode: row.mode,
+          nb_joueurs_dispatches: row.nb_joueurs_dispatches,
+          resa_statut: row.resa_statut,
+          stage_id: stage.id,
+        })),
+        terrainsOk
+      ),
+      kinesitherapie: stage.kinesitherapie ? "Oui" : "Non",
     });
   }
 

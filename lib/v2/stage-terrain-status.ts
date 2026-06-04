@@ -3,7 +3,7 @@ import {
   parseTerrainsBesoinsFromNotes,
   stripTerrainsBesoinsFromNotes,
 } from "@/lib/data/terrains";
-import { normalizeCourtNomKey } from "@/lib/terrain/court-infrastructure";
+import { besoinsSameCourt } from "@/lib/terrain/court-infrastructure";
 
 export { stripTerrainsBesoinsFromNotes };
 
@@ -32,9 +32,10 @@ export function stageHasTerrainsConfigured(input: {
   return false;
 }
 
-function besoinMergeKey(b: TerrainBesoin): string {
-  if (b.terrainNom?.trim()) return normalizeCourtNomKey(b.terrainNom);
-  return b.terrainId;
+function findBesoinIndex(existing: TerrainBesoin[], besoin: TerrainBesoin): number {
+  const byId = existing.findIndex((b) => b.terrainId === besoin.terrainId);
+  if (byId >= 0) return byId;
+  return existing.findIndex((b) => besoinsSameCourt(b, besoin));
 }
 
 export function appendTerrainBesoinToNotes(
@@ -42,8 +43,7 @@ export function appendTerrainBesoinToNotes(
   besoin: TerrainBesoin
 ): string {
   const existing = parseTerrainsBesoinsFromNotes(notes) ?? [];
-  const key = besoinMergeKey(besoin);
-  const idx = existing.findIndex((b) => besoinMergeKey(b) === key);
+  const idx = findBesoinIndex(existing, besoin);
   const normalized: TerrainBesoin = {
     ...besoin,
     creneaux:
