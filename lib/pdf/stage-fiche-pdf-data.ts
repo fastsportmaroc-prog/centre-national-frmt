@@ -1,4 +1,4 @@
-import { formatDateFR, formatStatutPdf, safePdfCell } from "@/lib/pdf/pdf-format";
+import { formatDateFR, formatPeriodePdf, formatStatutPdf, safePdfCell } from "@/lib/pdf/pdf-format";
 import type { HebergementStageV2, JourRepasStage, RestaurationStageV2 } from "@/lib/types/v2";
 import { getCreneauInfoForReservation } from "@/lib/v2/reservations-utils";
 
@@ -72,23 +72,13 @@ export function buildHebergementPdfRows(
 
   return champValeurRows([
     ["Statut", formatStatutPdf(hebergement.statut)],
-    [
-      "Période",
-      `${formatDateFR(hebergement.date_debut)} → ${formatDateFR(hebergement.date_fin)}`,
-    ],
+    ["Période", formatPeriodePdf(hebergement.date_debut, hebergement.date_fin)],
     ["Chambres joueurs", safePdfCell(hebergement.nb_chambres_joueurs)],
     ["Chambres encadrants", safePdfCell(hebergement.nb_chambres_coachs)],
     ["Total chambres", safePdfCell(totalChambres)],
     ["Type chambre joueurs", safePdfCell(hebergement.type_chambre_joueurs)],
     ["Type chambre encadrants", safePdfCell(hebergement.type_chambre_coachs)],
-    ["Kitchenette", hebergement.kitchenette ? "Oui" : "Non"],
-    ["Remarques", safePdfCell(hebergement.remarques)],
   ]);
-}
-
-function stripRestaurationNotes(raw: string | null | undefined): string {
-  if (!raw) return "—";
-  return raw.replace(/\[EAU:(oui|non)\]/gi, "").trim() || "—";
 }
 
 export function buildRestaurationPdfRows(ctx: StageRestaurationPdfContext): Record<string, string>[] {
@@ -109,7 +99,7 @@ export function buildRestaurationPdfRows(ctx: StageRestaurationPdfContext): Reco
     [
       "Période",
       ctx.dates.debut && ctx.dates.fin
-        ? `${formatDateFR(ctx.dates.debut)} → ${formatDateFR(ctx.dates.fin)}`
+        ? formatPeriodePdf(ctx.dates.debut, ctx.dates.fin)
         : "—",
     ],
     [
@@ -135,7 +125,6 @@ export function buildRestaurationPdfRows(ctx: StageRestaurationPdfContext): Reco
   if (ctx.totalRepasEstimate != null && ctx.totalRepasEstimate > 0) {
     rows.push(["Total repas estimé", String(ctx.totalRepasEstimate)]);
   }
-  rows.push(["Remarques", stripRestaurationNotes(ctx.record?.remarques)]);
 
   return champValeurRows(rows);
 }
@@ -166,10 +155,7 @@ export function buildTerrainsPdfRows(
       heure_fin: null,
       statut: String(r.resa_statut ?? "confirmee"),
     });
-    const dateLine =
-      r.date_fin !== r.date_debut
-        ? `${formatDateFR(r.date_debut)} → ${formatDateFR(r.date_fin)}`
-        : formatDateFR(r.date_debut);
+    const dateLine = formatPeriodePdf(String(r.date_debut), String(r.date_fin));
 
     return {
       Terrain: safePdfCell(r.terrain_nom),

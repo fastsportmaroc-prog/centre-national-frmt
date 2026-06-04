@@ -1,7 +1,13 @@
 "use client";
 
 import { FRMTPdfEngine } from "@/lib/pdf/pdfEngine";
-import { buildPdfFilename, formatDateFR, formatStatutPdf, safePdfCell } from "@/lib/pdf/pdf-format";
+import {
+  buildPdfFilename,
+  formatDateFR,
+  formatStagePdfSubtitle,
+  formatStatutPdf,
+  safePdfCell,
+} from "@/lib/pdf/pdf-format";
 import { loadPdfLogoBase64 } from "@/lib/pdf/load-pdf-logo";
 
 export type FicheStagePdfInput = {
@@ -27,6 +33,18 @@ function daysBetween(debut: string, fin: string): number {
   return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000) + 1);
 }
 
+function tableColWidths(keys: string[]): number[] {
+  const n = keys.length;
+  if (n === 2 && keys[0] === "Champ" && keys[1] === "Valeur") {
+    return [52, 130];
+  }
+  if (n === 6 && keys.includes("Terrain") && keys.includes("Créneau")) {
+    return [42, 38, 34, 22, 18, 28];
+  }
+  const base = 182 / n;
+  return keys.map(() => base);
+}
+
 function tableFromRows(rows: Record<string, string>[] | undefined, title: string, engine: FRMTPdfEngine) {
   if (!rows?.length) {
     engine.sectionTitle(title);
@@ -38,7 +56,8 @@ function tableFromRows(rows: Record<string, string>[] | undefined, title: string
   engine.table({
     headers: keys,
     rows: rows.map((r) => keys.map((k) => safePdfCell(r[k]))),
-    colWidths: keys.map(() => 182 / keys.length),
+    colWidths: tableColWidths(keys),
+    wrapText: true,
   });
 }
 
@@ -68,7 +87,7 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
   engine.drawHeader({
     documentType: "FICHE DE STAGE",
     stageName: stage.stage_action,
-    subtitle: `${formatDateFR(stage.date_debut)} → ${formatDateFR(stage.date_fin)} · ${jours} jours · ${stage.categorie}`,
+    subtitle: formatStagePdfSubtitle(stage.date_debut, stage.date_fin, jours, stage.categorie),
     date: `Généré le ${formatDateFR(new Date().toISOString())}`,
     logoBase64: logo,
   });
@@ -97,6 +116,7 @@ export async function generateFicheStagePDF(stage: FicheStagePdfInput): Promise<
   engine.table({
     headers: ["#", "Nom", "Prénom", "Type", "Catégorie", "Statut"],
     colWidths: [10, 38, 35, 25, 28, 46],
+    wrapText: true,
     rows:
       participants.length ?
         participants

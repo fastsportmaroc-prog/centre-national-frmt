@@ -194,37 +194,59 @@ export class FRMTPdfEngine {
     const { marginLeft, contentW, fontSmall, fontBody } = this.pageLayout();
     const doc = this.doc;
     const colW = contentW / columns;
-    const rowH = 7;
+    const lineH = 4;
+    const minRowH = 7;
     let col = 0;
+    let rowStartY = this.currentY;
+    let rowMaxH = minRowH;
+
+    const flushRow = () => {
+      setDrawHex(doc, PDF_COLORS.tableBorder);
+      doc.setLineWidth(0.2);
+      doc.line(marginLeft + 1, rowStartY + rowMaxH - 1, marginLeft + contentW - 2, rowStartY + rowMaxH - 1);
+      this.currentY = rowStartY + rowMaxH;
+      rowMaxH = minRowH;
+      rowStartY = this.currentY;
+    };
 
     for (const item of items) {
-      this.checkPageBreak(rowH);
       const x = marginLeft + col * colW;
+      const labelTxt = `${item.label.toUpperCase()} :`;
+      doc.setFont(PDF_FONTS.body, "bold");
+      doc.setFontSize(fontSmall);
+      const labelW = doc.getTextWidth(labelTxt + " ");
+      const valueMaxW = Math.max(20, colW - labelW - 8);
+      doc.setFont(PDF_FONTS.body, "normal");
+      doc.setFontSize(fontBody);
+      const valLines = doc.splitTextToSize(String(item.value ?? "—"), valueMaxW);
+      const cellH = Math.max(minRowH, valLines.length * lineH + 3);
+
+      if (col === 0) {
+        this.checkPageBreak(cellH);
+        rowStartY = this.currentY;
+        rowMaxH = cellH;
+      } else {
+        this.checkPageBreak(Math.max(0, rowMaxH - (this.currentY - rowStartY)) + cellH);
+        rowMaxH = Math.max(rowMaxH, cellH);
+      }
 
       doc.setFont(PDF_FONTS.body, "bold");
       doc.setFontSize(fontSmall);
       setTextHex(doc, PDF_COLORS.textMuted);
-      const labelTxt = `${item.label.toUpperCase()} :`;
-      doc.text(labelTxt, x + 2, this.currentY + 4);
+      doc.text(labelTxt, x + 2, rowStartY + 4);
 
       doc.setFont(PDF_FONTS.body, "normal");
       doc.setFontSize(fontBody);
       setTextHex(doc, PDF_COLORS.textPrimary);
-      const labelW = doc.getTextWidth(labelTxt + " ");
-      const val = (item.value ?? "—").slice(0, 48);
-      doc.text(val, x + 2 + labelW + 1, this.currentY + 4);
-
-      setDrawHex(doc, PDF_COLORS.tableBorder);
-      doc.setLineWidth(0.2);
-      doc.line(x + 1, this.currentY + rowH - 1, x + colW - 2, this.currentY + rowH - 1);
+      doc.text(valLines, x + 2 + labelW + 1, rowStartY + 4);
 
       col++;
       if (col >= columns) {
         col = 0;
-        this.currentY += rowH;
+        flushRow();
       }
     }
-    if (col > 0) this.currentY += rowH;
+    if (col > 0) flushRow();
     this.currentY += 4;
   }
 
@@ -234,6 +256,8 @@ export class FRMTPdfEngine {
     colWidths?: number[];
     headerBg?: string;
     statusColIndex?: number;
+    /** Retour à la ligne dans les cellules (texte long). */
+    wrapText?: boolean;
   }) {
     const { marginLeft, contentW, tableHeaderH, tableRowH, fontSmall, fontBody, tablePadX } =
       this.pageLayout();
@@ -246,8 +270,12 @@ export class FRMTPdfEngine {
     if (widthSum > 0 && Math.abs(widthSum - contentW) > 0.01) {
       colWidths = colWidths.map((w) => (w / widthSum) * contentW);
     }
+    const wrapText = params.wrapText ?? false;
+    const lineH = 3.8;
+    const cellPadY = 2.5;
 
     this.checkPageBreak(tableHeaderH + 2);
+    const tableTop = this.currentY;
     setFillHex(doc, params.headerBg ?? PDF_COLORS.tableHeader);
     doc.rect(marginLeft, this.currentY, contentW, tableHeaderH, "F");
     setFillHex(doc, PDF_COLORS.primary);
@@ -258,61 +286,79 @@ export class FRMTPdfEngine {
       doc.setFont(PDF_FONTS.heading, "bold");
       doc.setFontSize(fontSmall);
       setTextHex(doc, PDF_COLORS.tableHeaderTx);
-      doc.text(String(headers[i]).toUpperCase(), x + tablePadX + 1, this.currentY + tableHeaderH / 2 + 2);
+      const headerMaxW = colWidths[i]! - tablePadX * 2;
+      const headerLines = wrapText
+        ? doc.splitTextToSize(String(headers[i]).toUpperCase(), headerMaxW)
+        : [String(headers[i]).toUpperCase()];
+      doc.text(headerLines, x + tablePadX + 1, this.currentY + 5);
       x += colWidths[i]!;
     }
     this.currentY += tableHeaderH;
 
-    const tableTop = this.currentY - tableHeaderH;
+    let bodyHeight = 0;
 
     for (let rowIdx = 0; rowIdx < params.rows.length; rowIdx++) {
       const row = params.rows[rowIdx]!;
-      this.checkPageBreak(tableRowH + 1);
+      const wrappedCells: string[][] = [];
+      let maxLines = 1;
+
+      for (let colIdx = 0; colIdx < row.length; colIdx++) {
+        const cell = String(row[colIdx] ?? "—");
+        const maxW = Math.max(8, colWidths[colIdx]! - tablePadX * 2);
+        const lines =
+          wrapText ? doc.splitTextToSize(cell, maxW) : [this.truncateCell(doc, cell, maxW)];
+        wrappedCells.push(lines);
+        maxLines = Math.max(maxLines, lines.length);
+      }
+
+      const rowH = wrapText
+        ? Math.max(tableRowH, maxLines * lineH + cellPadY * 2)
+        : tableRowH;
+
+      this.checkPageBreak(rowH + 1);
 
       if (rowIdx % 2 === 1) {
         setFillHex(doc, PDF_COLORS.tableRowAlt);
-        doc.rect(marginLeft, this.currentY, contentW, tableRowH, "F");
+        doc.rect(marginLeft, this.currentY, contentW, rowH, "F");
       }
 
       x = marginLeft;
       for (let colIdx = 0; colIdx < row.length; colIdx++) {
-        const cell = String(row[colIdx] ?? "—");
+        const lines = wrappedCells[colIdx]!;
         if (colIdx === params.statusColIndex) {
           doc.setFont(PDF_FONTS.body, "bold");
           doc.setFontSize(fontSmall);
-          setTextHex(doc, this.getStatusColor(cell));
+          setTextHex(doc, this.getStatusColor(lines.join(" ")));
         } else {
           doc.setFont(PDF_FONTS.body, "normal");
           doc.setFontSize(fontBody);
           setTextHex(doc, PDF_COLORS.textPrimary);
         }
-        const maxW = colWidths[colIdx]! - tablePadX * 2;
-        let truncated = cell;
-        while (doc.getTextWidth(truncated) > maxW && truncated.length > 1) {
-          truncated = truncated.slice(0, -2);
-        }
-        if (truncated !== cell) truncated += "…";
-        doc.text(truncated, x + tablePadX, this.currentY + tableRowH / 2 + 2);
+        doc.text(lines, x + tablePadX, this.currentY + cellPadY + 3);
         x += colWidths[colIdx]!;
       }
 
       setDrawHex(doc, PDF_COLORS.tableBorder);
       doc.setLineWidth(0.15);
-      doc.line(marginLeft, this.currentY + tableRowH, marginLeft + contentW, this.currentY + tableRowH);
-      this.currentY += tableRowH;
+      doc.line(marginLeft, this.currentY + rowH, marginLeft + contentW, this.currentY + rowH);
+      this.currentY += rowH;
+      bodyHeight += rowH;
     }
 
     setDrawHex(doc, PDF_COLORS.tableBorder);
     doc.setLineWidth(0.4);
-    doc.rect(
-      marginLeft,
-      tableTop,
-      contentW,
-      tableHeaderH + tableRowH * params.rows.length,
-      "S"
-    );
+    doc.rect(marginLeft, tableTop, contentW, tableHeaderH + bodyHeight, "S");
 
     this.currentY += 6;
+  }
+
+  private truncateCell(doc: jsPDF, cell: string, maxW: number): string {
+    let truncated = cell;
+    while (doc.getTextWidth(truncated) > maxW && truncated.length > 1) {
+      truncated = truncated.slice(0, -2);
+    }
+    if (truncated !== cell) truncated += "...";
+    return truncated;
   }
 
   kpiRow(items: Array<{ label: string; value: string; color?: string }>) {

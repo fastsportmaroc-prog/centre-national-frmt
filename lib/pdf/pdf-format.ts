@@ -16,12 +16,52 @@ export function formatMoneyMAD(value: number): string {
   );
 }
 
-/** Date : 10 juin 2026 */
+function parsePdfDate(iso: string | Date | null | undefined): Date | null {
+  if (!iso) return null;
+  const d =
+    typeof iso === "string" ? parseISO(iso.includes("T") ? iso : `${iso.slice(0, 10)}T12:00:00`) : iso;
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Date : 11 mai 2026 (affichage PDF / documents). */
 export function formatDateFR(iso: string | Date | null | undefined): string {
-  if (!iso) return "—";
-  const d = typeof iso === "string" ? parseISO(iso.includes("T") ? iso : `${iso}T12:00:00`) : iso;
-  if (Number.isNaN(d.getTime())) return String(iso);
+  const d = parsePdfDate(iso);
+  if (!d) return iso ? String(iso) : "—";
   return format(d, "d MMMM yyyy", { locale: fr });
+}
+
+/** Alias explicite pour exports PDF stage. */
+export const formatDateFRPro = formatDateFR;
+
+/**
+ * Période sans caractères Unicode (flèches) — compatible police Helvetica jsPDF.
+ * Ex. « Du 11 au 16 mai 2026 »
+ */
+export function formatPeriodePdf(debut: string, fin: string): string {
+  const d0 = parsePdfDate(debut);
+  const d1 = parsePdfDate(fin);
+  if (!d0) return "—";
+  if (!d1 || format(d0, "yyyy-MM-dd") === format(d1, "yyyy-MM-dd")) {
+    return format(d0, "d MMMM yyyy", { locale: fr });
+  }
+  if (format(d0, "yyyy-MM") === format(d1, "yyyy-MM")) {
+    return `Du ${format(d0, "d", { locale: fr })} au ${format(d1, "d MMMM yyyy", { locale: fr })}`;
+  }
+  if (format(d0, "yyyy") === format(d1, "yyyy")) {
+    return `Du ${format(d0, "d MMMM", { locale: fr })} au ${format(d1, "d MMMM yyyy", { locale: fr })}`;
+  }
+  return `Du ${format(d0, "d MMMM yyyy", { locale: fr })} au ${format(d1, "d MMMM yyyy", { locale: fr })}`;
+}
+
+/** Sous-titre fiche stage (séparateurs ASCII). */
+export function formatStagePdfSubtitle(
+  debut: string,
+  fin: string,
+  jours: number,
+  categorie: string
+): string {
+  const j = jours > 1 ? "jours" : "jour";
+  return `${formatPeriodePdf(debut, fin)} | ${jours} ${j} | ${categorie}`;
 }
 
 export function formatDateTimeFR(iso: string): string {
