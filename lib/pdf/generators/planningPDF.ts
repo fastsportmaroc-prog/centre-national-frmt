@@ -1,7 +1,15 @@
 "use client";
 
 import { FRMTPdfEngine } from "@/lib/pdf/pdfEngine";
-import { formatDateFR, formatStatutPdf, safePdfCell } from "@/lib/pdf/pdf-format";
+import {
+  formatCreneauPlanningPdf,
+  formatDateFR,
+  formatDateTablePdf,
+  formatHorairePdf,
+  formatJourCourtPdf,
+  formatStatutPdf,
+  safePdfCell,
+} from "@/lib/pdf/pdf-format";
 import { loadPdfLogoBase64 } from "@/lib/pdf/load-pdf-logo";
 
 export type PlanningPdfSeance = {
@@ -50,10 +58,10 @@ export async function generatePlanningPDF(
       )
     )
     .map((r) => [
-      formatDateFR(r.date),
-      safePdfCell(r.jour),
-      safePdfCell(r.creneau),
-      safePdfCell(r.horaire ?? `${r.heure_debut ?? "—"} – ${r.heure_fin ?? "—"}`),
+      formatDateTablePdf(r.date),
+      formatJourCourtPdf(r.date),
+      formatCreneauPlanningPdf(r.creneau),
+      formatHorairePdf(r.horaire, r.heure_debut, r.heure_fin),
       safePdfCell(r.stage),
       safePdfCell(r.categorie),
       formatStatutPdf(r.statut ?? "prevu"),
@@ -114,8 +122,9 @@ export async function generatePlanningPDF(
       "Lettre",
       "Lic.",
     ],
-    colWidths: [16, 12, 16, 16, 22, 10, 12, 8, 8, 8, 8, 8, 10, 8, 8],
+    colWidths: [22, 12, 18, 22, 28, 12, 14, 8, 8, 8, 8, 8, 10, 8, 8],
     statusColIndex: 6,
+    wrapText: true,
     rows: rows.length ? rows : [["—"]],
   });
 

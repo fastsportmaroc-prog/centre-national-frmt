@@ -53,6 +53,47 @@ export function formatPeriodePdf(debut: string, fin: string): string {
   return `Du ${format(d0, "d MMMM yyyy", { locale: fr })} au ${format(d1, "d MMMM yyyy", { locale: fr })}`;
 }
 
+/** Date en colonne de tableau PDF (ex. 11/05/2026). */
+export function formatDateTablePdf(iso: string | Date | null | undefined): string {
+  const d = parsePdfDate(iso);
+  if (!d) return "—";
+  return format(d, "dd/MM/yyyy", { locale: fr });
+}
+
+const JOURS_COURTS_PDF = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"] as const;
+
+/** Jour abrégé pour tableaux PDF (Lun, Mar…). */
+export function formatJourCourtPdf(iso: string | Date | null | undefined): string {
+  const d = parsePdfDate(iso);
+  if (!d) return "—";
+  return JOURS_COURTS_PDF[d.getDay()] ?? "—";
+}
+
+/** Horaire sans tiret Unicode (compatible Helvetica). */
+export function formatHorairePdf(
+  horaire?: string | null,
+  heureDebut?: string | null,
+  heureFin?: string | null
+): string {
+  const normalized = (horaire ?? "").replace(/[–—]/g, "-").trim();
+  if (normalized) return normalized;
+  const d = (heureDebut ?? "").trim();
+  const f = (heureFin ?? "").trim();
+  if (d && f) return `${d} - ${f}`;
+  if (d) return d;
+  if (f) return f;
+  return "—";
+}
+
+/** Libellé court créneau planning pour colonnes étroites. */
+export function formatCreneauPlanningPdf(creneau?: string | null): string {
+  const c = (creneau ?? "").toLowerCase();
+  if (c.includes("matin") && !c.includes("apres") && !c.includes("apr")) return "Matin";
+  if (c.includes("apres") || c.includes("apr")) return "Ap.-midi";
+  if (c.includes("journ")) return "Journee";
+  return safePdfCell(creneau);
+}
+
 /** Sous-titre fiche stage (séparateurs ASCII). */
 export function formatStagePdfSubtitle(
   debut: string,
