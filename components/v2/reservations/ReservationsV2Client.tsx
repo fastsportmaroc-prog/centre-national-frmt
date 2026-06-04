@@ -157,9 +157,22 @@ export function ReservationsV2Client() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [filtered]);
 
+  function handleStageLifecycleFilter(next: StageLifecycleFilter) {
+    setStageLifecycleFilter(next);
+    if (stageFilter !== "all") {
+      const stillVisible = stages
+        .filter((s) => s.id === stageFilter)
+        .some((s) => stageMatchesLifecycleFilter(s, next, today));
+      if (!stillVisible) setStageFilter("all");
+    }
+  }
+
   function filterSubtitle(): string {
     const parts: string[] = [];
     if (plannerRange?.label) parts.push(plannerRange.label);
+    if (stageLifecycleFilter !== "all") {
+      parts.push(lifecycleFilterLabel(stageLifecycleFilter));
+    }
     if (stageFilter !== "all") {
       parts.push(stages.find((s) => s.id === stageFilter)?.stage_action ?? "Stage");
     }
