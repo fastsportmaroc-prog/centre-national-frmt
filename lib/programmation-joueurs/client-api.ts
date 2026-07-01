@@ -5,7 +5,6 @@ import type {
   ProgrammationEvenementInput,
   ProgrammationFilters,
   ProgrammationJoueurStats,
-  ProgrammationPdfTypeLetter,
 } from "@/lib/types/programmation-joueurs";
 import type { ProgrammationPdfOptions } from "@/lib/pdf/programmation/types";
 
@@ -84,19 +83,22 @@ export async function updateProgrammationEvenement(
   return { evenement: json.evenement ?? null };
 }
 
-export async function deleteProgrammationEvenement(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteProgrammationEvenement(
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`/api/programmation-joueurs/${id}`, { method: "DELETE" });
   const json = (await res.json()) as { ok?: boolean; error?: string };
   if (!res.ok) return { ok: false, error: json.error ?? "Erreur suppression" };
-  return { ok: json.ok ?? true };
+  return { ok: true };
 }
 
 export async function fetchProgrammationStats(
   joueurId: string,
-  annee?: number
+  annee: number
 ): Promise<{ stats: ProgrammationJoueurStats | null; error?: string }> {
-  const qs = annee ? `?annee=${annee}` : "";
-  const res = await fetch(`/api/programmation-joueurs/stats/${joueurId}${qs}`, { cache: "no-store" });
+  const res = await fetch(`/api/programmation-joueurs/stats/${joueurId}?annee=${annee}`, {
+    cache: "no-store",
+  });
   const json = (await res.json()) as { stats?: ProgrammationJoueurStats; error?: string };
   if (!res.ok) return { stats: null, error: json.error ?? "Erreur stats" };
   return { stats: json.stats ?? null };
@@ -106,12 +108,7 @@ export type ProgrammationPdfExportOptions = {
   joueurIds: string[];
   dateDebut: string;
   dateFin: string;
-  typePdf: ProgrammationPdfTypeLetter;
   options?: Partial<ProgrammationPdfOptions>;
-  /** @deprecated Utiliser typePdf A–E */
-  includeResultats?: boolean;
-  includePoints?: boolean;
-  includeClassement?: boolean;
 };
 
 function filenameFromDisposition(header: string | null): string | null {
@@ -120,17 +117,8 @@ function filenameFromDisposition(header: string | null): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
+/** Export PDF : tableau déplacements par semaine (Maroc / étranger). */
 export async function exportProgrammationPdf(options: ProgrammationPdfExportOptions): Promise<void> {
-  const pdfOptions: ProgrammationPdfOptions = {
-    inclurePhoto: true,
-    inclureResultats: options.includeResultats ?? true,
-    inclurePoints: options.includePoints ?? true,
-    inclurePrizeMoney: true,
-    langue: "fr",
-    orientation: options.typePdf === "D" ? "portrait" : "auto",
-    ...options.options,
-  };
-
   const res = await fetch("/api/programmation-joueurs/export/pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -138,8 +126,7 @@ export async function exportProgrammationPdf(options: ProgrammationPdfExportOpti
       joueurIds: options.joueurIds,
       dateDebut: options.dateDebut,
       dateFin: options.dateFin,
-      typePdf: options.typePdf,
-      options: pdfOptions,
+      options: options.options,
     }),
   });
   if (!res.ok) {
@@ -151,8 +138,7 @@ export async function exportProgrammationPdf(options: ProgrammationPdfExportOpti
   const a = document.createElement("a");
   a.href = url;
   a.download =
-    filenameFromDisposition(res.headers.get("Content-Disposition")) ??
-    `FRMT_Planning_${options.typePdf}.pdf`;
+    filenameFromDisposition(res.headers.get("Content-Disposition")) ?? "FRMT_Deplacements.pdf";
   a.click();
   URL.revokeObjectURL(url);
 }

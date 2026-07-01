@@ -15,7 +15,9 @@ import {
 import { formatDateFR, formatPeriodePdf } from "@/lib/pdf/pdf-format";
 import { PDF_META } from "@/lib/pdf/pdfDesignSystem";
 import { PDF_PRO, TYPE_PDF_RGB, LEGEND_ORDER } from "@/lib/pdf/programmation/couleurs";
+import { flagForPays } from "@/lib/pdf/programmation/flagEmoji";
 import { truncateText } from "@/lib/pdf/programmation/formatters";
+import { eventsInWeek } from "@/lib/pdf/programmation/dataPreparation";
 import type { JoueurPdfRow } from "@/lib/pdf/programmation/types";
 
 export const PRO_MARGINS = { left: 10, right: 10, top: 24, bottom: 12 };
@@ -146,26 +148,27 @@ export function drawProLegend(doc: jsPDF, x: number, y: number, w: number): numb
   doc.setFillColor(...PDF_PRO.legendBg);
   doc.setDrawColor(224, 224, 224);
   doc.setLineWidth(0.2);
-  doc.roundedRect(x, y, w, 11, 1.5, 1.5, "FD");
+  doc.roundedRect(x, y, w, 13, 1.5, 1.5, "FD");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setTextColor(...PDF_PRO.textDark);
-  doc.text("CODE COULEUR", x + 3, y + 4);
+  doc.text("CODE COULEUR — bordure jaune = à l'étranger", x + 3, y + 4);
 
-  let cx = x + 24;
+  let cx = x + 3;
+  const legendY = y + 8;
   for (const type of LEGEND_ORDER) {
     const [r, g, b] = TYPE_PDF_RGB[type];
     doc.setFillColor(r, g, b);
-    doc.rect(cx, y + 3, 3, 3, "F");
+    doc.rect(cx, legendY + 0.5, 3, 3, "F");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(5.5);
+    doc.setFontSize(5);
     doc.setTextColor(...PDF_PRO.textMuted);
-    const lbl = PROGRAMMATION_TYPE_LABELS[type].slice(0, 22);
-    doc.text(lbl, cx + 4, y + 5.5);
+    const lbl = PROGRAMMATION_TYPE_LABELS[type].slice(0, 18);
+    doc.text(lbl, cx + 4, legendY + 2.5);
     cx += 4 + doc.getTextWidth(lbl) + 5;
     if (cx > x + w - 8) break;
   }
-  return y + 13;
+  return y + 15;
 }
 
 export function drawJoueurRowBanner(
@@ -223,6 +226,194 @@ export function drawWeeklyPlanningMatrix(
     rangeStart: parseISO(dateDebut.slice(0, 10)),
     rows: gridRows,
   });
+}
+
+function isMaroc(pays: string | null | undefined): boolean {
+  if (!pays?.trim()) return true;
+  const p = pays.trim().toLowerCase();
+  return p.includes("maroc") || p === "morocco" || p === "ma";
+}
+
+function eventsInWeekColumn(
+  events: ProgrammationEvenementEnriched[],
+  col: TimeColumn
+): ProgrammationEvenementEnriched[] {
+  return eventsInWeek(events, col.start, col.end);
+}
+
+function pickMainEvent(evs: ProgrammationEvenementEnriched[]): ProgrammationEvenementEnriched | null {
+  if (!evs.length) return null;
+  const rank = (t: ProgrammationEvenementEnriched["type"]) => {
+    if (["tournoi_atp_wta", "tournoi_itf", "coupe_davis", "bjk_cup"].includes(t)) return 0;
+    if (t.startsWith("stage")) return 1;
+    if (t === "competition_nationale") return 2;
+    if (t === "repos") return 4;
+    if (t === "blessure") return 5;
+    return 3;
+  };
+  return [...evs].sort((a, b) => rank(a.type) - rank(b.type))[0]!;
+}
+
+function cellDeplacementLines(ev: ProgrammationEvenementEnriched) {
+  if (ev.type === "repos") {
+    return { line1: "Repos", line2: "Maroc — Centre National", local: true, type: ev.type };
+  }
+  if (ev.type === "blessure") {
+    return {
+      line1: "Blessure",
+      line2: ev.ville ? `${ev.ville} — Maroc` : "Maroc",
+      local: true,
+      type: ev.type,
+    };
+  }
+  if (ev.type === "stage_national") {
+    return {
+      line1: ev.nom,
+      line2: "Maroc — Stage CN",
+      local: true,
+      type: ev.type,
+    };
+  }
+  const pays = ev.pays?.trim() || "—";
+  const local = isMaroc(ev.pays);
+  const flag = flagForPays(ev.pays);
+  const ville = ev.ville?.trim();
+  const line2 = ville ? `${ville} — ${flag} ${pays}` : `${flag} ${pays}`;
+  return { line1: ev.nom, line2, local, type: ev.type };
+}
+
+/**
+ * Tableau déplacements : lignes = joueurs, colonnes = semaines,
+ * chaque cellule = où est le joueur (Maroc ou pays étranger).
+ */
+export function drawDeplacementsSemaineTable(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  dateDebut: string,
+  dateFin: string,
+  rows: JoueurPdfRow[],
+  labelWidth = 46,
+  rowHeight = 16
+): number {
+  const cols = buildWeekColumns(dateDebut, dateFin);
+  if (!cols.length) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(...PDF_PRO.textMuted);
+    doc.text("Aucune semaine sur la période sélectionnée.", x, y + 5);
+    return y + 10;
+  }
+
+  const gridW = width - labelWidth;
+  const colW = gridW / cols.length;
+  const headerH = 11;
+
+  doc.setFillColor(...PDF_PRO.planningCol);
+  doc.rect(x, y, labelWidth, headerH, "F");
+  doc.setFillColor(...PDF_PRO.tableHead);
+  doc.rect(x + labelWidth, y, gridW, headerH, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("JOUEUR", x + 2, y + 6);
+
+  for (let i = 0; i < cols.length; i++) {
+    const c = cols[i]!;
+    const cx = x + labelWidth + i * colW;
+    doc.text(c.label, cx + colW / 2, y + 4.5, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5);
+    doc.setTextColor(203, 213, 225);
+    doc.text(c.sub, cx + colW / 2, y + 8.5, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(255, 255, 255);
+  }
+
+  let cy = y + headerH;
+
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri]!;
+    const rowY = cy + ri * rowHeight;
+
+    doc.setFillColor(...PDF_PRO.labelBg);
+    doc.rect(x, rowY, labelWidth, rowHeight, "F");
+    doc.setDrawColor(...PDF_PRO.border);
+    doc.setLineWidth(0.15);
+    doc.rect(x, rowY, width, rowHeight);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...PDF_PRO.textDark);
+    doc.text(truncateText(doc, row.label, labelWidth - 4), x + 2, rowY + 6);
+    if (row.categorie) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(5);
+      doc.setTextColor(...PDF_PRO.textMuted);
+      doc.text(truncateText(doc, row.categorie, labelWidth - 4), x + 2, rowY + 11);
+    }
+
+    for (let i = 0; i < cols.length; i++) {
+      const col = cols[i]!;
+      const cx = x + labelWidth + i * colW;
+      const pad = 0.8;
+      const cellInnerW = colW - pad * 2;
+      const cellX = cx + pad;
+      const cellY = rowY + 1.5;
+      const cellH = rowHeight - 3;
+
+      const weekEvs = eventsInWeekColumn(row.events, col);
+      const main = pickMainEvent(weekEvs);
+
+      doc.setDrawColor(...PDF_PRO.border);
+      doc.rect(cx, rowY, colW, rowHeight);
+
+      if (!main) {
+        doc.setFillColor(...PDF_PRO.emptyCell);
+        doc.rect(cellX, cellY, cellInnerW, cellH, "F");
+        doc.setTextColor(...PDF_PRO.textMuted);
+        doc.setFontSize(9);
+        doc.text("—", cx + colW / 2, rowY + rowHeight / 2 + 1, { align: "center" });
+        continue;
+      }
+
+      const lines = cellDeplacementLines(main);
+      lines.line1 = truncateText(doc, lines.line1, cellInnerW - 2);
+      lines.line2 = truncateText(doc, lines.line2, cellInnerW - 2);
+
+      const [r, g, b] = TYPE_PDF_RGB[lines.type];
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(cellX, cellY, cellInnerW, cellH, 1, 1, "F");
+
+      if (!lines.local) {
+        doc.setDrawColor(255, 200, 50);
+        doc.setLineWidth(0.35);
+        doc.roundedRect(cellX, cellY, cellInnerW, cellH, 1, 1, "S");
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(cellInnerW > 18 ? 5.5 : 4.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(lines.line1, cellX + 1.2, cellY + 5.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(cellInnerW > 18 ? 5 : 4);
+      doc.setTextColor(245, 245, 245);
+      doc.text(lines.line2, cellX + 1.2, cellY + 10);
+
+      if (weekEvs.length > 1) {
+        doc.setFontSize(4);
+        doc.text(`+${weekEvs.length - 1}`, cellX + cellInnerW - 1, cellY + cellH - 1.5, {
+          align: "right",
+        });
+      }
+    }
+  }
+
+  return cy + rows.length * rowHeight + 4;
 }
 
 export function drawMonthlyHeatmap(
