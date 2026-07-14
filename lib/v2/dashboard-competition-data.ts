@@ -15,7 +15,7 @@ const EMPTY: CompetitionDashboardSummary = {
 
 export async function loadDashboardCompetition(): Promise<CompetitionDashboardSummary> {
   try {
-    const res = await fetch("/api/competitions/dashboard", { cache: "no-store" });
+    const res = await fetch("/api/dashboard/competitions", { cache: "no-store" });
     const json = (await res.json()) as CompetitionDashboardSummary & { error?: string };
     if (!res.ok) {
       return { ...EMPTY, error: json.error ?? "Impossible de charger les compétitions." };
