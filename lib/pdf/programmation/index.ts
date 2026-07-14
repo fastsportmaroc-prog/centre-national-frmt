@@ -6,4 +6,4 @@ export type {
   ProgrammationPdfRequest,
 } from "@/lib/pdf/programmation/types";
 export { DEFAULT_PDF_OPTIONS } from "@/lib/pdf/programmation/types";
-export { formatPdfFilename, typePdfTitle } from "@/lib/pdf/programmation/formatters";
+export { formatPdfFilename } from "@/lib/pdf/programmation/formatters";

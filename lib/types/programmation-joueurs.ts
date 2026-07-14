@@ -63,6 +63,8 @@ export type ProgrammationEvenementEnriched = ProgrammationEvenement & {
   joueur_photo_url?: string | null;
   joueur_categorie?: string | null;
   joueur_classement?: string | null;
+  /** Colonne coach Planning CNE (optionnel). */
+  cne_column_id?: string | null;
 };
 
 export type ProgrammationEvenementInput = Omit<
