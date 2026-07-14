@@ -1,11 +1,13 @@
 "use client";
 
-import { X } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BadgeTypeEvenement } from "./BadgeTypeEvenement";
 import {
   PROGRAMMATION_SURFACE_LABELS,
 } from "@/lib/constants/programmation-joueurs";
+import { isStageProgrammeVirtualEvent } from "@/lib/programmation-joueurs/planning-cne-stages";
 import type { ProgrammationEvenementEnriched } from "@/lib/types/programmation-joueurs";
 import { formatPeriodePdf } from "@/lib/pdf/pdf-format";
 
@@ -19,6 +21,7 @@ type Props = {
 export function EvenementDrawer({ evenement, onClose, onEdit, onDelete }: Props) {
   if (!evenement) return null;
 
+  const fromStageProgramme = isStageProgrammeVirtualEvent(evenement);
   const joueur = [evenement.joueur_prenom, evenement.joueur_nom].filter(Boolean).join(" ");
   const lieu = [evenement.ville, evenement.pays].filter(Boolean).join(", ");
 
@@ -56,8 +59,27 @@ export function EvenementDrawer({ evenement, onClose, onEdit, onDelete }: Props)
             )}
             {evenement.categorie_tournoi && (
               <div>
-                <dt className="text-[var(--text-secondary)]">Catégorie tournoi</dt>
+                <dt className="text-[var(--text-secondary)]">
+                  {fromStageProgramme ? "Catégorie stage" : "Catégorie tournoi"}
+                </dt>
                 <dd>{evenement.categorie_tournoi}</dd>
+              </div>
+            )}
+            {fromStageProgramme && evenement.stage_programme_id && (
+              <div>
+                <dt className="text-[var(--text-secondary)]">Source</dt>
+                <dd>
+                  <Link
+                    href={`/v2/stages/${evenement.stage_programme_id}`}
+                    className="inline-flex items-center gap-1 font-medium text-frmt-green hover:underline"
+                  >
+                    Stage programme CNE
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Données synchronisées depuis le module Stages (lecture seule ici).
+                  </p>
+                </dd>
               </div>
             )}
             <div>
@@ -95,12 +117,12 @@ export function EvenementDrawer({ evenement, onClose, onEdit, onDelete }: Props)
           </dl>
         </div>
         <div className="flex gap-2 border-t border-[var(--border)] p-4">
-          {onEdit && (
+          {onEdit && !fromStageProgramme && (
             <Button variant="secondary" onClick={() => onEdit(evenement)}>
               Modifier
             </Button>
           )}
-          {onDelete && (
+          {onDelete && !fromStageProgramme && (
             <Button variant="ghost" className="text-red-400" onClick={() => onDelete(evenement.id)}>
               Supprimer
             </Button>

@@ -1,5 +1,6 @@
 import { createSupabaseBrowserClientAsync } from "@/lib/supabase/browser";
 import { assertSupabaseConfigured } from "@/lib/supabase/assert-configured";
+import { cacheJoueurPhotoUrl } from "@/lib/storage/entraineur-photo-cache";
 
 const BUCKET = "joueurs-photos";
 const MAX_SIZE = 2 * 1024 * 1024;
@@ -29,7 +30,9 @@ export async function uploadJoueurPhoto(
   if (uploadError) throw new Error(uploadError.message);
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  const publicUrl = data.publicUrl;
+  cacheJoueurPhotoUrl(joueurId, publicUrl);
+  return publicUrl;
 }
 
 export async function deleteJoueurPhoto(photoUrl: string) {

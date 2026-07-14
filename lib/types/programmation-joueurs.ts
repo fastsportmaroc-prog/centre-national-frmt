@@ -63,7 +63,9 @@ export type ProgrammationEvenementEnriched = ProgrammationEvenement & {
   joueur_photo_url?: string | null;
   joueur_categorie?: string | null;
   joueur_classement?: string | null;
-  /** Colonne coach Planning CNE (optionnel). */
+  /** Événement dérivé du module Stages (lecture seule dans l'UI programmation). */
+  stage_programme_id?: string | null;
+  /** Colonne planning CNE : id joueur ou `coach-{id}`. */
   cne_column_id?: string | null;
 };
 

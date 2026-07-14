@@ -13,6 +13,7 @@ import {
   type GlobalSearchResult,
   type GlobalSearchResultType,
 } from "@/lib/v2/global-search";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 
 const TYPE_ICON: Record<GlobalSearchResultType, LucideIcon> = {
   joueur: User,
@@ -23,6 +24,7 @@ const TYPE_ICON: Record<GlobalSearchResultType, LucideIcon> = {
 
 export function GlobalSearchBar({ className }: { className?: string }) {
   const router = useRouter();
+  const { canAccessPath } = useUserPermissions();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,9 +41,9 @@ export function GlobalSearchBar({ className }: { className?: string }) {
     }
     setLoading(true);
     const found = await runGlobalSearch(t, 10);
-    setResults(found);
+    setResults(found.filter((r) => canAccessPath(r.href)));
     setLoading(false);
-  }, []);
+  }, [canAccessPath]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,14 +69,16 @@ export function GlobalSearchBar({ className }: { className?: string }) {
     const term = q.trim();
     if (!term) return;
     setLoading(true);
-    const found = await runGlobalSearch(term, 12);
+    const found = (await runGlobalSearch(term, 12)).filter((r) => canAccessPath(r.href));
     setLoading(false);
     const best = pickBestSearchResult(found);
     if (best) {
       goTo(best);
       return;
     }
-    router.push(`/v2/joueurs?q=${encodeURIComponent(term)}`);
+    if (canAccessPath("/v2/joueurs")) {
+      router.push(`/v2/joueurs?q=${encodeURIComponent(term)}`);
+    }
   }
 
   return (

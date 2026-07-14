@@ -25,6 +25,7 @@ import { normalizeStatut } from "@/lib/v2/reservations-utils";
 import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import { useSupabaseTableRefresh } from "@/lib/hooks/use-supabase-table-refresh";
 import {
   Activity,
@@ -119,6 +120,7 @@ export function generatePlanningSessionsFromStages(
 export function PlanningV2Client() {
   const router = useRouter();
   const { user } = useAuth();
+  const { filterByCategory, hasCategoryRestrictions, lockedCategoryLabel } = useUserPermissions();
   const searchParams = useSearchParams();
   const stageFromUrl = searchParams.get("stage") ?? "";
   const [stages, setStages] = useState<StageProgrammeV2[]>([]);
@@ -137,7 +139,8 @@ export function PlanningV2Client() {
   const load = useCallback(async () => {
     setLoading(true);
     const [s, p, r] = await Promise.all([getStages(), getPlanning(), getReservationsEnriched()]);
-    setStages(s);
+    const scopedStages = filterByCategory(s, (stage) => stage.categorie);
+    setStages(scopedStages);
     setPlanningRows(p);
     setReservations(
       r
@@ -157,7 +160,7 @@ export function PlanningV2Client() {
       console.info("[PlanningV2] stages loaded:", s.length, "reservations stage:", r.length);
     }
     setLoading(false);
-  }, []);
+  }, [filterByCategory, isDev]);
 
   useEffect(() => {
     setStageFilter(stageFromUrl);
@@ -333,14 +336,20 @@ export function PlanningV2Client() {
               </option>
             ))}
             </Select>
-            <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="max-w-xs">
-              <option value="all">Toutes catégories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
+            {hasCategoryRestrictions ? (
+              <div className="max-w-xs rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm">
+                {lockedCategoryLabel || categoryFilter}
+              </div>
+            ) : (
+              <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="max-w-xs">
+                <option value="all">Toutes catégories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StageStatusFilter)} className="max-w-xs">
               <option value="prevus_confirmes">Stages prévus/confirmés</option>
               <option value="en_cours">En cours</option>

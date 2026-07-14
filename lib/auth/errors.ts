@@ -17,10 +17,13 @@ export function mapAuthErrorMessage(message: string, code?: string): string {
       ? "Veuillez confirmer votre adresse email avant de vous connecter."
       : "Email non confirmé. Supabase → Authentication → Users → confirmez l'utilisateur, ou désactivez « Confirm email » dans Providers → Email.";
   }
+  if (c === "config" || m.includes("clé anon pour le projet")) {
+    return message;
+  }
   if (m.includes("invalid login") || m.includes("invalid credentials")) {
     return isProd
       ? "Email ou mot de passe incorrect."
-      : "Supabase refuse email/mot de passe pour ce projet. Vérifiez la clé anon eyJ… dans .env.local ou lancez npm run fix:password.";
+      : "Connexion refusée. Double-cliquez REPARER-ABDOU.bat ou lancez : npm run ensure:user -- abdou@frmt.ma FrmtAbdou2026! puis npm run restart";
   }
   if (m.includes("user already registered")) {
     return "Un compte existe déjà avec cet email.";

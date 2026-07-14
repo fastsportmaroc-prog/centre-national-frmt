@@ -5,6 +5,10 @@ import {
   generateProgrammationProPdf,
 } from "@/lib/pdf/programmation/index.server";
 import { DEFAULT_PDF_OPTIONS } from "@/lib/pdf/programmation/types";
+import { enforceProgrammationJoueurIds } from "@/lib/auth/planning-cne-access.server";
+import { filterProgrammationEvenements } from "@/lib/auth/apply-player-category-filter.server";
+import { getPlayerCategoryContext } from "@/lib/auth/player-category-context.server";
+import { getPlanningCneAccessContext } from "@/lib/auth/planning-cne-access.server";
 import { listProgrammationEvenements } from "@/lib/programmation-joueurs/server";
 import type { ProgrammationEvenementEnriched } from "@/lib/types/programmation-joueurs";
 
@@ -37,21 +41,30 @@ export async function POST(request: Request) {
   }
 
   const joueurIds = body.joueurIds?.filter(Boolean) ?? [];
-  if (!joueurIds.length) {
-    return NextResponse.json({ error: "joueurIds requis" }, { status: 400 });
+  const access = await getPlanningCneAccessContext();
+  if (!access?.canExport) {
+    return NextResponse.json({ error: "Export non autorisé" }, { status: 403 });
+  }
+
+  const enforced = await enforceProgrammationJoueurIds(joueurIds);
+  if (!enforced.ok) {
+    return NextResponse.json({ error: enforced.error }, { status: enforced.status });
   }
 
   const { dateDebut, dateFin } = defaultProPdfDateRange(body.dateDebut, body.dateFin);
 
-  const loaded = await loadEvents(joueurIds, dateDebut, dateFin);
+  const loaded = await loadEvents(enforced.joueurIds, dateDebut, dateFin);
   if (loaded.error) return NextResponse.json({ error: loaded.error }, { status: 500 });
 
+  const ctx = await getPlayerCategoryContext();
+  const evenements = filterProgrammationEvenements(loaded.data, ctx);
+
   const { buffer, filename } = await generateProgrammationProPdf({
-    joueurIds,
+    joueurIds: enforced.joueurIds,
     dateDebut,
     dateFin,
     options: { ...DEFAULT_PDF_OPTIONS, ...body.options },
-    evenements: loaded.data,
+    evenements,
     generatedBy: user.email ?? user.id,
   });
 
@@ -68,10 +81,16 @@ export async function GET(request: Request) {
   const user = await requireProgrammationApiUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
+  const access = await getPlanningCneAccessContext();
+  if (!access?.canExport) {
+    return NextResponse.json({ error: "Export non autorisé" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const joueurIds = searchParams.getAll("joueurIds").filter(Boolean);
-  if (!joueurIds.length) {
-    return NextResponse.json({ error: "joueurIds requis" }, { status: 400 });
+  const enforced = await enforceProgrammationJoueurIds(joueurIds);
+  if (!enforced.ok) {
+    return NextResponse.json({ error: enforced.error }, { status: enforced.status });
   }
 
   const { dateDebut, dateFin } = defaultProPdfDateRange(
@@ -79,14 +98,17 @@ export async function GET(request: Request) {
     searchParams.get("dateFin") ?? undefined
   );
 
-  const loaded = await loadEvents(joueurIds, dateDebut, dateFin);
+  const loaded = await loadEvents(enforced.joueurIds, dateDebut, dateFin);
   if (loaded.error) return NextResponse.json({ error: loaded.error }, { status: 500 });
 
+  const ctx = await getPlayerCategoryContext();
+  const evenements = filterProgrammationEvenements(loaded.data, ctx);
+
   const { buffer, filename } = await generateProgrammationProPdf({
-    joueurIds,
+    joueurIds: enforced.joueurIds,
     dateDebut,
     dateFin,
-    evenements: loaded.data,
+    evenements,
     generatedBy: user.email ?? user.id,
   });
 

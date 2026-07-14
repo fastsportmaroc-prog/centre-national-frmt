@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { FileDown, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FileDown, FileSpreadsheet, Plus } from "lucide-react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/v2/ui/ToastProvider";
 import type { JoueurV2 } from "@/lib/types/v2";
@@ -13,6 +14,8 @@ import type {
 } from "@/lib/types/programmation-joueurs";
 import {
   createProgrammationEvenements,
+  exportProgrammationCneExcel,
+  exportProgrammationCnePdf,
   exportProgrammationPdf,
   fetchProgrammationEvenements,
   fetchProgrammationStats,
@@ -21,6 +24,7 @@ import {
 import { FormulaireEvenement } from "@/components/v2/programmation-joueurs/FormulaireEvenement";
 import { EvenementDrawer } from "@/components/v2/programmation-joueurs/EvenementDrawer";
 import { ExportPdfModal } from "@/components/v2/programmation-joueurs/ExportPdfModal";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import { StatsRapidesJoueur } from "./StatsRapidesJoueur";
 import { MiniCalendrierJoueur } from "./MiniCalendrierJoueur";
 import { ListeEvenementsJoueur } from "./ListeEvenementsJoueur";
@@ -32,6 +36,7 @@ type Props = {
 
 export function TabProgramme({ joueur, allJoueurs }: Props) {
   const { toast } = useToast();
+  const { planningCne, canViewJoueur } = useUserPermissions();
   const [evenements, setEvenements] = useState<ProgrammationEvenementEnriched[]>([]);
   const [stats, setStats] = useState<ProgrammationJoueurStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +44,21 @@ export function TabProgramme({ joueur, allJoueurs }: Props) {
   const [editEv, setEditEv] = useState<ProgrammationEvenementEnriched | null>(null);
   const [drawerEv, setDrawerEv] = useState<ProgrammationEvenementEnriched | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportingCne, setExportingCne] = useState(false);
+
+  const monthRange = useMemo(() => {
+    const now = new Date();
+    return {
+      start: format(startOfMonth(now), "yyyy-MM-dd"),
+      end: format(endOfMonth(now), "yyyy-MM-dd"),
+    };
+  }, []);
+
+  const canViewThisJoueur = canViewJoueur(joueur);
+  const canExportThisJoueur =
+    planningCne.canExport &&
+    canViewThisJoueur &&
+    (!planningCne.selfOnly || planningCne.selfJoueurId === joueur.id);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -76,17 +96,70 @@ export function TabProgramme({ joueur, allJoueurs }: Props) {
     await refresh();
   }
 
+  async function handleExportCne(kind: "pdf" | "excel") {
+    setExportingCne(true);
+    try {
+      const opts = {
+        dateDebut: monthRange.start,
+        dateFin: monthRange.end,
+        columnIds: [joueur.id],
+        displayMode: "joueurs" as const,
+      };
+      if (kind === "pdf") await exportProgrammationCnePdf(opts);
+      else await exportProgrammationCneExcel(opts);
+      toast(kind === "pdf" ? "PDF CNE téléchargé" : "Excel CNE téléchargé", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erreur export", "error");
+    } finally {
+      setExportingCne(false);
+    }
+  }
+
+  if (!canViewThisJoueur) {
+    return (
+      <p className="text-sm text-[var(--text-secondary)]">
+        Vous n&apos;avez pas accès au programme de ce joueur.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <StatsRapidesJoueur stats={stats} loading={loading} />
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setExportOpen(true)}>
-            <FileDown className="mr-1 h-4 w-4" /> Exporter PDF
-          </Button>
-          <Button size="sm" onClick={() => { setEditEv(null); setFormOpen(true); }}>
-            <Plus className="mr-1 h-4 w-4" /> Ajouter
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {canExportThisJoueur && (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={exportingCne}
+                onClick={() => void handleExportCne("pdf")}
+              >
+                <FileDown className="mr-1 h-4 w-4" />
+                {exportingCne ? "Export…" : "PDF CNE"}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={exportingCne}
+                onClick={() => void handleExportCne("excel")}
+              >
+                <FileSpreadsheet className="mr-1 h-4 w-4" />
+                Excel CNE
+              </Button>
+            </>
+          )}
+          {canExportThisJoueur && !planningCne.selfOnly && (
+            <Button size="sm" variant="secondary" onClick={() => setExportOpen(true)}>
+              <FileDown className="mr-1 h-4 w-4" /> PDF déplacements
+            </Button>
+          )}
+          {planningCne.canManageEvents && (
+            <Button size="sm" onClick={() => { setEditEv(null); setFormOpen(true); }}>
+              <Plus className="mr-1 h-4 w-4" /> Ajouter
+            </Button>
+          )}
         </div>
       </div>
 
@@ -97,31 +170,39 @@ export function TabProgramme({ joueur, allJoueurs }: Props) {
         <ListeEvenementsJoueur evenements={evenements} onEventClick={setDrawerEv} />
       </div>
 
-      <FormulaireEvenement
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditEv(null); }}
-        joueurs={allJoueurs}
-        initial={editEv}
-        defaultJoueurIds={[joueur.id]}
-        onSubmit={handleFormSubmit}
-      />
+      {planningCne.canManageEvents && (
+        <FormulaireEvenement
+          open={formOpen}
+          onClose={() => { setFormOpen(false); setEditEv(null); }}
+          joueurs={allJoueurs}
+          initial={editEv}
+          defaultJoueurIds={[joueur.id]}
+          onSubmit={handleFormSubmit}
+        />
+      )}
 
       <EvenementDrawer
         evenement={drawerEv}
         onClose={() => setDrawerEv(null)}
-        onEdit={(ev) => { setEditEv(ev); setFormOpen(true); setDrawerEv(null); }}
+        onEdit={
+          planningCne.canManageEvents
+            ? (ev) => { setEditEv(ev); setFormOpen(true); setDrawerEv(null); }
+            : undefined
+        }
       />
 
-      <ExportPdfModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        joueurs={[joueur]}
-        defaultSelectedIds={[joueur.id]}
-        onConfirm={async (opts) => {
-          await exportProgrammationPdf(opts);
-          toast("PDF téléchargé", "success");
-        }}
-      />
+      {!planningCne.selfOnly && (
+        <ExportPdfModal
+          open={exportOpen}
+          onClose={() => setExportOpen(false)}
+          joueurs={[joueur]}
+          defaultSelectedIds={[joueur.id]}
+          onConfirm={async (opts) => {
+            await exportProgrammationPdf(opts);
+            toast("PDF téléchargé", "success");
+          }}
+        />
+      )}
     </div>
   );
 }

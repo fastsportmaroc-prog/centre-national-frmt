@@ -80,7 +80,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/api/health" ||
     request.nextUrl.pathname === "/api/status" ||
     request.nextUrl.pathname === "/api/stages/count" ||
-    request.nextUrl.pathname.startsWith("/api/frmt-logo");
+    request.nextUrl.pathname.startsWith("/api/frmt-logo") ||
+    (process.env.NODE_ENV !== "production" &&
+      request.nextUrl.pathname.startsWith("/api/dev"));
 
   let user = null;
 

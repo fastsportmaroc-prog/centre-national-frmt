@@ -23,6 +23,8 @@ type Props = {
   onExportPdf: () => void;
   options: Options;
   loading?: boolean;
+  categoryLocked?: boolean;
+  lockedCategoryLabel?: string;
 };
 
 export function StatsFilterBar({
@@ -34,6 +36,8 @@ export function StatsFilterBar({
   onExportPdf,
   options,
   loading,
+  categoryLocked = false,
+  lockedCategoryLabel = "",
 }: Props) {
   return (
     <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
@@ -51,16 +55,22 @@ export function StatsFilterBar({
         </label>
         <label className="space-y-1 text-xs">
           <span className="text-muted">Catégorie</span>
-          <Select
-            value={filters.categorie}
-            onChange={(e) => setFilter("categorie", e.target.value)}
-          >
-            {officialCategoryFilterOptions(true).map((o) => (
-              <option key={o.value || "toutes"} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+          {categoryLocked ? (
+            <div className="rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm">
+              {lockedCategoryLabel || filters.categorie}
+            </div>
+          ) : (
+            <Select
+              value={filters.categorie}
+              onChange={(e) => setFilter("categorie", e.target.value)}
+            >
+              {officialCategoryFilterOptions(true).map((o) => (
+                <option key={o.value || "toutes"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          )}
         </label>
         <label className="space-y-1 text-xs">
           <span className="text-muted">Début période</span>

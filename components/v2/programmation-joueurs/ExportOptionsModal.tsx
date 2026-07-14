@@ -5,6 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
 import type { ProgrammationPdfType } from "@/lib/types/programmation-joueurs";
+import { FrenchDateInput } from "./FrenchDateInput";
+import { sanitizePlanningCneRange } from "@/lib/programmation-joueurs/planning-cne-period";
 import {
   endOfMonth,
   endOfYear,
@@ -54,14 +56,15 @@ export function ExportOptionsModal({ open, onClose, joueurCount, onConfirm }: Pr
   }
 
   async function handleExport() {
+    const { start, end } = sanitizePlanningCneRange(dateDebut, dateFin);
     setLoading(true);
     try {
       const pdfType =
         joueurCount > 1 && periode !== "annee" && typePdf !== "annuel" ? "multi" : typePdf;
       await onConfirm({
         typePdf: pdfType,
-        dateDebut,
-        dateFin,
+        dateDebut: start,
+        dateFin: end,
         includeResultats,
         includePoints,
         includeClassement,
@@ -99,14 +102,18 @@ export function ExportOptionsModal({ open, onClose, joueurCount, onConfirm }: Pr
         </div>
         {periode === "plage" && (
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Du</Label>
-              <Input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
-            </div>
-            <div>
-              <Label>Au</Label>
-              <Input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} />
-            </div>
+            <FrenchDateInput
+              label="Du"
+              value={dateDebut}
+              onChange={(iso) => iso && setDateDebut(iso)}
+              max={dateFin}
+            />
+            <FrenchDateInput
+              label="Au"
+              value={dateFin}
+              onChange={(iso) => iso && setDateFin(iso)}
+              min={dateDebut}
+            />
           </div>
         )}
         <div>

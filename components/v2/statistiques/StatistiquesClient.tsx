@@ -9,6 +9,7 @@ import { StatsComparatifView } from "@/components/v2/statistiques/tabs/StatsComp
 import { StatsFinancierView } from "@/components/v2/statistiques/tabs/StatsFinancierView";
 import { StatsJoueursView } from "@/components/v2/statistiques/tabs/StatsJoueursView";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import { useStatistiquesFilters } from "@/lib/statistiques/hooks/useStatistiquesFilters";
 import {
   loadFilterOptions,
@@ -30,6 +31,8 @@ const TABS: { id: StatistiquesTab; label: string }[] = [
 function StatistiquesContent() {
   const { toast } = useToast();
   const { filters, setFilter, resetFilters } = useStatistiquesFilters();
+  const { categoryContext, hasCategoryRestrictions, lockedCategoryLabel, sanitizeCategoryParam } =
+    useUserPermissions();
   const [data, setData] = useState<StatistiquesBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState<{
@@ -40,18 +43,28 @@ function StatistiquesContent() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const bundle = await loadStatistiques(filters);
+      const bundle = await loadStatistiques(filters, categoryContext);
       setData(bundle);
     } catch {
       toast("Erreur chargement statistiques", "error");
     } finally {
       setLoading(false);
     }
-  }, [filters, toast]);
+  }, [filters, categoryContext, toast]);
 
   useEffect(() => {
-    void loadFilterOptions().then(setOptions);
-  }, []);
+    void loadFilterOptions(categoryContext).then(setOptions);
+  }, [categoryContext]);
+
+  useEffect(() => {
+    if (!hasCategoryRestrictions) return;
+    const enforced = sanitizeCategoryParam(
+      filters.categorie === "Toutes" ? undefined : filters.categorie
+    );
+    if (enforced && filters.categorie !== enforced) {
+      setFilter("categorie", enforced);
+    }
+  }, [hasCategoryRestrictions, filters.categorie, sanitizeCategoryParam, setFilter]);
 
   useEffect(() => {
     void refresh();
@@ -122,6 +135,8 @@ function StatistiquesContent() {
           onExportPdf={() => void handleExportPdf()}
           options={options}
           loading={loading}
+          categoryLocked={hasCategoryRestrictions}
+          lockedCategoryLabel={lockedCategoryLabel}
         />
 
         <div className="flex flex-wrap gap-1 border-b border-[var(--border)] pb-1">

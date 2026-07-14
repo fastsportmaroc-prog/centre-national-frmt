@@ -5,21 +5,16 @@ import { PARAMETRES_ACCESS_ROLES } from "@/lib/v2/access-roles-config";
 import { UsersAccessPanel } from "@/components/v2/parametres/UsersAccessPanel";
 
 export function AccessRolesManager() {
-  const roleOptions = PARAMETRES_ACCESS_ROLES.map((r) => ({
-    value: r.value,
-    label: r.label,
-  }));
-
   return (
     <Card className="space-y-4 p-4">
       <div>
-        <h2 className="font-semibold">Accès Admin, Coach &amp; Joueur</h2>
+        <h2 className="font-semibold">Gestion des utilisateurs</h2>
         <p className="mt-1 text-sm text-muted">
-          Définissez qui peut se connecter et ce qu&apos;il voit dans l&apos;application V2.
+          Changez le rôle et les rubriques visibles pour chaque compte connecté.
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {PARAMETRES_ACCESS_ROLES.map((r) => (
           <div
             key={r.value}
@@ -31,12 +26,7 @@ export function AccessRolesManager() {
         ))}
       </div>
 
-      <UsersAccessPanel
-        roleOptions={roleOptions}
-        defaultInviteRole="joueur"
-        hideCoachLink
-        showAdvancedLink
-      />
+      <UsersAccessPanel hideCoachLink showAdvancedLink />
     </Card>
   );
 }

@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/Card";
 import { Input, Label, Select } from "@/components/ui/Input";
 
 import { useAgeCategories } from "@/lib/hooks/useAgeCategories";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 
 import {
 
@@ -73,6 +74,7 @@ export function GroupesV2Client() {
   const searchParams = useSearchParams();
 
   const { categories: ageCategories } = useAgeCategories();
+  const { filterJoueurs, filterByCategory } = useUserPermissions();
 
   const [items, setItems] = useState<{ id: string; nom: string }[]>([]);
 
@@ -132,13 +134,13 @@ export function GroupesV2Client() {
 
     const [p, c] = await Promise.all([getJoueursByStage(id), getEntraineursByStage(id)]);
 
-    setPlayers(p);
+    setPlayers(filterJoueurs(p));
 
     setPlayerStageIds(new Map());
 
     setCoaches(c);
 
-  }, []);
+  }, [filterJoueurs]);
 
 
 
@@ -152,7 +154,7 @@ export function GroupesV2Client() {
 
     const joueurIds = new Set(relevantLinks.map((l) => l.joueur_id));
 
-    const p = allJoueurs.filter((j) => joueurIds.has(j.id));
+    const p = filterJoueurs(allJoueurs.filter((j) => joueurIds.has(j.id)));
 
 
 
@@ -188,7 +190,7 @@ export function GroupesV2Client() {
 
     setCoaches([...coachDedup.values()]);
 
-  }, []);
+  }, [filterJoueurs]);
 
 
 
@@ -220,9 +222,9 @@ export function GroupesV2Client() {
 
     setItems(g);
 
-    setStages(st);
+    setStages(filterByCategory(st, (s) => s.categorie));
 
-  }, []);
+  }, [filterByCategory]);
 
 
 

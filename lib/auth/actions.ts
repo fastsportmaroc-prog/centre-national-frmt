@@ -7,8 +7,20 @@ import type { AuthFormState } from "@/lib/auth/form-state";
 import { isProductionRuntime } from "@/lib/env/runtime";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getServerSupabaseEnv, validateSupabaseEnvMatch } from "@/lib/supabase/server-env";
 
 async function signInEmailPassword(email: string, password: string) {
+  const envMismatch = validateSupabaseEnvMatch(
+    getServerSupabaseEnv().url,
+    getServerSupabaseEnv().anonKey
+  );
+  if (envMismatch) {
+    return {
+      error: { message: envMismatch, code: "config" } as const,
+      session: null,
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return { error: { message: "Supabase indisponible", code: "config" } as const, session: null };

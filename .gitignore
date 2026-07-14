@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# RapidAPI ranking snapshots (local cache, regenerable)
+data/classements-externes/cache/

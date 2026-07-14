@@ -8,6 +8,7 @@ import { LogoPlaceholder } from "@/components/brand/LogoPlaceholder";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { NAV_BADGE_KEYS, v2NavSections } from "./nav-items";
 import { loadNavBadges } from "@/lib/v2/nav-badges";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 
 function badgeForHref(href: string, badges: Record<string, number>): number {
   if (href === NAV_BADGE_KEYS.hebergement) return badges["/v2/hebergement"] ?? 0;
@@ -18,7 +19,9 @@ function badgeForHref(href: string, badges: Record<string, number>): number {
 
 export function V2Sidebar() {
   const pathname = usePathname();
+  const { filterNavSections } = useUserPermissions();
   const [badges, setBadges] = useState<Record<string, number>>({});
+  const visibleSections = filterNavSections(v2NavSections);
 
   useEffect(() => {
     void loadNavBadges().then(setBadges);
@@ -37,13 +40,15 @@ export function V2Sidebar() {
         </div>
       </Link>
       <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto p-2 pt-2">
-        {v2NavSections.map((section) => (
+        {visibleSections.map((section) => (
           <div
             key={section.id}
             className={cn(section.separatorBefore && "mt-1 border-t border-[var(--border-light)] pt-1")}
           >
             {section.label && (
-              <p className="v2-sidebar-section-label">{section.label}</p>
+              <p className="v2-sidebar-section-label" suppressHydrationWarning>
+                {section.label}
+              </p>
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {

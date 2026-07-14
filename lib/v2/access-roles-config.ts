@@ -1,34 +1,68 @@
 import type { AppRole } from "@/lib/types/app-roles";
 
-/** Rôles gérés depuis Paramètres → Accès */
-export const PARAMETRES_ACCESS_ROLES: { value: AppRole; label: string; description: string }[] = [
+/** Rôles proposés dans Paramètres → Gestion des utilisateurs */
+export type ParametresAccessRole = "admin" | "direction" | "coach" | "viewer" | "custom";
+
+export const PARAMETRES_ACCESS_ROLES: {
+  value: ParametresAccessRole;
+  label: string;
+  description: string;
+}[] = [
   {
     value: "admin",
-    label: "Administrateur",
-    description: "Accès complet : paramètres, budget, utilisateurs, suppression, toutes les rubriques V2.",
+    label: "Admin",
+    description: "Accès total : toutes les rubriques, paramètres, utilisateurs et suppressions.",
+  },
+  {
+    value: "direction",
+    label: "Directeur",
+    description: "Pilotage opérationnel : budget, rapports, historique — sans gestion des utilisateurs.",
   },
   {
     value: "coach",
     label: "Coach",
-    description: "Tableau de bord, planning, calendrier, réservations — sans budget ni paramètres.",
+    description: "Planning, joueurs, stages, calendrier — sans budget ni paramètres.",
   },
   {
-    value: "joueur",
-    label: "Joueur",
-    description: "Consultation limitée : tableau de bord, fiches joueurs, calendrier (lecture).",
+    value: "viewer",
+    label: "Consultation",
+    description: "Lecture seule sur le tableau de bord, joueurs, stages et calendrier.",
+  },
+  {
+    value: "custom",
+    label: "Personnalisé",
+    description: "Whitelist manuelle : choisissez rubrique par rubrique (consultation et modification).",
   },
 ];
 
-export function roleForProfileSelect(storedRole: string): AppRole {
-  const r = (storedRole ?? "").toLowerCase();
-  if (r === "viewer" || r === "joueur") return "joueur";
-  if (r === "admin") return "admin";
-  if (r === "coach") return "coach";
-  if (r === "entraineur") return "entraineur";
-  if (r === "direction" || r === "directeur") return "direction";
-  return "joueur";
+/** Rôles proposés à l'invitation (sans personnalisé). */
+export const INVITE_ACCESS_ROLES = PARAMETRES_ACCESS_ROLES.filter((r) => r.value !== "custom");
+
+export function parametresRoleLabel(role: ParametresAccessRole): string {
+  return PARAMETRES_ACCESS_ROLES.find((r) => r.value === role)?.label ?? role;
 }
 
-export function roleToStore(selected: AppRole): string {
+export function roleForProfileSelect(
+  storedRole: string,
+  hasCustom = false
+): ParametresAccessRole {
+  if (hasCustom) return "custom";
+  const r = (storedRole ?? "").toLowerCase();
+  if (r === "admin") return "admin";
+  if (r === "direction" || r === "directeur") return "direction";
+  if (r === "coach" || r === "entraineur") return "coach";
+  if (r === "viewer" || r === "joueur" || r === "staff") return "viewer";
+  return "viewer";
+}
+
+export function roleToStore(selected: ParametresAccessRole): string {
+  if (selected === "custom") return "viewer";
+  return selected;
+}
+
+/** Compat legacy — map vers AppRole */
+export function toAppRole(selected: ParametresAccessRole): AppRole {
+  if (selected === "custom") return "viewer";
+  if (selected === "direction") return "direction";
   return selected;
 }

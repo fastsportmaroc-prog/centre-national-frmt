@@ -44,6 +44,7 @@ export async function getAdminDocumentsRaw(): Promise<AdminDocument[]> {
   }
   if (usesSupabaseApi()) {
     const res = await fetch("/api/admin-documents", { credentials: "include", cache: "no-store" });
+    if (res.status === 401 || res.status === 403) return [];
     if (!res.ok) throw new Error(await parseApiError(res));
     const json = (await res.json()) as { documents?: AdminDocument[] };
     return json.documents ?? [];

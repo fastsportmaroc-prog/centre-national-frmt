@@ -52,7 +52,9 @@ import {
   getCreneauInfo,
 } from "@/lib/v2/reservations-utils";
 import { useRole } from "@/lib/hooks/useRole";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { filterCalendarRawData } from "@/lib/v2/calendar-category-filter";
 import { useSupabaseTableRefresh } from "@/lib/hooks/use-supabase-table-refresh";
 import {
   CALENDAR_CATEGORY_LEGEND,
@@ -119,6 +121,7 @@ const EMPTY_RAW: CalendarRawData = {
 
 export function CalendrierV2Client() {
   const { canDelete } = useRole();
+  const { categoryContext } = useUserPermissions();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const stageFromUrl = searchParams.get("stage") ?? "";
@@ -138,16 +141,20 @@ export function CalendrierV2Client() {
   const load = useCallback(async () => {
     setLoading(true);
     const result = await loadCalendarMonthData(cursor, view);
-    setRaw({
-      stages: result.stages,
-      hebergements: result.hebergements,
-      reservations: result.reservations,
-      restaurations: result.restaurations,
-      billets: result.billets,
-    });
+    const scoped = filterCalendarRawData(
+      {
+        stages: result.stages,
+        hebergements: result.hebergements,
+        reservations: result.reservations,
+        restaurations: result.restaurations,
+        billets: result.billets,
+      },
+      categoryContext
+    );
+    setRaw(scoped);
     setLoadError(result.loadError);
     setLoading(false);
-  }, [cursor, view]);
+  }, [cursor, view, categoryContext]);
 
   useEffect(() => {
     void load();

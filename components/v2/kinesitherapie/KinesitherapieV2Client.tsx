@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label, Select } from "@/components/ui/Input";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import {
   createKinesitherapieSeance,
   deleteKinesitherapieSeance,
@@ -19,6 +20,7 @@ import { Activity } from "lucide-react";
 
 export function KinesitherapieV2Client() {
   const { toast } = useToast();
+  const { filterJoueurs, filterByCategory } = useUserPermissions();
   const searchParams = useSearchParams();
   const [seances, setSeances] = useState<KinesitherapieSeanceV2[]>([]);
   const [joueurs, setJoueurs] = useState<JoueurV2[]>([]);
@@ -35,10 +37,18 @@ export function KinesitherapieV2Client() {
 
   const load = useCallback(async () => {
     const [s, j, st] = await Promise.all([getKinesitherapieSeances(), getJoueurs(), getStages()]);
-    setSeances(s);
-    setJoueurs(j);
-    setStages(st);
-  }, []);
+    const scopedJoueurs = filterJoueurs(j);
+    const scopedStages = filterByCategory(st, (stage) => stage.categorie);
+    const allowedJoueurIds = new Set(scopedJoueurs.map((x) => x.id));
+    setSeances(s.filter((row) => allowedJoueurIds.has(row.joueur_id)));
+    setJoueurs(scopedJoueurs);
+    setStages(scopedStages);
+  }, [filterJoueurs, filterByCategory]);
+
+  useEffect(() => {
+    if (!stageFilter) return;
+    if (!stages.some((st) => st.id === stageFilter)) setStageFilter("");
+  }, [stageFilter, stages]);
 
   useEffect(() => {
     void load();

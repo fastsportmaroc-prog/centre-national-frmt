@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/v2/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/v2/ui/ConfirmDialog";
 import { EmptyState } from "@/components/v2/ui/EmptyState";
 import { useToast } from "@/components/v2/ui/ToastProvider";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 import {
   createJoueur,
   deleteJoueur,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/supabase/queries";
 import { resolveOwnerPasseportForForm } from "@/lib/passeport/resolve-owner-passeport-form";
 import { uploadJoueurPhoto } from "@/lib/storage/upload-photo";
+import { resolveJoueurPhotoUrl } from "@/lib/storage/entraineur-photo-cache";
 import { JoueurPhotoField } from "@/components/v2/joueurs/JoueurPhotoField";
 import { exportJoueursPDF } from "@/lib/pdf/pdf-exports";
 import { calcAge } from "@/lib/v2/status-styles";
@@ -100,6 +102,7 @@ export function JoueursV2Client() {
   const searchParams = useSearchParams();
   const { categories: ageCategories } = useAgeCategories();
   const { toast } = useToast();
+  const { filterJoueurs } = useUserPermissions();
   const { canWrite, canDelete, role } = useRole();
   const canManageJoueurs = canWrite || role === "viewer" || role === "direction";
   const canDeleteJoueurs = canDelete || role === "viewer" || role === "direction";
@@ -149,25 +152,27 @@ export function JoueursV2Client() {
     if (q?.trim()) setSearch(q.trim());
   }, [searchParams]);
 
+  const visibleItems = useMemo(() => filterJoueurs(items), [items, filterJoueurs]);
+
   const birthYears = useMemo(() => {
     const years = new Set<number>();
-    for (const j of items) {
+    for (const j of visibleItems) {
       if (j.date_naissance) years.add(new Date(j.date_naissance).getFullYear());
     }
     return [...years].sort((a, b) => b - a);
-  }, [items]);
+  }, [visibleItems]);
 
   const clubOptions = useMemo(() => {
     const clubs = new Set<string>();
-    for (const j of items) {
+    for (const j of visibleItems) {
       const c = (j.club ?? "").trim();
       if (c) clubs.add(c);
     }
     return [...clubs].sort((a, b) => a.localeCompare(b, "fr"));
-  }, [items]);
+  }, [visibleItems]);
 
   const filtered = useMemo(() => {
-    let list = [...items];
+    let list = [...visibleItems];
     const tokens = normalizeSearchText(debouncedSearch).split(/\s+/).filter(Boolean);
     if (tokens.length) {
       list = list.filter((j) => {
@@ -208,7 +213,7 @@ export function JoueursV2Client() {
       return `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, "fr");
     });
     return list;
-  }, [items, debouncedSearch, sexe, categorie, annee, statut, clubFilter, sortMode]);
+  }, [visibleItems, debouncedSearch, sexe, categorie, annee, statut, clubFilter, sortMode]);
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => filtered.some((j) => j.id === id)));
@@ -683,7 +688,7 @@ export function JoueursV2Client() {
                       <PlayerAvatar
                     prenom={j.prenom}
                     nom={j.nom}
-                    photoUrl={j.photo_url}
+                    photoUrl={resolveJoueurPhotoUrl(j.id, j.photo_url)}
                         categorie={getJoueurDisplayCategorie(j)}
                     size="lg"
                   />
@@ -748,7 +753,7 @@ export function JoueursV2Client() {
               </p>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[72rem] text-sm">
+            <table className="w-full min-w-[64rem] text-sm">
               <thead className="sticky top-0 z-10 bg-surface-elevated shadow-sm">
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                   <th className="p-3 w-10">
@@ -763,9 +768,7 @@ export function JoueursV2Client() {
                       />
                     )}
                   </th>
-                  <th className="p-3 w-12" />
-                  <th className="p-3 whitespace-nowrap">Nom</th>
-                  <th className="p-3 whitespace-nowrap">Prénom</th>
+                  <th className="p-3 whitespace-nowrap min-w-[14rem]">Joueur</th>
                   <th className="p-3 whitespace-nowrap">Sexe</th>
                   <th className="p-3 whitespace-nowrap">Catégorie</th>
                   <th className="p-3 whitespace-nowrap">Âge</th>
@@ -796,21 +799,23 @@ export function JoueursV2Client() {
                         />
                       )}
                     </td>
-                    <td className="p-3">
-                      <PlayerAvatar
-                        prenom={j.prenom}
-                        nom={j.nom}
-                        photoUrl={j.photo_url}
-                        categorie={getJoueurDisplayCategorie(j)}
-                        size="sm"
-                      />
-                    </td>
                     <td className="p-3 whitespace-nowrap">
-                      <Link href={`/v2/joueurs/${j.id}`} className="font-medium hover:text-frmt-green">
-                        {j.nom}
+                      <Link
+                        href={`/v2/joueurs/${j.id}`}
+                        className="flex items-center gap-3 font-medium hover:text-frmt-green"
+                      >
+                        <PlayerAvatar
+                          prenom={j.prenom}
+                          nom={j.nom}
+                          photoUrl={resolveJoueurPhotoUrl(j.id, j.photo_url)}
+                          categorie={getJoueurDisplayCategorie(j)}
+                          size="md"
+                        />
+                        <span>
+                          {j.prenom} {j.nom}
+                        </span>
                       </Link>
                     </td>
-                    <td className="p-3 whitespace-nowrap">{j.prenom}</td>
                     <td className="p-3">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${sexeBadgeClass(j.sexe)}`}

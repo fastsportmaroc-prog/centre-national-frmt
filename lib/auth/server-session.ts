@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isInvalidRefreshTokenError } from "@/lib/auth/session-errors";
 import { purgeSupabaseAuthServer } from "@/lib/auth/purge-session.server";
 import type { AuthUser, Profile, UserRole } from "@/lib/types/auth";
+import { isFrmtSuperAdminEmail } from "@/lib/auth/admin-access";
 import { resolveEffectiveAppRole } from "@/lib/auth/passeports-access";
 import { normalizeAppRole, type AppRole } from "@/lib/types/app-roles";
 import type { RoleUtilisateur } from "@/lib/types/roles";
@@ -37,9 +38,14 @@ function toAuthUser(user: User, profile: Profile | null): AuthUser {
   const frmtRole = mapFrmtRole(profile);
   let appRole = normalizeAppRole(profile?.role ?? profile?.frmt_role ?? metaRole);
 
+  const email = user.email ?? "";
+  if (isFrmtSuperAdminEmail(email)) {
+    appRole = "admin";
+  }
+
   const authUser: AuthUser = {
     id: user.id,
-    email: user.email ?? "",
+    email,
     role: profile?.role === "admin" || appRole === "admin" ? "admin" : "staff",
     appRole,
     frmtRole,

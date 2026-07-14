@@ -21,8 +21,14 @@ export function isFrmtSuperAdminEmail(email: string | null | undefined): boolean
   return superAdminEmails().has(email.trim().toLowerCase());
 }
 
-/** Vrai si l'utilisateur doit avoir les droits admin applicatifs. */
-export function authUserIsAppAdmin(user: AuthUser): boolean {
+/** Vrai si l'utilisateur doit avoir les droits admin applicatifs (accès total). */
+export function authUserIsAppAdmin(
+  user: AuthUser,
+  options?: { hasCustomPermissions?: boolean }
+): boolean {
+  // Droits personnalisés actifs → whitelist stricte, pas de bypass admin
+  if (options?.hasCustomPermissions) return false;
+
   if (user.appRole === "admin") return true;
   if (user.role === "admin" || user.frmtRole === "admin") return true;
   return isFrmtSuperAdminEmail(user.email);

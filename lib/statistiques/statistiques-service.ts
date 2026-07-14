@@ -17,7 +17,13 @@ import { calcFacturationClub } from "@/lib/v2/logistique-operationnelle";
 import { BUDGET_TARIFS_DEFAULTS } from "@/lib/v2/settings-store";
 import { getJoueurDisplayCategorie } from "@/lib/utils/joueur";
 import { kineMotifToStack } from "@/lib/statistiques/kine-utils";
+import type { PlayerCategoryContext } from "@/lib/auth/player-category-context";
+import {
+  filterByEntityCategory,
+  sanitizeCategoryParam,
+} from "@/lib/auth/player-category-context";
 import { matchesOfficialCategoryFilter } from "@/lib/constants/official-categories";
+import { filterJoueursByCategory } from "@/lib/auth/player-category-access";
 import {
   countDaysInclusive,
   formatMonthLabel,
@@ -754,13 +760,27 @@ function buildJoueursStats(
   };
 }
 
-export async function loadStatistiques(filters: StatistiquesFilters): Promise<StatistiquesBundle> {
-  const range = saisonToDateRange(filters.saison);
-  const rangeDebut = filters.start_date || range.debut;
-  const rangeFin = filters.end_date || range.fin;
-  const prevRange = saisonToDateRange(previousSaison(filters.saison));
+export async function loadStatistiques(
+  filters: StatistiquesFilters,
+  scope?: PlayerCategoryContext
+): Promise<StatistiquesBundle> {
+  let effectiveFilters = filters;
+  if (scope?.restricted) {
+    const enforced = sanitizeCategoryParam(
+      filters.categorie === "Toutes" ? undefined : filters.categorie,
+      scope
+    );
+    if (enforced) {
+      effectiveFilters = { ...filters, categorie: enforced as CategorieFilter };
+    }
+  }
 
-  const [stages, joueurs, coachs, joueurLinks, coachLinks, competitions, allKine] =
+  const range = saisonToDateRange(effectiveFilters.saison);
+  const rangeDebut = effectiveFilters.start_date || range.debut;
+  const rangeFin = effectiveFilters.end_date || range.fin;
+  const prevRange = saisonToDateRange(previousSaison(effectiveFilters.saison));
+
+  const [stagesRaw, joueursRaw, coachs, joueurLinks, coachLinks, competitions, allKine] =
     await Promise.all([
       getStages(),
       getJoueurs(),
@@ -771,20 +791,27 @@ export async function loadStatistiques(filters: StatistiquesFilters): Promise<St
       getKinesitherapieSeances(),
     ]);
 
+  let stages = stagesRaw;
+  let joueurs = joueursRaw;
+  if (scope?.restricted) {
+    stages = filterByEntityCategory(stages, (s) => s.categorie, scope);
+    joueurs = filterJoueursByCategory(joueurs, scope.allowedCategories, false);
+  }
+
   const coachCountByStage = new Map<string, number>();
   for (const l of coachLinks) {
     coachCountByStage.set(l.stage_id, (coachCountByStage.get(l.stage_id) ?? 0) + 1);
   }
 
-  let filteredStages = filterStages(stages, filters, rangeDebut, rangeFin);
-  if (filters.coach_id) {
+  let filteredStages = filterStages(stages, effectiveFilters, rangeDebut, rangeFin);
+  if (effectiveFilters.coach_id) {
     const coachStageIds = new Set(
-      coachLinks.filter((l) => l.coach_id === filters.coach_id).map((l) => l.stage_id)
+      coachLinks.filter((l) => l.coach_id === effectiveFilters.coach_id).map((l) => l.stage_id)
     );
     filteredStages = filteredStages.filter((s) => coachStageIds.has(s.id));
   }
 
-  const prevFiltered = filterStages(stages, filters, prevRange.debut, prevRange.fin);
+  const prevFiltered = filterStages(stages, effectiveFilters, prevRange.debut, prevRange.fin);
 
   const [enriched, prevEnriched] = await Promise.all([
     Promise.all(
@@ -799,12 +826,12 @@ export async function loadStatistiques(filters: StatistiquesFilters): Promise<St
     ),
   ]);
 
-  const stagesStats = buildStagesStats(enriched, prevEnriched, filters);
+  const stagesStats = buildStagesStats(enriched, prevEnriched, effectiveFilters);
   const competitionsStats = await buildCompetitionsStats(
     competitions,
     rangeDebut,
     rangeFin,
-    filters
+    effectiveFilters
   );
   const comparatif = buildComparatif(
     stagesStats,
@@ -815,7 +842,7 @@ export async function loadStatistiques(filters: StatistiquesFilters): Promise<St
     rangeFin
   );
   const financier = buildFinancier(enriched, competitionsStats, comparatif.budgetMensuel);
-  const joueursStats = buildJoueursStats(enriched, joueurs, filters, joueurLinks);
+  const joueursStats = buildJoueursStats(enriched, joueurs, effectiveFilters, joueurLinks);
 
   void coachs;
 
@@ -828,8 +855,11 @@ export async function loadStatistiques(filters: StatistiquesFilters): Promise<St
   };
 }
 
-export async function loadFilterOptions() {
-  const [stages, coachs] = await Promise.all([getStages(), getEntraineurs()]);
+export async function loadFilterOptions(scope?: PlayerCategoryContext) {
+  const [stagesRaw, coachs] = await Promise.all([getStages(), getEntraineurs()]);
+  const stages = scope?.restricted
+    ? filterByEntityCategory(stagesRaw, (s) => s.categorie, scope)
+    : stagesRaw;
   return {
     stages: stages.map((s) => ({ id: s.id, label: s.stage_action })),
     coachs: coachs.map((c) => ({ id: c.id, label: `${c.prenom} ${c.nom}` })),

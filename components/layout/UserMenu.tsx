@@ -14,6 +14,8 @@ export function UserMenu() {
 
   if (!user) return null;
 
+  const label = user.fullName ?? user.email ?? "Utilisateur";
+
   return (
     <div className="border-t border-border p-4">
       <div className="mb-2 flex items-center gap-2">
@@ -21,8 +23,8 @@ export function UserMenu() {
           <User className="h-4 w-4 text-muted" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {user.fullName ?? user.email}
+          <p className="truncate text-sm font-medium" suppressHydrationWarning>
+            {label}
           </p>
           <Badge variant={user.role === "admin" ? "success" : "muted"}>
             {user.role === "admin" ? "Admin" : "Staff"}

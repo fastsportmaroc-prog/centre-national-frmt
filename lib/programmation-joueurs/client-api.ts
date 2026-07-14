@@ -117,6 +117,62 @@ function filenameFromDisposition(header: string | null): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
+export type ProgrammationCneExcelExportOptions = {
+  dateDebut: string;
+  dateFin: string;
+  columnIds: string[];
+  displayMode?: "joueurs" | "coaches" | "both";
+  categorieJoueur?: string;
+};
+
+/** Export Excel planning CNE (format transposé, couleurs par type). */
+export async function exportProgrammationCneExcel(
+  options: ProgrammationCneExcelExportOptions
+): Promise<void> {
+  const res = await fetch("/api/programmation-joueurs/export/excel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? "Erreur export Excel");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    filenameFromDisposition(res.headers.get("Content-Disposition")) ??
+    `Planning_CNE_FRMT_${options.dateDebut}_${options.dateFin}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Export PDF A3 paysage — planning CNE transposé (jours × joueurs). */
+export async function exportProgrammationCnePdf(
+  options: ProgrammationCneExcelExportOptions
+): Promise<void> {
+  const res = await fetch("/api/programmation-joueurs/export/cne-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? "Erreur export PDF");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    filenameFromDisposition(res.headers.get("Content-Disposition")) ??
+    `Planning_CNE_FRMT_${options.dateDebut}_${options.dateFin}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Export PDF : tableau déplacements par semaine (Maroc / étranger). */
 export async function exportProgrammationPdf(options: ProgrammationPdfExportOptions): Promise<void> {
   const res = await fetch("/api/programmation-joueurs/export/pdf", {

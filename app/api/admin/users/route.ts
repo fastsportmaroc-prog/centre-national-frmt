@@ -8,6 +8,20 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+async function attachCustomFlags<T extends { id: string }>(
+  users: T[],
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>
+): Promise<(T & { hasCustom: boolean })[]> {
+  if (users.length === 0) return [];
+  const ids = users.map((u) => u.id);
+  const { data: perms } = await admin
+    .from("user_permissions")
+    .select("user_id")
+    .in("user_id", ids);
+  const customIds = new Set((perms ?? []).map((p) => p.user_id as string));
+  return users.map((u) => ({ ...u, hasCustom: customIds.has(u.id) }));
+}
+
 export async function GET() {
   if (!(await requireParametresAdmin())) {
     return NextResponse.json(
@@ -23,7 +37,8 @@ export async function GET() {
       .select("id, email, nom, prenom, full_name, role, entraineur_id, actif, created_at")
       .order("created_at", { ascending: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ users: data ?? [] });
+    const users = await attachCustomFlags(data ?? [], admin);
+    return NextResponse.json({ users });
   }
 
   const supabase = await createSupabaseServerClient();

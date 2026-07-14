@@ -21,6 +21,12 @@ import {
 } from "@/lib/local-test/programmation-joueurs-store";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { normalizeProgrammationDbError } from "@/lib/programmation-joueurs/db-errors";
+import { mergeProgrammationWithStageProgramme } from "@/lib/programmation-joueurs/planning-cne-stages";
+import { fetchStageProgrammePlanningData } from "@/lib/programmation-joueurs/planning-cne-stages.server";
+import { mergeProgrammationWithCompetitions } from "@/lib/programmation-joueurs/planning-cne-competitions";
+import { fetchCompetitionPlanningData } from "@/lib/programmation-joueurs/planning-cne-competitions.server";
+import { resolveJoueurIdsForCategorie } from "@/lib/programmation-joueurs/category-joueurs.server";
+import { getJoueurDisplayCategorie } from "@/lib/utils/joueur";
 
 const TABLE = "programmation_evenements";
 
@@ -41,18 +47,27 @@ async function enrichRows(rows: ProgrammationEvenement[]): Promise<Programmation
   const ids = [...new Set(rows.map((r) => r.joueur_id))];
   const { data: joueurs } = await supabase
     .from("joueurs")
-    .select("id, nom, prenom, photo_url, categorie, classement")
+    .select("id, nom, prenom, photo_url, categorie_age, date_naissance, classement")
     .in("id", ids);
   const byId = new Map((joueurs ?? []).map((j) => [j.id, j]));
   return rows.map((r) => {
-    const j = byId.get(r.joueur_id);
+    const extra = r as ProgrammationEvenementEnriched;
+    const j = byId.get(r.joueur_id) as
+      | { nom?: string; prenom?: string; photo_url?: string | null; categorie_age?: string | null; date_naissance?: string | null; classement?: string | null }
+      | undefined;
+    const joueurCategorie =
+      extra.joueur_categorie ??
+      (j ? getJoueurDisplayCategorie(j) : undefined);
     return {
+      ...extra,
       ...resolveStatutRow(r),
-      joueur_nom: j?.nom,
-      joueur_prenom: j?.prenom,
-      joueur_photo_url: j?.photo_url,
-      joueur_categorie: j?.categorie,
-      joueur_classement: j?.classement,
+      joueur_nom: extra.joueur_nom ?? j?.nom,
+      joueur_prenom: extra.joueur_prenom ?? j?.prenom,
+      joueur_photo_url: extra.joueur_photo_url ?? j?.photo_url,
+      joueur_categorie: joueurCategorie,
+      joueur_classement: extra.joueur_classement ?? j?.classement,
+      stage_programme_id: extra.stage_programme_id ?? null,
+      cne_column_id: extra.cne_column_id ?? null,
     };
   });
 }
@@ -81,11 +96,7 @@ export async function listProgrammationEvenements(
       q = q.or(`nom.ilike.${term},ville.ilike.${term},pays.ilike.${term}`);
     }
     if (filters?.categorieJoueur) {
-      const { data: js } = await supabase
-        .from("joueurs")
-        .select("id")
-        .ilike("categorie", `%${filters.categorieJoueur}%`);
-      const ids = (js ?? []).map((j) => j.id);
+      const ids = await resolveJoueurIdsForCategorie(supabase, filters.categorieJoueur);
       if (!ids.length) return { data: [] };
       q = q.in("joueur_id", ids);
     }
@@ -98,6 +109,53 @@ export async function listProgrammationEvenements(
   } catch (e) {
     return { data: [], error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+export async function listProgrammationEvenementsWithStages(
+  filters?: ProgrammationFilters & {
+    includeStageProgramme?: boolean;
+    includeCompetitions?: boolean;
+  }
+): Promise<{ data: ProgrammationEvenementEnriched[]; error?: string; migrationRequired?: boolean }> {
+  const {
+    includeStageProgramme = true,
+    includeCompetitions = true,
+    ...progFilters
+  } = filters ?? {};
+  const result = await listProgrammationEvenements(progFilters);
+  if (result.error && !result.migrationRequired) return result;
+
+  const typeFilter = progFilters.type;
+  const types = typeFilter ? (Array.isArray(typeFilter) ? typeFilter : [typeFilter]) : null;
+  const stageTypesAllowed =
+    !types || types.some((t) => t === "stage_national" || t === "stage_etranger");
+  const competitionTypesAllowed = !types || types.includes("competition_nationale");
+
+  let data = result.data;
+
+  if (includeStageProgramme && stageTypesAllowed) {
+    const stageData = await fetchStageProgrammePlanningData(progFilters);
+    data = mergeProgrammationWithStageProgramme(
+      data,
+      stageData.stages,
+      stageData.joueurLinks,
+      stageData.coachLinks,
+      progFilters
+    );
+  }
+
+  if (includeCompetitions && competitionTypesAllowed) {
+    const compData = await fetchCompetitionPlanningData(progFilters);
+    data = mergeProgrammationWithCompetitions(
+      data,
+      compData.competitions,
+      compData.participants,
+      progFilters
+    );
+  }
+
+  if (data === result.data) return result;
+  return { ...result, data: await enrichRows(data) };
 }
 
 export async function getProgrammationEvenement(

@@ -144,6 +144,6 @@ if (anonKey) {
 }
 
 console.log("\n=== TERMINE ===");
-console.log("Connectez-vous sur http://localhost:3001/auth/login");
+console.log("Connectez-vous sur http://localhost:3000/auth/login");
 console.log("Email:", email);
 console.log("Mot de passe: celui que vous venez de definir\n");

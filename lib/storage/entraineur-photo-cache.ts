@@ -1,4 +1,5 @@
 const PREFIX = "frmt_entraineur_photo_";
+const JOUEUR_PREFIX = "frmt_joueur_photo_";
 
 export function cacheEntraineurPhotoUrl(entraineurId: string, url: string): void {
   if (typeof window === "undefined" || !url.startsWith("http")) return;
@@ -26,6 +27,33 @@ export function resolveEntraineurPhotoUrl(
   const fromDb = photoUrl?.trim();
   if (fromDb) return fromDb;
   return readCachedEntraineurPhotoUrl(entraineurId);
+}
+
+export function cacheJoueurPhotoUrl(joueurId: string, url: string): void {
+  if (typeof window === "undefined" || !url.startsWith("http")) return;
+  try {
+    localStorage.setItem(`${JOUEUR_PREFIX}${joueurId}`, url);
+  } catch {
+    /* quota / mode privé */
+  }
+}
+
+export function readCachedJoueurPhotoUrl(joueurId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(`${JOUEUR_PREFIX}${joueurId}`);
+  } catch {
+    return null;
+  }
+}
+
+export function resolveJoueurPhotoUrl(
+  joueurId: string,
+  photoUrl?: string | null
+): string | null {
+  const fromDb = photoUrl?.trim();
+  if (fromDb) return fromDb;
+  return readCachedJoueurPhotoUrl(joueurId);
 }
 
 export function photoUrlWithCacheBust(url: string): string {

@@ -18,6 +18,8 @@ import type {
 } from "@/lib/types/programmation-joueurs";
 import type { JoueurV2 } from "@/lib/types/v2";
 import { matchesParticipantSearch } from "@/lib/v2/global-search";
+import { FrenchDateInput } from "./FrenchDateInput";
+import { mergeProgrammationDateFilters } from "@/lib/programmation-joueurs/filter-dates";
 
 type Props = {
   open: boolean;
@@ -222,22 +224,38 @@ export function FormulaireEvenement({
             <Label>Ville</Label>
             <Input value={form.ville ?? ""} onChange={(e) => patch({ ville: e.target.value || null })} />
           </div>
-          <div>
-            <Label>Date début</Label>
-            <Input
-              type="date"
-              value={form.date_debut.slice(0, 10)}
-              onChange={(e) => patch({ date_debut: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Date fin</Label>
-            <Input
-              type="date"
-              value={form.date_fin.slice(0, 10)}
-              onChange={(e) => patch({ date_fin: e.target.value })}
-            />
-          </div>
+          <FrenchDateInput
+            label="Date début"
+            value={form.date_debut.slice(0, 10)}
+            onChange={(iso) => {
+              if (!iso) return;
+              const next = mergeProgrammationDateFilters(
+                { dateDebut: form.date_debut, dateFin: form.date_fin },
+                { dateDebut: iso }
+              );
+              patch({
+                date_debut: next.dateDebut ?? iso,
+                date_fin: next.dateFin ?? form.date_fin,
+              });
+            }}
+            max={form.date_fin.slice(0, 10)}
+          />
+          <FrenchDateInput
+            label="Date fin"
+            value={form.date_fin.slice(0, 10)}
+            onChange={(iso) => {
+              if (!iso) return;
+              const next = mergeProgrammationDateFilters(
+                { dateDebut: form.date_debut, dateFin: form.date_fin },
+                { dateFin: iso }
+              );
+              patch({
+                date_debut: next.dateDebut ?? form.date_debut,
+                date_fin: next.dateFin ?? iso,
+              });
+            }}
+            min={form.date_debut.slice(0, 10)}
+          />
           <div>
             <Label>Surface</Label>
             <Select

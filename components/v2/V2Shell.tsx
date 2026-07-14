@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/v2/ui/ToastProvider";
 import { V2TopBar } from "@/components/v2/V2TopBar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { v2NavSections } from "./nav-items";
+import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
 
 const V2MobileContext = createContext<() => void>(() => {});
 
@@ -14,16 +15,16 @@ export function useV2OpenMobileMenu() {
   return useContext(V2MobileContext);
 }
 
-/** Sections plates pour menu mobile (compat NavMenu) */
-const mobileSections = v2NavSections.map((s, idx) => ({
-  id: (idx === 0 ? "general" : "systeme") as "general" | "systeme",
-  label: s.label ?? "Navigation",
-  description: undefined,
-  items: s.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })),
-}));
-
 export function V2Shell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { filterNavSections } = useUserPermissions();
+
+  const mobileSections = filterNavSections(v2NavSections).map((s, idx) => ({
+    id: (idx === 0 ? "general" : "systeme") as "general" | "systeme",
+    label: s.label ?? "Navigation",
+    description: undefined,
+    items: s.items.map((i) => ({ href: i.href, label: i.label, icon: i.icon })),
+  }));
 
   return (
     <ToastProvider>

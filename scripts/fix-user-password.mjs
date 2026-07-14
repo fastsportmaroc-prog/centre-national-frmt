@@ -88,4 +88,4 @@ if (updateError) {
 }
 
 console.log("OK - Mot de passe mis a jour pour:", user.email);
-console.log("Connectez-vous sur http://localhost:3001/auth/login avec ce nouveau mot de passe");
+console.log("Connectez-vous sur http://localhost:3000/auth/login avec ce nouveau mot de passe");

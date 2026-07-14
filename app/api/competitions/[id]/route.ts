@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCompetitionApiUser } from "@/lib/competitions/auth-api";
+import { canAccessCompetitionCategory } from "@/lib/auth/apply-player-category-filter.server";
+import { getPlayerCategoryContext } from "@/lib/auth/player-category-context.server";
 import { deleteCompetition, getCompetition, updateCompetition } from "@/lib/competitions/server";
 import type { CompetitionInput } from "@/lib/types/competition";
 
@@ -10,10 +12,14 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, { params }: Ctx) {
   const user = await requireCompetitionApiUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  const ctx = await getPlayerCategoryContext();
   const { id } = await params;
   const { data, error } = await getCompetition(id);
   if (error) return NextResponse.json({ error }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+  if (!canAccessCompetitionCategory(data.categorie, ctx)) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
   return NextResponse.json({ competition: data });
 }
 
