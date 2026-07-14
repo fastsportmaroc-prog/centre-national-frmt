@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   BookText,
   Landmark,
+  History,
+  Globe2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +54,11 @@ export const v2NavSections: V2NavSection[] = [
     id: "dashboard",
     items: [
       { href: `${V2_PREFIX}/dashboard`, label: "Tableau de bord", icon: LayoutDashboard },
+      {
+        href: `${V2_PREFIX}/classement-national-maroc`,
+        label: "Classement International",
+        icon: Globe2,
+      },
     ],
   },
   {
@@ -70,7 +77,7 @@ export const v2NavSections: V2NavSection[] = [
     separatorBefore: true,
     items: [
       { href: `${V2_PREFIX}/joueurs`, label: "Joueurs", icon: Users },
-      { href: `${V2_PREFIX}/programmation-joueurs`, label: "Programmation Joueurs", icon: CalendarDays },
+      { href: `${V2_PREFIX}/programmation-joueurs`, label: "Programmes", icon: CalendarDays },
       { href: `${V2_PREFIX}/entraineurs`, label: "Entraîneurs", icon: UserCog },
       { href: `${V2_PREFIX}/groupes`, label: "Groupes", icon: UsersRound },
     ],
@@ -95,6 +102,7 @@ export const v2NavSections: V2NavSection[] = [
     items: [
       { href: `${V2_PREFIX}/budget`, label: "Budget administratif", icon: Wallet },
       { href: `${V2_PREFIX}/rapports`, label: "Rapports", icon: FileText, badgeKey: "rapports" },
+      { href: `${V2_PREFIX}/historique`, label: "Historique", icon: History },
       { href: `${V2_PREFIX}/statistiques`, label: "Statistiques", icon: BarChart3 },
     ],
   },

@@ -1,0 +1,5 @@
+# Déploiement Edge Function sync-classements
+# Projet : kcwvqwvcyiiwalyvhvxz
+
+[functions.sync-classements]
+verify_jwt = false
