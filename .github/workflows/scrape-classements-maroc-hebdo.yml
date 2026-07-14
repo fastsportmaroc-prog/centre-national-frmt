@@ -1,0 +1,25 @@
+name: Scrape classements marocains (hebdo)
+
+on:
+  schedule:
+    # Lundi 21:00 UTC ≈ mardi 22h Maroc (été) / 22h lundi UTC+1 hiver
+    - cron: "0 21 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Install Chrome for Puppeteer (fallback ATP)
+        run: npx puppeteer browsers install chrome
+      - name: Scrape ATP/WTA → Supabase
+        run: node scripts/scrape-classements-maroc.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
